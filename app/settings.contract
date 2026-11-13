@@ -38,16 +38,19 @@ component SettingsScreen
   derive voiceLine = `${voiceName(voice)}${match settings.personalities.filter(p => p.id == settings.personality and p.id != "default").at(0) { case some(p) => ` · ${p.label}`, case none => "" }}`
   derive chosenColor = personaColor == "" ? "#FFFFFF" : personaColor
   action pickPersona(p: string)
-    haptic("selection")
+    if haptics
+      haptic("selection")
     setPersona(p)
   action pickSwatch(id: string)
-    haptic("selection")
+    if haptics
+      haptic("selection")
     if persona == "opal"
       setOpalPalette(id)
     else
       setPersonaColor(id)
   action pickReaction(r: string)
-    haptic("selection")
+    if haptics
+      haptic("selection")
     setReaction(r)
   view
     column navigationKey=`${entry.id}` navigationPresentation=(book ? "fullscreen" : "modal") navigationScroll="settings" position="absolute" inset=0 testId="settings"

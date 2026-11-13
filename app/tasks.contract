@@ -14,6 +14,8 @@ shape TabItem
 fn emptyWords(tab: string): string = tab == "needs" ? "Nothing waits on you" : tab == "working" ? "Nothing is working" : tab == "done" ? "Nothing done in the last day" : tab == "quiet" ? "Nothing is quiet" : "Nothing from hex yet"
 
 component TasksList
+  inject
+    haptics: bool
   props
     entry: Entry
     viewport: Viewport
@@ -69,7 +71,8 @@ component TasksList
     else
       open(path("task", homeOf(page, tasks.tasks)))
   action goThrough
-    haptic("selection")
+    if haptics
+      haptic("selection")
     talk("asks")
   view
     column navigationKey=`${entry.id}` navigationPresentation=(viewport.width < 700 ? "modal" : "push") navigationDetent=(inCall ? "medium large" : "large") navigationInitialDetent="large" navigationScroll="tasks-list" position="absolute" inset=0 testId="tasks"
@@ -84,14 +87,14 @@ component TasksList
             if not searching
               row role="tablist" aria-label="Stages" gap=6 padding="2px 16px 8px" overflow-x="auto" scrollbar-width="none"
                 for t, i in tabs key=t.id
-                  button press=pickTab(t.id) appearance="none" padding="6px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" flex-shrink=0 role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic="selection" transition="background-color 160ms ease" testId=`tab-${t.id}`
+                  button press=pickTab(t.id) appearance="none" padding="6px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" flex-shrink=0 role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic=(haptics ? "selection" : "none") transition="background-color 160ms ease" testId=`tab-${t.id}`
                     text t.label font="-exact-subheadline" font-weight=600 color=(tab == t.id ? "-exact-background" : "-exact-label") white-space="nowrap"
                     if t.id != "all"
                       text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(t.id == "needs" ? "hex.accent" : tab == t.id ? "-exact-background" : "-exact-secondary-label") opacity=(tab == t.id and t.id != "needs" ? 0.7 : 1)
             if failed and known
               text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 16px" testId="tasks-behind"
             if needsTab and picks.length > 1
-              link href=path("picks") -exact-press-haptic="selection" testId="open-picks"
+              link href=path("picks") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-picks"
                 Mark(state="pick", size=22)
                 text `hex picked for ${picks.length} questions` flex=1 font="-exact-body"
                 text "Take them" font="-exact-subheadline" color="hex.accent"
@@ -105,7 +108,7 @@ component TasksList
               else
                 ProjectRow(topic=t, now=now, offset=offset, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=split, selected=(split and beside == homeOf(pageOf(t), tasks.tasks)), select=select(homeOf(pageOf(t), tasks.tasks)))
             if needsTab and asks.check.at > 0
-              link href=path("check") -exact-press-haptic="selection" testId="open-check"
+              link href=path("check") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-check"
                 Mark(state="done", size=22)
                 column flex=1 min-width=0 gap=2
                   text `Checked ${whenOf(asks.check.at, now, offset)}` font="-exact-body"

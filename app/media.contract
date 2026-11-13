@@ -43,6 +43,8 @@ component Album
 
 // The "+" that adds a photo or video: a menu of Camera and Photos. `menu` names it on the screen.
 component AddMedia
+  inject
+    haptics: bool
   props
     menu: string
     label: string
@@ -52,7 +54,7 @@ component AddMedia
     add: action
   view
     row
-      button popovertarget=menu disabled=disabled appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial=(glass ? "glass" : "none") background-color=(glass ? "transparent" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" aria-label=label -exact-press-haptic="selection" testId=menu
+      button popovertarget=menu disabled=disabled appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial=(glass ? "glass" : "none") background-color=(glass ? "transparent" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" aria-label=label -exact-press-haptic=(haptics ? "selection" : "none") testId=menu
         image "symbol:sf/plus" width=(size * 0.38) height=(size * 0.38) object-fit="contain" color="-exact-label"
       column id=menu popover="auto" role="menu"
         button press=add("camera") popovertarget=menu popovertargetaction="hide" testId=`${menu}-camera`

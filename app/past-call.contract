@@ -26,6 +26,8 @@ fn sourceLine(source: string): string = source == "app" ? "You called from the a
 fn sourceSymbol(source: string): string = source == "app" ? "symbol:sf/iphone" : source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : source == "discord" ? "symbol:sf/headphones" : "symbol:sf/phone"
 
 component PastCall
+  inject
+    haptics: bool
   props
     entry: Entry
     viewport: Viewport
@@ -69,7 +71,7 @@ component PastCall
             text "Delete call"
       list id="past-call" appearance="none" flex=1 min-height=0 padding=`12px ${gutter}px 40px`
         if onCall
-          button press=home appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=8 padding="10px 0 14px" -exact-press-haptic="selection" testId="back-to-call"
+          button press=home appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=8 padding="10px 0 14px" -exact-press-haptic=(haptics ? "selection" : "none") testId="back-to-call"
             box width=7 height=7 border-radius=4 background-color="-exact-system-green" aria-hidden=true
             text "Back to your call" font="-exact-subheadline" font-weight=600 color="-exact-system-green"
         if not ready

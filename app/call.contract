@@ -114,9 +114,9 @@ component Home
         button press=open(path("calls")) class=Glass aria-label="Calls" testId="open-calls"
           image "symbol:sf/clock.arrow.circlepath"
         row backgroundMaterial="glass" border-radius=22 height=44 align-items="center" padding="0 4px" gap=2 position="relative"
-          button press=openTasks("") appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${counts.yours} need you, ${counts.working} working` -exact-press-haptic="selection" testId="open-tasks"
+          button press=openTasks("") appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${counts.yours} need you, ${counts.working} working` -exact-press-haptic=(haptics ? "selection" : "none") testId="open-tasks"
             image "symbol:list" width=20 height=20 object-fit="contain" color="-exact-label"
-          button press=open(path("settings")) appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" -exact-press-haptic="selection" testId="open-settings"
+          button press=open(path("settings")) appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
             image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
           if counts.yours > 0
             box position="absolute" top=-2 left=34 width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"

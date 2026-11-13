@@ -3,6 +3,8 @@
 use CallRow from "./shapes.contract"
 
 component WrapUp
+  inject
+    haptics: bool
   props
     call: CallRow
     whole: bool
@@ -20,7 +22,7 @@ component WrapUp
         button press=open(path("pastCall", call.id)) appearance="none" display="flex" flex-direction="column" align-items="center" width="100%" aria-label=`${call.title}. ${lead}` aria-description="Opens the call" testId="open-wrap-up"
           WrapBody(call=call, lead=lead, shown=shown, whole=false)
       if left > 0
-        button press=openTasks("needs") appearance="none" align-self=(whole ? "flex-start" : "center") -exact-press-haptic="selection" testId="wrap-up-more"
+        button press=openTasks("needs") appearance="none" align-self=(whole ? "flex-start" : "center") -exact-press-haptic=(haptics ? "selection" : "none") testId="wrap-up-more"
           text `${left} more in Tasks` font="-exact-footnote" font-weight=600 color="AccentColor"
 
 component WrapBody

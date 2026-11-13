@@ -11,6 +11,8 @@ use Said, unreached, failedWords from "./said.contract"
 fn evenRow(a: Ask): bool = a.options.length > 0 and a.options.length <= 3 and not a.multiple and a.options.filter(o => o.label.length > 14 or o.detail != "").length == 0
 
 component AskCard
+  inject
+    haptics: bool
   props
     ask: Ask
     now: number
@@ -39,7 +41,8 @@ component AskCard
   action choose(label: string)
     if ask.multiple
       chosen = chosen.includes(label) ? chosen.filter(c => c != label) : chosen.concat([label])
-      haptic("selection")
+      if haptics
+        haptic("selection")
     else
       answer(ask.id, label)
   action fold
@@ -57,14 +60,14 @@ component AskCard
                 text unreached(said.missed) font="-exact-footnote" color="hex.ask"
                 button press=again(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`card-again-${ask.id}`
                   text "Send again" font="-exact-footnote" font-weight=600
-          button press=undo(ask.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" aria-label=`Undo ${said.label}` testId=`card-undo-${ask.id}`
+          button press=undo(ask.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`card-undo-${ask.id}`
             text "Undo" font="-exact-subheadline" font-weight=600
       else
         row gap=8 align-items="center"
           text whenOf(ask.at, now, offset) font="-exact-footnote" color="-exact-secondary-label" font-variant-numeric="tabular-nums" flex=1
           if ask.tag != ""
             text ask.tag font="-exact-caption1" font-weight=600 color="hex.ask" padding="2px 8px" border-radius=999 background-color="hex.ask.wash"
-          button press=dismiss(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" testId=`ask-dismiss-${ask.id}`
+          button press=dismiss(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-dismiss-${ask.id}`
             text "Not needed" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
         button press=fold appearance="none" text-align="left" aria-expanded=(not folded) testId=`ask-fold-${ask.id}`
           text ask.question font="-exact-title3" font-weight=600 line-clamp=(folded ? 2 : 0)
@@ -93,17 +96,17 @@ component AskCard
               for o in shots key=o.label
                 column gap=6 align-items="center" width=(shotsTall * shapeOf(o.aspect)) flex-shrink=0
                   Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=(shotsTall * shapeOf(o.aspect)), square=false)
-                  button press=choose(o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-shot-${ask.id}-${o.label}`
+                  button press=choose(o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-shot-${ask.id}-${o.label}`
                     text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-footnote" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label") line-clamp=1
         if evenRow(ask)
           row gap=8
             for o in ask.options.filter(o => o.shot < 0) key=o.label
-              button press=choose(o.label) appearance="none" flex=1 min-width=0 padding="11px 8px" border-radius=12 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-option-${ask.id}-${o.label}`
+              button press=choose(o.label) appearance="none" flex=1 min-width=0 padding="11px 8px" border-radius=12 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-option-${ask.id}-${o.label}`
                 text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 text-align="center" color=(o.pick ? "hex.accent" : "-exact-label")
         else
           column border-top="0.5px solid -exact-separator"
             for o in ask.options.filter(o => o.shot < 0) key=o.label
-              button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`ask-option-${ask.id}-${o.label}`
+              button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`ask-option-${ask.id}-${o.label}`
                 if ask.multiple
                   image (chosen.includes(o.label) ? "symbol:select-fill" : "symbol:circle") width=22 height=22 object-fit="contain" color=(chosen.includes(o.label) ? "AccentColor" : "-exact-tertiary-label")
                 column flex=1 min-width=0 gap=2

@@ -28,6 +28,8 @@ fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.s
 fn retries(error: string): bool = error == "" or error.startsWith("Cannot reach hex")
 
 component Thread
+  inject
+    haptics: bool
   props
     entry: Entry
     viewport: Viewport
@@ -81,10 +83,12 @@ component Thread
       message(task.id, draft.trim())
       typed = ""
       started = true
-      haptic("selection")
+      if haptics
+        haptic("selection")
     else if task.running
       stop(task.id)
-      haptic("impact-medium")
+      if haptics
+        haptic("impact-medium")
   view
     column navigationKey=`${entry.id}` navigationScroll="thread" interactive-widget="resizes-content" position="absolute" inset=0 testId="thread"
       header display="flex" align-items="center"

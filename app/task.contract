@@ -321,6 +321,8 @@ component TaskBody
 // A section of the pinned post: its mark and title, its items with their own marks, links that
 // open, code in a box. Done sections start folded to "Title · N".
 component Pinned
+  inject
+    haptics: bool
   props
     section: PinSection
     first: bool
@@ -328,7 +330,8 @@ component Pinned
   derive folded = section.folded != flipped
   action fold
     flipped = not flipped
-    haptic("selection")
+    if haptics
+      haptic("selection")
   view
     section
       header

@@ -3,6 +3,8 @@
 use Viewport, Build from "./shapes.contract"
 
 component UpdateToast
+  inject
+    haptics: bool
   props
     build: Build
     skipped: number
@@ -22,7 +24,8 @@ component UpdateToast
   action install
     if step != "installing"
       step = "installing"
-      haptic("impact-medium")
+      if haptics
+        haptic("impact-medium")
       if live
         end()
       openURL(build.install, "update-install")

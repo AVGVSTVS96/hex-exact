@@ -16,6 +16,8 @@ fn tileHref(p: Place): string = p.call != "" ? `/calls/${encodeURIComponent(p.ca
 
 // A topic in the list: its mark, name, how many, when, and its newest headline.
 component ProjectRow
+  inject
+    haptics: bool
   props
     topic: Topic
     now: number
@@ -30,7 +32,7 @@ component ProjectRow
   derive mark = newest.stage == "needs" ? (newest.kind == "task" or newest.kind == "fresh" ? "needs" : newest.mark) : problem != "" ? "failed" : newest.stage == "working" ? "working" : newest.stage == "done" ? "done" : "idle"
   view
     if split
-      button press=select appearance="none" display="flex" text-align="left" padding="10px 12px" margin="0 -12px" border-radius=12 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic="selection" aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
+      button press=select appearance="none" display="flex" text-align="left" padding="10px 12px" margin="0 -12px" border-radius=12 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
         row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
           Mark(state=mark, size=22)
           column flex=1 min-width=0 gap=2
@@ -43,7 +45,7 @@ component ProjectRow
             if headline != topic.name
               text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
     else
-      link href=href -exact-press-haptic="selection" aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
+      link href=href -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
         row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
           Mark(state=mark, size=22)
           column flex=1 min-width=0 gap=2
@@ -70,6 +72,8 @@ component TopicHead
 
 // One entry: an ask, a thread, a stuck run, a fresh result or a finished thing.
 component EntryRow
+  inject
+    haptics: bool
   props
     entry: Item
     asks: Ask[]
@@ -103,7 +107,7 @@ component EntryRow
     else
       scroll swipeContent=`${entry.id}-row` swipeLeading=(lead != "" ? `${entry.id}-lead` : "") swipeTrailing=`${entry.kind == "ask" ? `${entry.id}-away ` : ""}${range(opens.length).map(i => `${entry.id}-tile-${i}`).join(" ")}` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" padding-right=0 testId=`entry-${entry.id}`
         if lead != ""
-          button id=`${entry.id}-lead` press=leading accent-color="hex.accent.solid" flex-shrink=0 scroll-snap-align="start" -exact-press-haptic="selection" testId=`lead-${entry.id}`
+          button id=`${entry.id}-lead` press=leading accent-color="hex.accent.solid" flex-shrink=0 scroll-snap-align="start" -exact-press-haptic=(haptics ? "selection" : "none") testId=`lead-${entry.id}`
             image "symbol:checkmark"
             text lead
         row id=`${entry.id}-row` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box" gap=12 align-items="flex-start" padding="10px 16px" press=openPage(entry.page != "" ? entry.page : `topic:${entry.topic}`)
@@ -126,12 +130,12 @@ component EntryRow
                 if inline(a)
                   row gap=8 flex-wrap="wrap" padding-top=4
                     for o in a.options key=o.label
-                      button press=answer(a.id, o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`inline-${a.id}-${o.label}`
+                      button press=answer(a.id, o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`inline-${a.id}-${o.label}`
                         text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
               case none
                 if entry.action != ""
                   row padding-top=4
-                    button press=leading disabled=entry.sent appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" testId=`act-${entry.id}`
+                    button press=leading disabled=entry.sent appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId=`act-${entry.id}`
                       text (entry.kind == "stuck" and entry.sent ? "Sent to hex" : entry.action) font="-exact-subheadline" font-weight=600
                 else if entry.kind == "stuck" and entry.sent
                   text "Sent to hex" font="-exact-footnote" color="-exact-secondary-label"
@@ -148,6 +152,8 @@ component EntryRow
 
 // An ask put away here: what was said, where it went, and Undo.
 component Folded
+  inject
+    haptics: bool
   props
     said: Said
     question: string
@@ -165,5 +171,5 @@ component Folded
             text unreached(said.missed) font="-exact-footnote" color="hex.ask"
             button press=again(said.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`again-${said.id}`
               text "Send again" font="-exact-footnote" font-weight=600
-      button press=undo(said.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
+      button press=undo(said.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
         text "Undo" font="-exact-subheadline" font-weight=600

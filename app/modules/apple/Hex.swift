@@ -116,7 +116,7 @@ final class OrbInstance: ExactNativeInstance {
   override var view: ExactNativeView { orb }
 
   override func setProps(_ props: [String: String]) throws {
-    let reaction = ["off": 0, "lively": 0.16][props["reaction"] ?? ""] ?? 0.07
+    let reaction: CGFloat = (["off": 0, "lively": 0.16] as [String: CGFloat])[props["reaction"] ?? ""] ?? 0.07
     orb.configure(
       status: props["state"] ?? "idle", silenced: props["silenced"] == "true",
       persona: personas.contains(props["persona"] ?? "") ? props["persona"]! : "opal",

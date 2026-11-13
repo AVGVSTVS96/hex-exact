@@ -1,4 +1,5 @@
-// Your words (§10): a short note on how hex should talk, saved when the sheet closes.
+// Your words (§10): a short note on how hex should talk, for every call. Saved with Done, and when
+// the field lets go (the sheet swiped away).
 component YourWords
   props
     entry: Entry
@@ -10,14 +11,17 @@ component YourWords
   action edit(v: string)
     draft = v
     touched = true
+  action save(value: string)
+    if value.trim() != words
+      set("words", value.trim())
   action done
     if touched
-      set("words", draft.trim())
+      save(draft)
     back()
   view
-    column navigationKey=`${entry.id}` navigationPresentation="modal" navigationDetent="medium" position="absolute" inset=0 testId="words"
-      header display="flex" align-items="center"
+    column navigationKey=`${entry.id}` navigationPresentation="modal" navigationDetent="260" position="absolute" inset=0 testId="words"
+      header
         text "Your words" role="heading" aria-level=2
         button id="back" press=done buttonStyle="bordered-prominent" aria-label="Done" testId="words-done"
           image "symbol:checkmark"
-      textarea value=(touched ? draft : words) input=edit maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." margin=16 flex=1 aria-label="Your words" autofocus=true testId="words-field"
+      textarea value=(touched ? draft : words) input=edit change=save maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="4px 20px 20px" flex=1 font="-exact-body" aria-label="Your words" autofocus=true testId="words-field"

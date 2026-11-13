@@ -1,0 +1,47 @@
+// The update toast (§11): a new build of hex Exact is on its install link. Install opens it there
+// (ending the call first); "Not now" hides it until the build after.
+use Viewport, Build from "./shapes.contract"
+
+component UpdateToast
+  props
+    build: Build
+    skipped: number
+    visible: bool
+    live: bool
+    place: string
+    viewport: Viewport
+    skip: action
+    end: action
+  // ready | installing | failed. The root rebuilds the toast when the app comes back to the front,
+  // so an install that didn't happen is offered again.
+  state step = "ready"
+  derive shown = build.running > 0 and build.latest > build.running and build.latest != skipped and build.install != ""
+  derive book = viewport.horizontalViewportSegments == 2
+  derive atTop = place == "home"
+  derive lift = place == "tasks" ? 72 : 12
+  action install
+    if step != "installing"
+      step = "installing"
+      haptic("impact-medium")
+      if live
+        end()
+      openURL(build.install, "update-install")
+  action heard(how: string)
+    if how == "failed"
+      step = "failed"
+  view
+    if shown
+      row position="absolute" top=(atTop ? `${viewport.safeAreaTop + 60}px` : "auto") bottom=(atTop ? "auto" : `${max(viewport.safeAreaBottom, 12) + lift}px`) left=0 width=(book ? "env(viewport-segment-width 0 0)" : "100%") justify-content="center" z-index=3 pointer-events="none" testId="update-toast"
+        row pointer-events="auto" backgroundMaterial="glass" border-radius=999 height=48 align-items="center" box-shadow="0 6px 24px rgba(0,0,0,0.18)"
+          button id="update-install" press=install change=heard appearance="none" height=48 padding=(step == "installing" ? "0 18px" : "0 6px 0 16px") display="flex" flex-direction="row" align-items="center" gap=8 aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
+            if step == "installing"
+              progress width=16 height=16 aria-label="Installing"
+              text "Installing" font="-exact-headline" color="-exact-label"
+              text `build ${build.latest}` font="-exact-subheadline" color="-exact-secondary-label"
+            else
+              image "symbol:sf/arrow.down.circle" width=20 height=20 object-fit="contain" color="AccentColor" aria-hidden=true
+              text (step == "failed" ? "Install didn't start" : "Update ready") font="-exact-subheadline" color="-exact-label" white-space="nowrap"
+              text (step == "failed" ? "Try again" : live ? "End call & install" : "Install") font="-exact-headline" color="AccentColor" white-space="nowrap"
+          if step != "installing"
+            button press=skip(build.latest) appearance="none" width=44 height=48 display="flex" align-items="center" justify-content="center" aria-label="Not now" testId="update-dismiss"
+              image "symbol:close" width=12 height=12 object-fit="contain" color="-exact-secondary-label" aria-hidden=true

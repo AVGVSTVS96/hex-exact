@@ -60,3 +60,13 @@ component PlaceTile
   view
     box width=size height=size border-radius=(size * 0.28) flex-shrink=0 position="relative" background-color=(place.link == "" ? "transparent" : appTint(place.app)) border=(place.link == "" ? "1px solid -exact-separator" : "none")
       image appSymbol(place.app) position="absolute" inset=0 margin="auto" width=(size * 0.48) height=(size * 0.48) object-fit="contain" color=(place.link == "" ? "-exact-secondary-label" : "#FFFFFF") aria-hidden=true
+
+// One of a few things to pick from, with a line under it (a persona, a voice).
+shape Option
+  id: string
+  label: string
+  detail: string
+
+// hex's faces. Opal has palettes of its own; Mana keeps its own colour; the rest take the colour picked.
+fn personas(): Option[] = [Option(id="obsidian", label="Obsidian", detail="Shifting silver"), Option(id="mana", label="Mana", detail="Soft blue light"), Option(id="opal", label="Opal", detail="Flowing color"), Option(id="halo", label="Halo", detail="A ring of light"), Option(id="glint", label="Glint", detail="A pair of stars"), Option(id="command", label="Command", detail="A simple slash")]
+fn paletteColor(id: string): string = id == "2" ? "#E5484D" : id == "3" ? "#F07B3F" : id == "4" ? "#E8C547" : id == "5" ? "#46B96C" : id == "6" ? "#2FB5AD" : id == "7" ? "#4562DA" : id == "8" ? "#9B4DD6" : id == "9" ? "#DE4FA6" : ""

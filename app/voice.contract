@@ -1,6 +1,35 @@
-// Voice (§10, second page): which of hex's voices answers, its personality and pace, and Bassim's
-// own words on how it should talk. Kept on hex, so every call hears them, phone calls too.
+// Voice (§10, second page): which of hex's voices answers (swipe to hear each), its personality and
+// pace, and Bassim's own words on how it should talk. Kept on hex, so every call hears them, phone
+// calls too. The voice can't change mid-call.
 use Viewport, Settings from "./shapes.contract"
+use Option from "./parts.contract"
+use Pager from "./settings.contract"
+
+sound "assets/voices/alloy.wav"
+sound "assets/voices/ash.wav"
+sound "assets/voices/ballad.wav"
+sound "assets/voices/beacon.wav"
+sound "assets/voices/bossa.wav"
+sound "assets/voices/cedar.wav"
+sound "assets/voices/cinder.wav"
+sound "assets/voices/coral.wav"
+sound "assets/voices/delta.wav"
+sound "assets/voices/echo.wav"
+sound "assets/voices/gleam.wav"
+sound "assets/voices/marin.wav"
+sound "assets/voices/meridian.wav"
+sound "assets/voices/quartz.wav"
+sound "assets/voices/ripple.wav"
+sound "assets/voices/sage.wav"
+sound "assets/voices/shimmer.wav"
+sound "assets/voices/stone.wav"
+sound "assets/voices/tempo.wav"
+sound "assets/voices/verse.wav"
+sound "assets/voices/vesper.wav"
+sound "assets/voices/willow.wav"
+
+// The Live API's voices, Marin first, each with its accent where it has one.
+fn voices(): Option[] = [Option(id="marin", label="Marin", detail=""), Option(id="alloy", label="Alloy", detail=""), Option(id="ash", label="Ash", detail=""), Option(id="ballad", label="Ballad", detail=""), Option(id="beacon", label="Beacon", detail="Filipino English"), Option(id="bossa", label="Bossa", detail="Brazilian Portuguese"), Option(id="cedar", label="Cedar", detail=""), Option(id="cinder", label="Cinder", detail="Southern U.S. English"), Option(id="coral", label="Coral", detail=""), Option(id="delta", label="Delta", detail="Southern U.S. English"), Option(id="echo", label="Echo", detail=""), Option(id="gleam", label="Gleam", detail="North American English"), Option(id="meridian", label="Meridian", detail="North American English"), Option(id="quartz", label="Quartz", detail="Australian English"), Option(id="ripple", label="Ripple", detail="Australian English"), Option(id="sage", label="Sage", detail=""), Option(id="shimmer", label="Shimmer", detail=""), Option(id="stone", label="Stone", detail="Irish English"), Option(id="tempo", label="Tempo", detail="Brazilian Portuguese"), Option(id="verse", label="Verse", detail=""), Option(id="vesper", label="Vesper", detail="British English"), Option(id="willow", label="Willow", detail="Irish English")].map(v => Option(v, detail=(v.detail == "" ? "Swipe to hear each voice" : v.detail)))
 
 component VoicePage
   props
@@ -11,39 +40,65 @@ component VoicePage
     inCall: bool
     loading: bool
     failed: bool
+    unsaved: bool
     set: action
     open: action
     back: action
-  derive voices = ["alloy", "ash", "ballad", "beacon", "bossa", "cedar", "cinder", "coral", "delta", "echo", "gleam", "marin", "meridian", "quartz", "ripple", "sage", "shimmer", "stone", "tempo", "verse", "vesper", "willow"]
+  derive book = viewport.horizontalViewportSegments == 2
+  derive paneWidth = book ? viewport.width / 2 - 40 : min(viewport.width - 64, 420)
   derive chosen = settings.voice != "" ? settings.voice : voice
+  derive locked = inCall or (loading and settings.voice == "")
+  derive personality = settings.personality != "" ? settings.personality : "default"
+  derive pace = settings.pace != "" ? settings.pace : "normal"
+  action choose(id: string)
+    haptic("selection")
+    set("voice", id)
+    playSound(`assets/voices/${id}.wav`, group="preview")
+  action hear(id: string)
+    if id == chosen
+      playSound(`assets/voices/${id}.wav`, group="preview")
+    else
+      choose(id)
+  action pickPace(p: string)
+    haptic("selection")
+    set("pace", p)
+  action pickPersonality(p: string)
+    haptic("selection")
+    set("personality", p)
   view
     column navigationKey=`${entry.id}` navigationScroll="voice" position="absolute" inset=0 testId="voice"
-      header display="flex" align-items="center"
+      header
         text "Voice" role="heading" aria-level=2
-      list id="voice" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        section
-          row
-            text "Voice" flex=1
-            select value=chosen change=set("voice") disabled=inCall aria-label="Voice" testId="voice-pick"
-              for v in voices key=v
-                option value=v
-                  text `${v.slice(0, 1).toUpperCase()}${v.slice(1)}`
-          if inCall
-            text "End the conversation to change voices." font="-exact-footnote" color="-exact-secondary-label"
-          row
-            text "Personality" flex=1
-            select value=settings.personality change=set("personality") aria-label="Personality" testId="personality"
-              for p in settings.personalities key=p.id
-                option value=p.id
-                  text p.label
-          row
-            text "Pace" flex=1
-            select value=settings.pace change=set("pace") aria-label="Pace" testId="pace"
-              for p in settings.paces key=p.id
-                option value=p.id
-                  text p.label
-          link href=path("words") testId="open-words"
-            text "Your words" flex=1
-            text (settings.words == "" ? "None" : settings.words) color="-exact-secondary-label" max-width="55%" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-          footer
-            text (failed ? "Can't reach hex right now." : "For every call, phone calls too.") color=(failed ? "-exact-system-red" : "-exact-secondary-label")
+      row flex=1 min-height=0
+        if book
+          column width="env(viewport-segment-width 0 0)" flex-shrink=0 align-items="center" justify-content="center" gap=18 padding-bottom=40 testId="voice-pane"
+            image "symbol:waveform" width=56 height=56 object-fit="contain" color="AccentColor" aria-hidden=true
+            Pager(options=voices(), value=chosen, pick=choose, replay=hear, width=paneWidth, locked=locked, note=(inCall ? "End the conversation to change voices." : "Loading your voice…"), label="Voice", testKey="voice")
+          box width="calc(env(viewport-segment-left 1 0) - env(viewport-segment-width 0 0))" flex-shrink=0
+        list id="voice" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+          if not book
+            section
+              column align-items="center" gap=12 padding="14px 0 8px" testId="voice-carousel"
+                image "symbol:waveform" width=34 height=34 object-fit="contain" color="AccentColor" aria-hidden=true
+                Pager(options=voices(), value=chosen, pick=choose, replay=hear, width=paneWidth, locked=locked, note=(inCall ? "End the conversation to change voices." : "Loading your voice…"), label="Voice", testKey="voice")
+          section
+            row gap=12 align-items="center"
+              image "symbol:sf/person.wave.2" width=20 height=20 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              text "Personality" flex=1
+              select value=personality change=pickPersonality disabled=(settings.personalities.length == 0) aria-label="How hex comes across on calls" testId="personality"
+                for p in settings.personalities key=p.id
+                  option value=p.id
+                    text p.label
+            row gap=12 align-items="center"
+              image "symbol:sf/speedometer" width=20 height=20 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              text "Pace" flex=1
+              row role="radiogroup" aria-label="How fast hex talks on calls" width="14rem" flex-shrink=0 testId="pace"
+                for p in settings.paces key=p.id
+                  button role="radio" aria-checked=(pace == p.id) press=pickPace(p.id) flex=1 testId=`pace-${p.id}`
+                    text p.label
+            link href=path("words") aria-label=(settings.words == "" ? "Tell hex how to talk, in your words" : `Your words: ${settings.words}`) testId="open-words"
+              image "symbol:sf/text.quote" width=20 height=20 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              text "Your words" flex-shrink=0
+              text (settings.words == "" ? "None" : settings.words) color="-exact-secondary-label" flex=1 min-width=0 text-align="right" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+            footer
+              text (failed ? "Can't reach hex right now." : unsaved ? "hex didn't save that. Try again." : "For every call, phone calls too.") color=(failed or unsaved ? "-exact-system-red" : "-exact-secondary-label") testId="voice-note"

@@ -2,7 +2,7 @@
 // call, Siri and the Live Activity; this root holds everything the screens read and write, as
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
-use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build from "./shapes.contract"
+use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page from "./shapes.contract"
 use Home from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
@@ -16,6 +16,8 @@ use LastCheck from "./last-check.contract"
 use SettingsScreen from "./settings.contract"
 use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
+use UpdateToast from "./toast.contract"
+use paletteColor from "./parts.contract"
 
 // Every screen and sheet. Home is the call; the rest open over it. hexexact://go/<path> opens any
 // of them from outside (Siri, scripts/sim).
@@ -40,9 +42,12 @@ component App
   state voice = "marin" persist
   state persona = "opal" persist
   state personaColor = "" persist
+  state opalPalette = "original" persist
   state reaction = "subtle" persist
   state sounds = true persist
   state haptics = true persist
+  // The build Bassim said "Not now" to; the toast comes back for the next one.
+  state skippedBuild = 0 persist
   // The Tasks tab: all | needs | working | done | quiet ("" until Bassim picks one: Needs if anything
   // needs him, else Working).
   state tab = ""
@@ -69,8 +74,10 @@ component App
   resource tasks = watchTasks() as shape Tasks else empty()
   resource asks = watchAsks() as shape Asks else empty()
 
-  // The newest build on the install link, for the update toast.
-  resource build = checkBuild() as shape Build else empty()
+  // The newest build on the install link, for the update toast, asked again each time the app
+  // comes to the front.
+  resource page = exactPage() as shape Page
+  resource build = checkBuild() when page.visibilityState == "visible" as shape Build else empty()
 
   // What the open screens show; asked only while they are open.
   derive names = stack(nav).map(e => e.name)
@@ -106,6 +113,9 @@ component App
   derive now = clock.epochAtZero + tick
   // Nothing attached: what a send carries until the camera and Photos attach media ids from POST /media.
   derive noMedia = [""].slice(0, 0)
+  // How the orb is tinted: Opal by its palette, Mana by its own colour, the rest by the colour picked.
+  derive orbTint = persona == "opal" ? paletteColor(opalPalette) : persona == "mana" ? "" : (personaColor == "" ? "#FFFFFF" : personaColor)
+  derive removeError = pending(removed) ? "" : match removed { case some(r) => r.error, case none => "" }
 
   task minute mount
     every(60000, ticked)
@@ -177,6 +187,7 @@ component App
   // Calls
   action removeCall(id: string)
     removing = id
+    haptic("impact-medium")
     send removed = removeCall(id)
 
   // Settings, on hex (voice, personality, pace, words) and on this phone
@@ -194,16 +205,30 @@ component App
     sounds = on
   action setHaptics(on: bool)
     haptics = on
+  action setOpalPalette(p: string)
+    opalPalette = p
+  action skipBuild(n: number)
+    skippedBuild = n
+
+  // The voice is hex's, for every call: the phone follows it, and gives hex its own when hex has none.
+  task voiceFromHex when settings.voice != "" and settings.voice != voice key=settings.voice
+    after(1, takeVoice)
+  task voiceToHex when current(settings) and settings.voice == "" key=voice
+    after(1, giveVoice)
+  action takeVoice
+    voice = settings.voice
+  action giveVoice
+    send saved = saveSetting("voice", voice)
 
   view
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, persona=persona, personaColor=personaColor, start=startCall(""), mute=toggleMute, end=endCall, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answering=answering)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, persona=persona, personaColor=orbTint, start=startCall(""), mute=toggleMute, end=endCall, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answering=answering)
         if e.name == "calls"
-          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, failed=failed(calls), open=open, remove=removeCall, removing=removing, back=back)
+          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(calls)), failed=failed(calls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"
-          PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, openTasks=openTasks, open=open, remove=removeCall, back=back)
+          PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
           TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, back=back)
         if e.name == "task"
@@ -219,8 +244,12 @@ component App
         if e.name == "check"
           LastCheck(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
         if e.name == "settings"
-          SettingsScreen(entry=e, viewport=viewport, settings=settings, persona=persona, personaColor=personaColor, reaction=reaction, sounds=sounds, haptics=haptics, setPersona=setPersona, setPersonaColor=setPersonaColor, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, open=open, back=back)
+          SettingsScreen(entry=e, viewport=viewport, settings=settings, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, tint=orbTint, reaction=reaction, sounds=sounds, haptics=haptics, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, open=open, back=back)
         if e.name == "voice"
-          VoicePage(entry=e, viewport=viewport, settings=settings, voice=voice, inCall=(call.status != "idle"), loading=(not current(settings)), failed=(failed(settings) or failed(saved)), set=setSetting, open=open, back=back)
+          VoicePage(entry=e, viewport=viewport, settings=settings, voice=voice, inCall=(call.status != "idle"), loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), set=setSetting, open=open, back=back)
         if e.name == "words"
           YourWords(entry=e, words=settings.words, set=setSetting, back=back)
+      // Over every screen: a new build is on the install link. Keyed by whether the app is in front,
+      // so coming back from an install that didn't happen offers it again.
+      for v in [page.visibilityState] key=v
+        UpdateToast(build=build, skipped=skippedBuild, visible=(page.visibilityState == "visible"), live=(call.status != "idle"), place=place.name, viewport=viewport, skip=skipBuild, end=endCall)

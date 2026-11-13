@@ -1,10 +1,28 @@
-// A past call (§5–6): its wrap-up, then everything said, with the tasks it started and what
+// A past call (§5–6): its wrap-up, then everything said in order, with the tasks it started and what
 // happened along the way, and how it ended. The live call opens here too, following as it goes.
-use Viewport, CallRecord, Turn from "./shapes.contract"
-use whenOf, lengthOf, endingOf, badEnding from "./parts.contract"
+use Viewport, CallRecord, CallTask from "./shapes.contract"
+use lengthOf, endingOf, badEnding from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 
-fn clockOf(ms: number): string = `${floor(ms / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}`
+// One thing in the call's timeline. kind: turn | task | mark | media. who: you | voice (a turn).
+// state: running | done | failed (a task), else the mark's or media's kind.
+shape Beat
+  key: string
+  at: number
+  kind: string
+  who: string
+  text: string
+  state: string
+
+fn clockOf(ms: number): string = ms >= 3600000 ? `${floor(ms / 3600000)}:${floor((ms % 3600000) / 60000) < 10 ? "0" : ""}${floor((ms % 3600000) / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}` : `${floor(ms / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}`
+fn shownMark(kind: string): bool = ["paused", "resumed", "warned", "muted", "unmuted", "stopped"].includes(kind)
+fn markSymbol(kind: string): string = kind == "paused" ? "symbol:sf/pause.circle" : kind == "resumed" ? "symbol:sf/play.circle" : kind == "warned" ? "symbol:sf/timer" : kind == "muted" ? "symbol:sf/speaker.slash" : kind == "unmuted" ? "symbol:sf/speaker.wave.2" : kind == "stopped" ? "symbol:sf/stop.circle" : kind == "video" ? "symbol:sf/video" : "symbol:sf/photo"
+// A task's latest state, at the moment it started.
+fn stateOf(tasks: CallTask[], id: string): string = match tasks.filter(t => t.id == id).at(-1) { case some(t) => t.state, case none => "done" }
+fn beatsOf(r: CallRecord): Beat[] = sortBy(r.turns.map((t, i) => Beat(key=`turn-${i}`, at=t.at, kind="turn", who=t.who, text=t.text, state="")).concat(r.tasks.filter((t, i) => r.tasks.map(x => x.id).indexOf(t.id) == i).map(t => Beat(key=`task-${t.id}`, at=t.at, kind="task", who="", text=t.text, state=stateOf(r.tasks, t.id)))).concat(r.moments.filter(m => shownMark(m.kind)).map((m, i) => Beat(key=`mark-${i}`, at=m.at, kind="mark", who="", text=m.text, state=m.kind))).concat(r.moments.filter(m => m.media != "" and (m.kind == "photo" or m.kind == "video")).map(m => Beat(key=`media-${m.media}`, at=m.at, kind="media", who="you", text=(m.kind == "video" ? "You shared a video" : "You shared a photo"), state=m.kind))), b => b.at)
+fn beatText(b: Beat): string = b.kind == "turn" ? `${b.who == "you" ? "You" : "hex"}: ${b.text}` : b.kind == "media" ? `You: (${b.state})` : `[${b.text}]`
+fn sourceLine(source: string): string = source == "app" ? "You called from the app" : source == "web" ? "You called from the web page" : source == "phone-in" ? "You called hex" : source == "phone-out" ? "hex called you" : source == "discord" ? "You called from Discord" : "A call with hex"
+fn sourceSymbol(source: string): string = source == "app" ? "symbol:sf/iphone" : source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : source == "discord" ? "symbol:sf/headphones" : "symbol:sf/phone"
 
 component PastCall
   props
@@ -16,36 +34,76 @@ component PastCall
     loading: bool
     failed: bool
     live: bool
+    onCall: bool
     openTasks: action
     open: action
     remove: action
+    home: action
     back: action
   derive c = record.call
+  derive ready = c.id != "" and c.id == entry.params.id
   derive name = c.title != "" ? c.title : c.preview != "" ? c.preview : "A quiet call"
+  derive beats = beatsOf(record)
+  derive gutter = max(20, (viewport.width - 680) / 2)
+  derive transcript = [c.summary].concat(c.waiting.length > 0 ? [`Waiting on you:\n${c.waiting.map(w => `- ${w}`).join("\n")}`] : []).concat(beats.map(b => beatText(b))).filter(t => t != "").join("\n\n")
+  action shareCall
+    share(title=name, text=transcript)
+  action delete
+    remove(c.id)
+    back()
   view
     column navigationKey=`${entry.id}` navigationScroll="past-call" position="absolute" inset=0 testId="past-call"
-      header display="flex" align-items="center"
-        text name role="heading" aria-level=2
-        text (live ? "Live now" : `${whenOf(c.started, now, offset)} · ${lengthOf(c.seconds)}`)
-      list id="past-call" appearance="none" flex=1 min-height=0 padding="8px 20px 32px"
-        if loading and c.id == ""
-          progress aria-label="Loading the call" margin="40px auto"
-        if failed and c.id == ""
-          text "hex didn't answer, so this call can't open yet." color="-exact-secondary-label" text-align="center" padding="40px 0" testId="past-call-failed"
-        if c.id != ""
-          text `You called from the ${c.source == "app" ? "app" : c.source} · ${whenOf(c.started, now, offset)}` font="-exact-footnote" color="-exact-secondary-label" padding-bottom=12
-          if c.title != "" or c.summary != ""
-            box padding-bottom=16
-              WrapUp(call=c, whole=true, more=0, openTasks=openTasks, open=open)
-          for t, i in record.turns key=`${i}`
-            row justify-content=(t.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
-              text t.text user-select="text" max-width=(t.who == "you" ? "82%" : "100%") color=(t.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(t.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(t.who == "you" ? "-exact-tertiary-fill" : "transparent")
-          for k in record.tasks key=k.id
-            row gap=8 padding="6px 0" align-items="center"
-              image (k.state == "done" ? "symbol:select-fill" : k.state == "failed" ? "symbol:alert-fill" : "symbol:sf/circle.dotted") width=14 height=14 object-fit="contain" color=(k.state == "failed" ? "-exact-system-red" : k.state == "done" ? "-exact-system-green" : "-exact-system-teal") aria-hidden=true
-              text k.text font="-exact-footnote" flex=1
-              text clockOf(k.at) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
-          if c.ended > 0
-            row gap=8 padding="16px 0 0" align-items="center" justify-content="center"
-              image "symbol:sf/phone.down.fill" width=14 height=14 object-fit="contain" color=(badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label") aria-hidden=true
-              text `${endingOf(c.ending)} · ${clockOf(c.seconds * 1000)}` font="-exact-footnote" color=(badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label")
+      header
+        text (ready ? name : "Call") role="heading" aria-level=2 testId="past-call-name"
+        text (not ready ? "" : live ? "Live now" : `${formatDay(c.started, now, offset, "day")}, ${formatTime(c.started, offset, "short")} · ${lengthOf(c.seconds)}`)
+        button popovertarget="call-menu" disabled=(not ready) aria-label="Call actions" testId="call-menu"
+          image "symbol:more"
+      column id="call-menu" popover="auto" role="menu"
+        button press=shareCall popovertarget="call-menu" popovertargetaction="hide" testId="share-call"
+          image "symbol:share"
+          text "Share transcript"
+        if not live
+          button press=delete destructive=true popovertarget="call-menu" popovertargetaction="hide" testId="delete-call"
+            image "symbol:delete"
+            text "Delete call"
+      list id="past-call" appearance="none" flex=1 min-height=0 padding=`12px ${gutter}px 40px`
+        if onCall
+          button press=home appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=8 padding="10px 0 14px" -exact-press-haptic="selection" testId="back-to-call"
+            box width=7 height=7 border-radius=4 background-color="-exact-system-green" aria-hidden=true
+            text "Back to your call" font="-exact-subheadline" font-weight=600 color="-exact-system-green"
+        if not ready
+          if failed
+            column gap=6 align-items="center" padding="64px 12px" text-align="center" testId="past-call-failed"
+              image "symbol:sf/wifi.exclamationmark" width=30 height=30 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+              text "hex didn't answer, so this call can't open yet." color="-exact-secondary-label"
+          else
+            progress aria-label="Loading the call" margin="64px auto"
+        else
+          column gap=18
+            row gap=6 align-items="center" justify-content="center" testId="past-call-source"
+              image sourceSymbol(c.source) width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              text `${sourceLine(c.source)} · ${formatTime(c.started, offset, "short")}` font="-exact-footnote" color="-exact-secondary-label"
+            if c.summary != "" or c.why != "" or c.waiting.length > 0
+              column class=WrapCard
+                WrapUp(call=c, whole=true, more=0, openTasks=openTasks, open=open)
+            for b in beats key=b.key
+              if b.kind == "turn"
+                row justify-content=(b.who == "you" ? "flex-end" : "flex-start")
+                  text b.text user-select="text" max-width=(b.who == "you" ? "82%" : "100%") font="-exact-body" color=(b.who == "you" ? "-exact-label" : "-exact-label") padding=(b.who == "you" ? "9px 14px" : "0") border-radius=20 background-color=(b.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word"
+              if b.kind == "task"
+                row gap=12 align-items="flex-start" testId=`call-task-${b.key}`
+                  box width=22 height=22 border-radius=11 flex-shrink=0 position="relative" background-color=(b.state == "failed" ? "-exact-system-red" : b.state == "running" ? "-exact-system-teal" : "-exact-tertiary-fill") opacity=(b.state == "done" ? 1 : 0.2)
+                  image (b.state == "failed" ? "symbol:sf/exclamationmark" : b.state == "running" ? "symbol:sf/circle.dotted" : "symbol:checkmark") position="absolute" width=11 height=11 margin="5.5px" object-fit="contain" color=(b.state == "failed" ? "-exact-system-red" : b.state == "running" ? "-exact-system-teal" : "-exact-secondary-label") aria-hidden=true
+                  text b.text font="-exact-subheadline" font-weight=500 flex=1 min-width=0 user-select="text" padding-top=1
+                  text clockOf(b.at) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" padding-top=3
+              if b.kind == "mark" or b.kind == "media"
+                row gap=6 align-items="center" justify-content="center"
+                  image markSymbol(b.state) width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                  text `${b.text} · ${clockOf(b.at)}` font="-exact-footnote" color="-exact-secondary-label"
+            if c.ended > 0 and not live
+              row gap=6 align-items="center" justify-content="center" padding-top=6 testId="past-call-ending"
+                image "symbol:sf/phone.down" width=13 height=13 object-fit="contain" color=(badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label") aria-hidden=true
+                text `${endingOf(c.ending) != "" ? endingOf(c.ending) : "The call ended"} · ${clockOf(c.seconds * 1000)}` font="-exact-footnote" color=(badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label")
+
+style WrapCard
+  background-color="-exact-secondary-background" border-radius=22 padding=16

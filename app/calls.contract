@@ -1,12 +1,18 @@
 // Calls (§5): every call with hex, newest first, grouped by day. A row opens the call; swiping one
-// away deletes it (not the live one).
+// away deletes it (not the live one), and a delete hex refuses puts the row back with why.
 use Viewport, Calls, CallRow from "./shapes.contract"
-use whenOf, lengthOf, endingOf, badEnding from "./parts.contract"
+use lengthOf from "./parts.contract"
 
 fn dayOf(at: number, now: number, offset: number): string = formatDate(at, offset, "iso") == formatDate(now, offset, "iso") ? "Today" : formatDate(at, offset, "iso") == formatDate(now - 86400000, offset, "iso") ? "Yesterday" : "Earlier"
 fn nameOf(c: CallRow): string = c.title != "" ? c.title : c.preview != "" ? c.preview : "A quiet call"
-fn metaOf(c: CallRow, now: number): string = c.live ? "Live now" : `${lengthOf(c.seconds)}${c.tasks > 0 ? ` · ${c.tasks} ${c.tasks == 1 ? "task" : "tasks"}` : ""}${c.title == "" and now - c.ended < 600000 ? " · naming…" : ""}${endingOf(c.ending) != "" and c.ending != "you" ? ` · ${endingOf(c.ending)}` : ""}`
-fn sourceSymbol(source: string): string = source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : "symbol:sf/headphones"
+// The time of day for today and yesterday (their headers say which), else the weekday or date.
+fn timeOf(c: CallRow, now: number, offset: number): string = c.live ? "Now" : dayOf(c.started, now, offset) == "Earlier" ? formatDay(c.started, now, offset, "list") : formatTime(c.started, offset, "short")
+fn naming(c: CallRow, now: number): bool = c.title == "" and c.ended > 0 and now - c.ended < 600000
+fn detailOf(c: CallRow, now: number): string = `${lengthOf(c.seconds)}${naming(c, now) ? " · naming…" : c.tasks > 0 ? ` · ${c.tasks} ${c.tasks == 1 ? "task" : "tasks"}` : ""}`
+// How a call ended, short, where it wasn't simply hung up by Bassim.
+fn endShort(kind: string): string = kind == "hex" ? "hex hung up" : kind == "dropped" ? "Dropped" : kind == "expired" ? "Time ran out" : kind == "no-connect" ? "Didn't connect" : kind == "no-answer" ? "No answer" : kind == "busy" ? "Busy" : ""
+fn endBad(kind: string): bool = kind == "dropped" or kind == "no-connect"
+fn sourceSymbol(source: string): string = source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : source == "discord" ? "symbol:sf/headphones" : "symbol:sf/phone"
 
 component CallsList
   props
@@ -15,42 +21,72 @@ component CallsList
     now: number
     offset: number
     calls: Calls
+    loading: bool
     failed: bool
     open: action
     remove: action
     removing: string
+    removeError: string
     back: action
-  derive shown = calls.calls.filter(c => c.id != removing)
-  derive groups = ["Today", "Yesterday", "Earlier"].filter(d => shown.map(c => dayOf(c.started, now, offset) == d).includes(true))
+  // A deleted call leaves at once; one hex refused comes back with why.
+  derive shown = calls.calls.filter(c => c.id != removing or removeError != "")
+  derive groups = ["Today", "Yesterday", "Earlier"].filter(d => shown.filter(c => dayOf(c.started, now, offset) == d).length > 0)
   view
     column navigationKey=`${entry.id}` navigationScroll="calls-list" position="absolute" inset=0 testId="calls"
-      header display="flex" align-items="center"
-        text "Calls" role="heading" aria-level=1 flex=1
+      header
+        text "Calls" role="heading" aria-level=1
       list id="calls-list" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        if failed and shown.length == 0
+        if shown.length == 0
           section
-            column gap=4 padding="24px 0" align-items="center" text-align="center"
-              text "Can't reach hex" font="-exact-headline"
-              text "Check that Tailscale is on, then try again." color="-exact-secondary-label"
+            column gap=6 padding="36px 8px" align-items="center" text-align="center" testId=(failed ? "calls-offline" : loading ? "calls-loading" : "calls-empty")
+              if loading and not failed
+                progress aria-label="Loading your calls"
+              else
+                image (failed ? "symbol:sf/wifi.exclamationmark" : "symbol:sf/phone.bubble") width=34 height=34 object-fit="contain" color="-exact-tertiary-label" margin-bottom=6 aria-hidden=true
+                text (failed ? "Can't reach hex" : "No calls yet") font="-exact-headline"
+                text (failed ? "Check that Tailscale is on, then try again." : "When a call ends, it lands here with what was said and what came of it.") font="-exact-subheadline" color="-exact-secondary-label"
         else
-          if shown.length == 0
+          if failed
             section
-              column gap=4 padding="24px 0" align-items="center" text-align="center" testId="calls-empty"
-                text "No calls yet" font="-exact-headline"
-                text "When a call ends, it lands here with what was said and what came of it." color="-exact-secondary-label"
-        if failed and shown.length > 0
-          section
-            text "Can't reach hex. These are the calls it last sent." font="-exact-footnote" color="-exact-secondary-label"
-        for d in groups key=d
-          section
-            header
-              text d
-            for c in shown.filter(x => dayOf(x.started, now, offset) == d) key=c.id
-              link href=path("pastCall", c.id) delete=remove(c.id) disabled=c.live testId=`call-${c.id}`
-                column flex=1 min-width=0 gap=2
-                  row gap=6 align-items="center"
-                    if c.source != "app" and c.source != ""
-                      image sourceSymbol(c.source) width=14 height=14 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-                    text nameOf(c) font="-exact-body" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-                    text (c.live ? "Now" : whenOf(c.started, now, offset)) font="-exact-footnote" color="-exact-secondary-label"
-                  text metaOf(c, now) font="-exact-footnote" color=(c.live ? "AccentColor" : badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label")
+              row gap=8 align-items="center" testId="calls-stale"
+                image "symbol:sf/wifi.exclamationmark" width=16 height=16 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                text "Can't reach hex. These are the calls it last sent." font="-exact-footnote" color="-exact-secondary-label" flex=1
+          for d in groups key=d
+            if groups.length > 1
+              section
+                header
+                  text d
+                for c in shown.filter(x => dayOf(x.started, now, offset) == d) key=c.id
+                  CallRowView(c=c, now=now, offset=offset, remove=remove, removing=removing, removeError=removeError)
+            else
+              section
+                for c in shown key=c.id
+                  CallRowView(c=c, now=now, offset=offset, remove=remove, removing=removing, removeError=removeError)
+
+// One call: its name and when, how long and what came of it, or that it's live.
+component CallRowView
+  props
+    c: CallRow
+    now: number
+    offset: number
+    remove: action
+    removing: string
+    removeError: string
+  view
+    link href=path("pastCall", c.id) delete=remove(c.id) disabled=c.live aria-label=`${nameOf(c)}, ${c.live ? "live now" : `${timeOf(c, now, offset)}, ${detailOf(c, now)}`}` testId=`call-${c.id}`
+      column flex=1 min-width=0 gap=3 padding="2px 0"
+        row gap=8 align-items="baseline"
+          text nameOf(c) font="-exact-body" font-weight=500 flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" testId=`call-name-${c.id}`
+          text timeOf(c, now, offset) font="-exact-subheadline" font-variant-numeric="tabular-nums" color=(c.live ? "-exact-system-green" : "-exact-secondary-label") flex-shrink=0
+        row gap=6 align-items="center"
+          if c.live
+            box width=7 height=7 border-radius=4 background-color="-exact-system-green" aria-hidden=true
+            text "Live now" font="-exact-subheadline" color="-exact-system-green"
+          else
+            if c.source != "app" and c.source != ""
+              image sourceSymbol(c.source) width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+            text detailOf(c, now) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
+            if endShort(c.ending) != ""
+              text `· ${endShort(c.ending)}` font="-exact-subheadline" color=(endBad(c.ending) ? "-exact-system-red" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+        if c.id == removing and removeError != ""
+          text `Not deleted · ${removeError}` font="-exact-footnote" color="-exact-system-red" testId=`call-error-${c.id}`

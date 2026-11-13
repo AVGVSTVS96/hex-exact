@@ -385,6 +385,10 @@ shape Build
   running: number
   install: string
 
+// The app's own page: visible while it's in front, hidden in the background.
+shape Page
+  visibilityState: string
+
 // A write's reply that carries nothing but whether it went.
 shape Reply
   ok: bool

@@ -1,5 +1,5 @@
 // The wrap-up a call leaves (§6): what it was, what came of it, and what now waits on Bassim. Under
-// the orb once a call has ended, and at the top of a past call, whole there.
+// the orb once a call has ended (tap it for the call), and whole at the top of a past call.
 use CallRow from "./shapes.contract"
 
 component WrapUp
@@ -11,23 +11,34 @@ component WrapUp
     open: action
   derive lead = call.summary != "" ? call.summary : call.why != "" ? `hex called because: ${call.why}` : ""
   derive shown = whole ? call.waiting : call.waiting.slice(0, 3)
-  derive left = whole ? 0 : max(0, call.waiting.length - 3) + more
+  derive left = call.waiting.length - shown.length + more
   view
-    column gap=8 align-items=(whole ? "stretch" : "center") text-align=(whole ? "left" : "center") max-width="26.25rem" testId="wrap-up"
-      if call.title != "" and whole
-        text call.title font="-exact-headline" testId="wrap-up-title"
-      if call.title != "" and not whole
-        button press=open(path("pastCall", call.id)) appearance="none" testId="open-wrap-up"
-          text call.title font="-exact-headline" color="-exact-label" testId="wrap-up-title"
-      if lead != ""
-        text lead color="-exact-secondary-label" line-clamp=(whole ? 0 : 4) user-select=(whole ? "text" : "none")
-      if shown.length > 0
-        column gap=4 align-items="flex-start" padding-top=4 text-align="left"
-          text "Waiting on you" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
-          for w, i in shown key=`${i}`
-            row gap=8 align-items="baseline"
-              box width=6 height=6 border-radius=3 background-color="AccentColor" flex-shrink=0 transform="translateY(-2px)"
-              text w
+    column gap=14 align-items=(whole ? "stretch" : "center") max-width="26.25rem" width="100%" testId="wrap-up"
+      if whole
+        WrapBody(call=call, lead=lead, shown=shown, whole=true)
+      else
+        button press=open(path("pastCall", call.id)) appearance="none" display="flex" flex-direction="column" align-items="center" width="100%" aria-label=`${call.title}. ${lead}` aria-description="Opens the call" testId="open-wrap-up"
+          WrapBody(call=call, lead=lead, shown=shown, whole=false)
       if left > 0
-        button press=openTasks("needs") testId="wrap-up-more"
-          text `${left} more in Tasks`
+        button press=openTasks("needs") appearance="none" align-self=(whole ? "flex-start" : "center") -exact-press-haptic="selection" testId="wrap-up-more"
+          text `${left} more in Tasks` font="-exact-footnote" font-weight=600 color="AccentColor"
+
+component WrapBody
+  props
+    call: CallRow
+    lead: string
+    shown: string[]
+    whole: bool
+  view
+    column gap=12 width="100%" align-items=(whole ? "stretch" : "center")
+      if not whole and call.title != ""
+        text call.title font="-exact-headline" color="-exact-label" text-align="center" testId="wrap-up-title"
+      if lead != ""
+        text lead font=(whole ? "-exact-body" : "-exact-subheadline") color="-exact-secondary-label" text-align=(whole ? "left" : "center") line-clamp=(whole ? 0 : 4) user-select=(whole ? "text" : "none") testId="wrap-up-lead"
+      if shown.length > 0
+        column gap=6 align-items="flex-start" width="100%"
+          text "Waiting on you" font="-exact-footnote" font-weight=600 color="-exact-secondary-label" align-self=(whole ? "flex-start" : "center")
+          for w, i in shown key=`${i}`
+            row gap=10 align-items="flex-start" width="100%"
+              box width=6 height=6 border-radius=3 background-color="AccentColor" flex-shrink=0 margin-top=8
+              text w font="-exact-subheadline" color="-exact-label" flex=1 min-width=0 line-clamp=(whole ? 0 : 2) user-select=(whole ? "text" : "none")

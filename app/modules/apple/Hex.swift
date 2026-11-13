@@ -14,6 +14,7 @@ import UIKit
 ///
 ///   app.ts  native.watch('call');     native.call({op: 'call'})      → the call's state
 ///           native.watch('captions'); native.call({op: 'captions'})  → its words and shared media
+///           native.watch('pose');     native.call({op: 'pose'})      → the Duo's bar side, fold, occlusions
 ///           native.later({op: start | mute | end | demo | share | attach | retry, …})
 ///   views   hex-orb state=… silenced=… persona=… tint=… palette=… reaction=… still=…
 ///           hex-media media=<id> kind=photo|video anchor=top|center  → an authed thumbnail; tap to look
@@ -32,6 +33,7 @@ final class Hex: ExactModule {
 
   private var state = Hex.idle
   private var captions: [String: Any] = ["call": "", "turns": [[String: Any]]()]
+  private var pose: [String: Any] = ["bar": "", "fold": [String: Any](), "occlusions": [[String: Any]]()]
   private var observers: [NSObjectProtocol] = []
 
   required init(context: ExactModuleContext) {
@@ -47,15 +49,22 @@ final class Hex: ExactModule {
       self.captions = info
       self.context.changed("captions")
     })
+    observers.append(center.addObserver(forName: Notification.Name("HexPose"), object: nil, queue: .main) { [weak self] note in
+      guard let self, let info = note.userInfo as? [String: Any] else { return }
+      self.pose = info
+      self.context.changed("pose")
+    })
     center.post(name: Notification.Name("HexCallAsk"), object: nil)
+    center.post(name: Notification.Name("HexPoseAsk"), object: nil)
   }
 
   override func call(_ request: [String: Any]) throws -> [String: Any] {
     switch request["op"] as? String {
     case "call": return state
     case "captions": return captions
+    case "pose": return pose
     case "build": return ["number": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0]
-    default: throw ExactNativeRefusal("hex answers call, captions and build")
+    default: throw ExactNativeRefusal("hex answers call, captions, pose and build")
     }
   }
 

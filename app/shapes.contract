@@ -24,6 +24,25 @@ shape Viewport
   keyboardHeight: number
   prefersReducedMotion: bool
 
+// What the Duo's frame takes from the screen, in its points (the shell's Screen): the side the system
+// bars sit on in a side column ("left", "right", ""), the fold (0 wide when there's none), and what
+// the cameras and status items cover.
+shape Rect
+  x: number
+  y: number
+  width: number
+  height: number
+
+shape Pose
+  bar: string
+  fold: Rect
+  occlusions: Rect[]
+
+// What the binary knows of its own updates: staged is a checked screen waiting to go in.
+shape Delivery
+  seq: number
+  staged: bool
+
 shape Time
   epochAtZero: number
   utcOffset: number

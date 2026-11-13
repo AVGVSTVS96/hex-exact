@@ -40,16 +40,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDelegate {
   var window: UIWindow?
   private var session: ExactSession?
+  private var screen: Screen?
 
   func scene(_ scene: UIScene, willConnectTo _: UISceneSession, options: UIScene.ConnectionOptions) {
     guard let scene = scene as? UIWindowScene else { return }
     let session = AppDelegate.exact.makeSession(delegate: self, label: "screen")
     self.session = session
-    let screen = UIViewController()
-    let view = ExactView(session: session)
-    view.frame = screen.view.bounds
-    view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    screen.view.addSubview(view)
+    let screen = Screen(session: session)
+    self.screen = screen
     let window = ExactWindow(windowScene: scene)
     window.rootViewController = screen
     window.makeKeyAndVisible()
@@ -85,7 +83,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     case "demo":
       Call.shared.startDemo()
       if !url.path().isEmpty, url.path() != "/" { session?.navigate(url.path()) }
-    case "go": session?.navigate(url.path().isEmpty ? "/" : url.path() + (url.query().map { "?" + $0 } ?? ""))
+    case "go":
+      screen?.follow(url)
+      session?.navigate(url.path().isEmpty ? "/" : url.path() + (url.query().map { "?" + $0 } ?? ""))
     default: break
     }
   }

@@ -57,9 +57,20 @@ new call about it); `answer`, `answerMany`, `answerAll` (picks), `note`, `dismis
 `openTask(id)`, `back`, `home`. Each write's reply is its mutation slot (`answered`, `noted`…):
 read `pending(x)` and the reply's `error`.
 
-**Media** goes as ids from `POST /media`: every send takes a `media` list (now `noMedia`).
-Uploading from the camera or Photos is (c)'s: a shell command that uploads and answers ids, and
-a root `state attached` that the sends pass instead of `noMedia`.
+**Media** goes as ids from `POST /media`: every send takes a `media` list. The camera and Photos
+are the shell's (shell/Shell/Media.swift); `media.contract` has the parts:
+
+```
+AddMedia(menu, label, glass, size, disabled, add)   "+" with a Camera / Photos menu
+Waiting(media, remove)                              what waits in a composer, each with ×
+Album(media, width) · Thumb(media, width, square)   pictures (the hex-media view: authed, tap to look)
+```
+
+A composer passes its key (`thread:<id>`, `ask:<id>`): root `attach(key, source)` picks and
+uploads, `attached` (Media[]) holds them while `attachedTo == key`, `detach(id)` takes one out.
+Its send passes `attached.map(m => m.id)` when `attachedTo` is its key, and clears `attached`.
+In the call, `share(source)` sends into the live call; the shell shows them among the captions
+(`Caption.media`, `note`: sending / why not), and `reshare(key)` tries again.
 
 ## The bridge
 

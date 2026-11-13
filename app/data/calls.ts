@@ -14,7 +14,7 @@ const record = (b: Json): Result<'loadCall'> => ({
   call: call(b, b.ended === undefined ? str(b.id) : ''),
   turns: list(b.turns, (t) => ({ who: str(t.who), at: num(t.at), text: str(t.text) })),
   tasks: list(b.tasks, (t) => ({ id: str(t.id), state: str(t.state), at: num(t.at), text: str(t.text) })),
-  moments: list(b.moments, (m) => ({ at: num(m.at), kind: str(m.kind), text: str(m.text), media: str(obj(m.media).id) })),
+  moments: list(b.moments, (m) => ({ at: num(m.at), kind: str(m.kind), text: str(m.text), media: typeof m.media === 'string' ? m.media : str(obj(m.media).id) })),
 });
 
 export const calls: Partial<Sources> = {

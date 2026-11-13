@@ -21,31 +21,50 @@ component ProjectRow
     now: number
     offset: number
     href: string
+    split: bool
+    selected: bool
+    select: action
   derive newest = match sortBy(topic.entries, e => e.at, "desc").at(0) { case some(e) => e, case none => Item(kind="", id="", topic="", app="", stage="", rank=0, at=0, page="", mark="", title="", line="", meta="", action="", sent=false, words="", tiles=[]) }
   derive problem = problemOf(newest.title)
   derive headline = problem != "" ? problem : newest.title
   derive mark = newest.stage == "needs" ? (newest.kind == "task" or newest.kind == "fresh" ? "needs" : newest.mark) : problem != "" ? "failed" : newest.stage == "working" ? "working" : newest.stage == "done" ? "done" : "idle"
   view
-    link href=href -exact-press-haptic="selection" aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
-      row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
-        Mark(state=mark, size=22)
-        column flex=1 min-width=0 gap=2
-          row gap=8 align-items="baseline"
-            text topic.name font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
-            if topic.entries.length > 1
-              Chip(n=topic.entries.length, state=mark, loading=false)
-            box flex=1
-            text whenOf(newest.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
-          if headline != topic.name
-            text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
+    if split
+      button press=select appearance="none" display="flex" text-align="left" padding="10px 12px" margin="0 -12px" border-radius=12 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic="selection" aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
+        row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
+          Mark(state=mark, size=22)
+          column flex=1 min-width=0 gap=2
+            row gap=8 align-items="baseline"
+              text topic.name font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+              if topic.entries.length > 1
+                Chip(n=topic.entries.length, state=mark, loading=false)
+              box flex=1
+              text whenOf(newest.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
+            if headline != topic.name
+              text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
+    else
+      link href=href -exact-press-haptic="selection" aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
+        row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
+          Mark(state=mark, size=22)
+          column flex=1 min-width=0 gap=2
+            row gap=8 align-items="baseline"
+              text topic.name font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+              if topic.entries.length > 1
+                Chip(n=topic.entries.length, state=mark, loading=false)
+              box flex=1
+              text whenOf(newest.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
+            if headline != topic.name
+              text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
 
 // A topic's head over its rows in search: tap to open the topic.
 component TopicHead
   props
     topic: Topic
     href: string
+    split: bool
+    select: action
   view
-    link href=href testId=`head-${topic.name}`
+    link href=(split ? "" : href) press=select testId=`head-${topic.name}`
       text topic.name font="-exact-footnote" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.4 flex=1
       Chip(n=topic.entries.length, state=match topic.entries.at(0) { case some(e) => e.stage, case none => "" }, loading=false)
 

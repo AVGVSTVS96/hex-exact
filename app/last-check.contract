@@ -29,24 +29,26 @@ component LastCheck
           section
             row gap=8 flex-wrap="wrap" padding="4px 0"
               for r in check.read key=r.label
-                column gap=0 padding="8px 12px" border-radius=14 background-color="-exact-tertiary-fill" min-width=72
+                column gap=0 padding="8px 12px" border-radius=14 background-color="-exact-tertiary-fill" min-width="4.5rem"
                   text `${r.n}` font="-exact-title2" font-weight=700 font-variant-numeric="tabular-nums"
                   text r.label font="-exact-caption1" color="-exact-secondary-label"
         if check.flagged.length > 0
           section
             header
               text "For you to look at"
-            for n, i in check.flagged key=`${i}`
+            for n in check.flagged key=`${n.title}${n.text}`
               row gap=12 align-items="flex-start"
-                Mark(state="needs", size=22)
+                Mark(state="asks", size=22)
                 column flex=1 gap=2
                   text n.title font-weight=600
                   text n.text font="-exact-subheadline" color="-exact-secondary-label"
+                  if n.did != ""
+                    text n.did font="-exact-footnote" color="-exact-tertiary-label"
         if check.fixed.length > 0
           section
             header
               text "Fixed on its own"
-            for n, i in check.fixed key=`${i}`
+            for n in check.fixed key=`${n.title}${n.text}`
               row gap=12 align-items="flex-start"
                 Mark(state="done", size=22)
                 column flex=1 gap=2

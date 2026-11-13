@@ -62,9 +62,53 @@ component TaskScreen
     attach: action
     detach: action
     back: action
+  view
+    column navigationKey=`${entry.id}` navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 testId="task"
+      TaskBody(id=entry.params.id, pane=false, entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, attach=attach, detach=detach, back=back)
+
+// The page itself: a route's (TaskScreen), or a pane beside the Tasks list on a wide screen.
+component TaskBody
+  props
+    id: string
+    pane: bool
+    // The route this shows on (a pane beside the list shows on the list's).
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    task: TaskPage
+    chat: Chat
+    asks: Asks
+    tasks: Tasks
+    said: Said[]
+    drafts: string[]
+    words: Words
+    wordsAsk: string
+    loading: bool
+    failed: bool
+    inCall: bool
+    open: action
+    openTask: action
+    answer: action
+    answerMany: action
+    note: action
+    dismiss: action
+    undo: action
+    again: action
+    act: action
+    markRead: action
+    showWords: action
+    keepDraft: action
+    talk: action
+    message: action
+    answering: string
+    attached: Media[]
+    attachedTo: string
+    attach: action
+    detach: action
+    back: action
   state replying = ""
   state allPlaces = false
-  derive id = entry.params.id
   derive topicName = id.startsWith("topic:") ? id.slice(6) : ""
   derive doneId = id.startsWith("done:") ? id.slice(5) : ""
   derive kind = topicName != "" ? "topic" : doneId != "" ? "done" : "task"
@@ -91,14 +135,23 @@ component TaskScreen
   action morePlaces
     allPlaces = not allPlaces
   view
-    column navigationKey=`${entry.id}` navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 testId="task"
-      header display="flex" align-items="center"
-        text title role="heading" aria-level=2
-        text subtitle
-        if kind != "done"
-          button press=talk(kind == "task" ? id : "asks") aria-label="Talk it through" testId="task-talk"
-            image "symbol:sf/phone.and.waveform"
-      list id="task-page" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+    column flex=1 min-height=0
+      if pane
+        row gap=8 align-items="center" padding="14px 16px 6px"
+          column flex=1 min-width=0 gap=1
+            text title font="-exact-title3" font-weight=700 line-clamp=1
+            text subtitle font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
+          if kind != "done"
+            button press=talk(kind == "task" ? id : "asks") appearance="auto" buttonStyle="glass" aria-label="Talk it through" testId="pane-talk"
+              image "symbol:sf/phone.and.waveform"
+      else
+        header display="flex" align-items="center"
+          text title role="heading" aria-level=2
+          text subtitle
+          if kind != "done"
+            button press=talk(kind == "task" ? id : "asks") aria-label="Talk it through" testId="task-talk"
+              image "symbol:sf/phone.and.waveform"
+      list id=(pane ? "task-pane" : "task-page") appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
         if kind == "done"
           section
             row gap=12 align-items="flex-start" padding="4px 0"

@@ -7,7 +7,7 @@ use Home from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
 use TasksList from "./tasks.contract"
-use TaskScreen from "./task.contract"
+use TaskScreen, TaskBody from "./task.contract"
 use Thread from "./thread.contract"
 use Steps from "./steps.contract"
 use Picks from "./picks.contract"
@@ -16,6 +16,7 @@ use LastCheck from "./last-check.contract"
 use SettingsScreen from "./settings.contract"
 use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
+use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 use UpdateToast from "./toast.contract"
 
@@ -54,6 +55,8 @@ component App
   // What's being sent, so a screen can say so beside it: `${askId}|${label}`, a task id, a call id.
   state answering = ""
   state messaging = ""
+  // The page beside the Tasks list when it's wide; "" until Bassim picks one (the first topic).
+  state beside = ""
   // What Bassim did with each question and message here, as said.contract's lines, so screens show
   // it at once and say how it went.
   state said = [""].slice(0, 0)
@@ -95,8 +98,12 @@ component App
   derive names = stack(nav).map(e => e.name)
   derive pastId = match stack(nav).filter(e => e.name == "pastCall").at(-1) { case some(e) => e.params.id, case none => "" }
   derive pastLive = calls.live != "" and pastId == calls.live
-  derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => "" }
-  derive chatOpen = names.includes("thread") or names.includes("task")
+  // Tasks beside a page: the Duo opened like a book, or a window wide enough for both.
+  derive split = viewport.horizontalViewportSegments == 2 or viewport.width >= 900
+  derive firstPage = match stageTopics(entriesOf(tasks, asks, now), shownTab).at(0) { case some(t) => homeOf(pageOf(t), tasks.tasks), case none => "" }
+  derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : ""
+  derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => besideId }
+  derive chatOpen = names.includes("thread") or names.includes("task") or besideId != ""
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
   // A topic (`topic:<name>`) or a finished item (`done:<id>`) opens a page made from the lists.
   derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") ? "" : taskId
@@ -160,6 +167,9 @@ component App
     nav = go(nav, path("tasks"))
   action openTask(id: string)
     nav = go(nav, path("task", id))
+  action besidePage(page: string)
+    beside = page
+    haptic("selection")
   action pickTab(t: string)
     tab = t
     haptic("selection")
@@ -356,7 +366,8 @@ component App
         if e.name == "pastCall"
           PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
-          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, back=back)
+          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
+            TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, attach=attach, detach=detach, back=back)
         if e.name == "task"
           TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, attach=attach, detach=detach, back=back)
         if e.name == "thread"

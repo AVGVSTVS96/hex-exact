@@ -72,6 +72,10 @@ component App
   state attachedTo = ""
   // The ask whose original message is open ("From <place>"), read from hex while it is.
   state wordsAsk = ""
+  // The live call's agents: those running at hex's last word, and the one that just finished, shown
+  // for a moment on the agent line.
+  state agentsRunning = [""].slice(0, 0)
+  state agentDone = ""
   // Milliseconds since launch, a minute at a time: "Today", "3 min ago" and the like move on.
   state tick = 0
 
@@ -152,6 +156,23 @@ component App
     every(60000, ticked)
   action ticked
     tick = performanceNow()
+
+  // An agent of the call finishing: its line says done or failed for 2.4 s, with a soft tap.
+  task agents key=activity.version
+    change(noticeAgents)
+  task agentHold when agentDone != "" key=agentDone
+    after(2400, letAgentGo)
+  action noticeAgents
+    match activity.tasks.filter(t => t.state != "running" and agentsRunning.includes(t.id)).at(0)
+      case some(t)
+        agentDone = t.id
+        if haptics
+          haptic("impact-soft")
+      case none
+        agentDone = activity.call == "" ? "" : agentDone
+    agentsRunning = activity.tasks.filter(t => t.state == "running").map(t => t.id)
+  action letAgentGo
+    agentDone = ""
 
   // Places
   action follow(url: string)
@@ -257,6 +278,7 @@ component App
     match answered
       case some(r)
         said = settledLines(said, r)
+        answering = answering.startsWith(`${r.id}|`) ? "" : answering
       case none
         said = said
   action settleDismiss
@@ -303,7 +325,7 @@ component App
   action message(id: string, words: string)
     let key = `app-${round(clock.epochAtZero + performanceNow())}`
     messaging = id
-    sends = sends.slice(-30).concat([sendingLine(Sending(task=id, key=key, text=words, status="sending", error=""))])
+    sends = sends.slice(-30).concat([sendingLine(Sending(task=id, key=key, text=words, status="sending", error="", media=(attachedTo == `thread:${id}` ? attached : attached.slice(0, 0))))])
     drafts = drafts.filter(l => field(l, 0) != `thread:${id}`)
     send messaged = sendChat(id, words, key, (attachedTo == `thread:${id}` ? attached.map(m => m.id) : noMedia))
     attached = attachedTo == `thread:${id}` ? attached.slice(0, 0) : attached
@@ -312,7 +334,7 @@ component App
     match sends.map(l => sendingOf(l)).filter(s => s.key == key).at(0)
       case some(s)
         sends = sends.map(l => field(l, 1) == key ? sendingLine(Sending(s, status="sending", error="")) : l)
-        send messaged = sendChat(s.task, s.text, key, noMedia)
+        send messaged = sendChat(s.task, s.text, key, s.media.map(m => m.id))
       case none
         sends = sends
   action settleMessage
@@ -365,7 +387,7 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answering=answering)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone)
         if e.name == "calls"
           CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(calls)), failed=failed(calls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"

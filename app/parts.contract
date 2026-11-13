@@ -14,15 +14,17 @@ style Glass
 style Pill
   padding="7px 14px" border-radius=999 background-color="-exact-tertiary-fill"
 
-// The colour a state is drawn in, everywhere: needs you, working, done, failed, quiet.
-fn tintOf(state: string): string = state == "needs" or state == "asks" or state == "pick" ? "AccentColor" : state == "working" or state == "running" ? "-exact-system-teal" : state == "done" or state == "read" ? "-exact-system-green" : state == "failed" ? "-exact-system-red" : state == "paused" or state == "stopped" ? "-exact-system-orange" : "-exact-secondary-label"
+// The colour a state is drawn in, everywhere: mint for what's Bassim's, amber for a question, blue
+// for work going on, red for a failure, grey for the settled (app.tamber).
+fn tintOf(state: string): string = state == "needs" or state == "pick" ? "hex.accent" : state == "asks" ? "hex.ask" : state == "working" or state == "running" ? "hex.progress" : state == "failed" ? "hex.danger" : "-exact-secondary-label"
+fn washOf(state: string): string = state == "needs" or state == "pick" ? "hex.accent.wash" : state == "asks" ? "hex.ask.wash" : state == "working" or state == "running" ? "hex.progress.wash" : state == "failed" ? "hex.danger.wash" : "-exact-tertiary-fill"
 
-fn symbolOf(state: string): string = state == "needs" or state == "asks" ? "symbol:sf/questionmark" : state == "pick" ? "symbol:sf/sparkle" : state == "working" or state == "running" ? "symbol:sf/ellipsis" : state == "done" or state == "read" ? "symbol:sf/checkmark" : state == "failed" ? "symbol:sf/exclamationmark" : state == "paused" ? "symbol:sf/pause.fill" : state == "stopped" ? "symbol:stop-fill" : "symbol:sf/circle"
+fn symbolOf(state: string): string = state == "asks" ? "symbol:sf/questionmark" : state == "pick" ? "symbol:sf/sparkle" : state == "done" ? "symbol:sf/checkmark" : state == "failed" ? "symbol:sf/exclamationmark" : state == "paused" ? "symbol:sf/pause.fill" : ""
 
 // Where a thread lives, as its tile: Telegram, T3 Code, Buzz, Discord, the server, a call, a link.
 fn appName(app: string): string = app == "telegram" ? "Telegram" : app == "t3" ? "T3 Code" : app == "buzz" ? "Buzz" : app == "discord" ? "Discord" : app == "server" ? "Server" : app == "voice" or app == "call" ? "Call" : app == "link" ? "Link" : app
 fn appSymbol(app: string): string = app == "telegram" ? "symbol:sf/paperplane.fill" : app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : app == "buzz" ? "symbol:sf/bolt.fill" : app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : app == "server" ? "symbol:sf/terminal.fill" : app == "voice" or app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right"
-fn appTint(app: string): string = app == "telegram" ? "#2AABEE" : app == "t3" ? "#7C5CFF" : app == "buzz" ? "#F5A623" : app == "discord" ? "#5865F2" : app == "server" ? "#3A3A3C" : app == "voice" or app == "call" ? "AccentColor" : "#8E8E93"
+fn appTint(app: string): string = app == "telegram" ? "tile.telegram" : app == "t3" ? "tile.t3" : app == "buzz" ? "tile.buzz" : app == "discord" ? "tile.discord" : app == "server" ? "tile.server" : app == "voice" or app == "call" ? "hex.accent.solid" : "tile.link"
 
 // When something happened: the time today, else the date.
 fn whenOf(at: number, now: number, offset: number): string = at == 0 ? "" : formatDate(at, offset, "iso") == formatDate(now, offset, "iso") ? formatTime(at, offset, "short") : formatDate(at, offset, "medium")
@@ -34,23 +36,54 @@ fn lengthOf(seconds: number): string = seconds < 60 ? `${round(seconds)} s` : se
 fn endingOf(kind: string): string = kind == "you" ? "You hung up" : kind == "hex" ? "hex hung up" : kind == "dropped" ? "The call dropped" : kind == "expired" ? "The call ran out of time" : kind == "no-connect" ? "Couldn't connect" : kind == "no-answer" ? "No answer" : kind == "busy" ? "Busy" : ""
 fn badEnding(kind: string): bool = kind == "dropped" or kind == "no-connect" or kind == "expired"
 
-// A state's round badge (the stable app's marks), its symbol in its tint.
+keyframes markSpin
+  to rotate="360deg"
+
+// A state's mark, the stable app's (§9.10), in a square of `size`: needs a mint dot on its wash; a
+// question amber with ?; hex's pick mint with ✦; working a turning blue arc; done a checked square;
+// read a dot; failed red with !; paused, stopped, pending (dashed) and idle (a ring) in grey.
 component Mark
   props
     state: string
     size: number
+  derive disc = round(size * 0.9)
+  derive dot = round(size * 0.4)
+  derive glyph = round(size * 0.5)
   view
-    box width=size height=size border-radius=(size / 2) background-color=tintOf(state) opacity=0.18 position="relative" flex-shrink=0
-      image symbolOf(state) position="absolute" inset=0 margin="auto" width=(size * 0.5) height=(size * 0.5) object-fit="contain" color=tintOf(state) opacity=1 aria-hidden=true
+    box width=size height=size flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-hidden=true
+      if state == "working" or state == "running"
+        svg width=disc height=disc viewBox="0 0 20 20" animation="markSpin 1.1s linear infinite"
+          circle cx=10 cy=10 r=8 fill="none" stroke="hex.progress.wash" stroke-width=2.25
+          circle cx=10 cy=10 r=8 fill="none" stroke="hex.progress" stroke-width=2.25 stroke-linecap="round" stroke-dasharray="14 40"
+      else if state == "needs"
+        box width=disc height=disc border-radius=(disc / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
+          box width=dot height=dot border-radius=(dot / 2) background-color="hex.accent"
+      else if state == "asks" or state == "pick"
+        box width=disc height=disc border-radius=(disc / 2) background-color=tintOf(state) display="flex" align-items="center" justify-content="center"
+          image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-background"
+      else if state == "failed" or state == "paused"
+        box width=disc height=disc border-radius=(disc / 2) background-color=washOf(state) display="flex" align-items="center" justify-content="center"
+          image symbolOf(state) width=glyph height=glyph object-fit="contain" color=(state == "failed" ? "hex.danger" : "-exact-secondary-label")
+      else if state == "done"
+        box width=disc height=disc border-radius=round(disc * 0.3) border="1.5px solid -exact-tertiary-label" display="flex" align-items="center" justify-content="center"
+          image "symbol:sf/checkmark" width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
+      else if state == "read"
+        box width=dot height=dot border-radius=(dot / 2) background-color="-exact-tertiary-label"
+      else if state == "stopped"
+        box width=dot height=dot border-radius=2 background-color="-exact-tertiary-label"
+      else if state == "pending"
+        box width=(disc - 4) height=(disc - 4) border-radius=(disc / 2) border="1.5px dashed -exact-tertiary-label"
+      else
+        box width=dot height=dot border-radius=(dot / 2) border="1.5px solid -exact-tertiary-label"
 
-// A count in its state's tint ("–" while loading).
+// A count in its state's ink on its wash ("–" while loading).
 component Chip
   props
     n: number
     state: string
     loading: bool
   view
-    text (loading ? "–" : `${n}`) font="-exact-caption1" font-weight=600 font-variant-numeric="tabular-nums" padding="2px 8px" border-radius=999 color=tintOf(state) background-color="-exact-tertiary-fill"
+    text (loading ? "–" : `${n}`) font="-exact-caption1" font-weight=600 font-variant-numeric="tabular-nums" padding="1px 7px" border-radius=999 color=tintOf(state) background-color=washOf(state)
 
 // A place's brand tile; an unlinked one is a ghost outline.
 component PlaceTile
@@ -59,7 +92,7 @@ component PlaceTile
     size: number
   view
     box width=size height=size border-radius=(size * 0.28) flex-shrink=0 position="relative" background-color=(place.link == "" ? "transparent" : appTint(place.app)) border=(place.link == "" ? "1px solid -exact-separator" : "none")
-      image appSymbol(place.app) position="absolute" inset=0 margin="auto" width=(size * 0.48) height=(size * 0.48) object-fit="contain" color=(place.link == "" ? "-exact-secondary-label" : "#FFFFFF") aria-hidden=true
+      image appSymbol(place.app) position="absolute" inset=0 margin="auto" width=(size * 0.48) height=(size * 0.48) object-fit="contain" color=(place.link == "" ? "-exact-secondary-label" : "ink.on-tile") aria-hidden=true
 
 // One of a few things to pick from, with a line under it (a persona, a voice).
 shape Option

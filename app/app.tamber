@@ -1,0 +1,26 @@
+// hex's colours, the stable app's (hex-voice src/ui/tokens.ts): mint for what's Bassim's, amber for
+// a question, blue for work going on, red for a failure, each with its wash behind a mark or count.
+// The accent fills buttons, so its dark side stays deep enough for their white label; mint text is
+// hex.accent.
+tamber hex
+
+theme
+  AccentColor = light-dark(#1F8A6D, #23A27F)
+  hex.accent = light-dark(#1F8A6D, #C4F3E5)
+  hex.accent.wash = light-dark(#D7F2EA, #1B3534)
+  hex.accent.solid = #1F8A6D  scheme=fixed
+  hex.ask = light-dark(#A35F00, #F2C58A)
+  hex.ask.wash = light-dark(#F7E6CF, #3A2E1E)
+  hex.progress = light-dark(#0A66D2, #8DB8FF)
+  hex.progress.wash = light-dark(#CFE0F7, #1F3354)
+  hex.danger = light-dark(#D93A42, #F0A5A8)
+  hex.danger.wash = light-dark(#FBE3E4, #3A2224)
+  // Where a thread lives: each app's own brand colour, the same in light and dark, under white.
+  tile.telegram = #2AABEE  scheme=fixed
+  tile.t3 = #7C5CFF  scheme=fixed
+  tile.buzz = #F5A623  scheme=fixed
+  tile.discord = #5865F2  scheme=fixed
+  tile.server = #3A3A3C  scheme=fixed
+  tile.link = #8E8E93  scheme=fixed
+  ink.on-tile = #FFFFFF  scheme=fixed
+  ink.on-accent = light-dark(#FFFFFF, #0A2A21)

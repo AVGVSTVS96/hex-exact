@@ -1,0 +1,150 @@
+// The rows of Tasks (§9.1): a topic's row in the list, and each entry's row in search and on a
+// topic's page. Every row swipes as the stable app's do: from the left to do the obvious thing (take
+// hex's pick, act, mark read), from the right to say "Not needed" or open where it lives.
+use Ask, Place from "./shapes.contract"
+use Mark, Chip, PlaceTile, whenOf, appName, appTint, appSymbol from "./parts.contract"
+use Item, Topic, problemOf, pageOf from "./inbox.contract"
+use Said, unreached, failedWords from "./said.contract"
+
+fn askOf(asks: Ask[], id: string): option<Ask> = asks.filter(a => a.id == id).at(0)
+fn pickOf(a: Ask): string = match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
+// Answers short enough to take right from the row.
+fn inline(a: Ask): bool = a.options.length > 0 and a.options.length <= 3 and not a.multiple and a.options.filter(o => o.label.length > 16).length == 0
+fn tileLabel(p: Place): string = p.place != "" ? p.place : appName(p.app)
+// The tile's link to open: its own, or a call's page in the app.
+fn tileHref(p: Place): string = p.call != "" ? `/calls/${encodeURIComponent(p.call)}` : p.link
+
+// A topic in the list: its mark, name, how many, when, and its newest headline.
+component ProjectRow
+  props
+    topic: Topic
+    now: number
+    offset: number
+    href: string
+  derive newest = match sortBy(topic.entries, e => e.at, "desc").at(0) { case some(e) => e, case none => Item(kind="", id="", topic="", app="", stage="", rank=0, at=0, page="", mark="", title="", line="", meta="", action="", sent=false, words="", tiles=[]) }
+  derive problem = problemOf(newest.title)
+  derive headline = problem != "" ? problem : newest.title
+  derive mark = newest.stage == "needs" ? (newest.kind == "task" or newest.kind == "fresh" ? "needs" : newest.mark) : problem != "" ? "failed" : newest.stage == "working" ? "working" : newest.stage == "done" ? "done" : "idle"
+  view
+    link href=href -exact-press-haptic="selection" aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
+      row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
+        Mark(state=mark, size=22)
+        column flex=1 min-width=0 gap=2
+          row gap=8 align-items="baseline"
+            text topic.name font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+            if topic.entries.length > 1
+              Chip(n=topic.entries.length, state=mark, loading=false)
+            box flex=1
+            text whenOf(newest.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
+          if headline != topic.name
+            text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
+
+// A topic's head over its rows in search: tap to open the topic.
+component TopicHead
+  props
+    topic: Topic
+    href: string
+  view
+    link href=href testId=`head-${topic.name}`
+      text topic.name font="-exact-footnote" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.4 flex=1
+      Chip(n=topic.entries.length, state=match topic.entries.at(0) { case some(e) => e.stage, case none => "" }, loading=false)
+
+// One entry: an ask, a thread, a stuck run, a fresh result or a finished thing.
+component EntryRow
+  props
+    entry: Item
+    asks: Ask[]
+    said: Said[]
+    why: string
+    now: number
+    offset: number
+    answer: action
+    dismiss: action
+    undo: action
+    again: action
+    act: action
+    markRead: action
+    openPage: action
+  derive ask = askOf(asks, entry.id)
+  derive word = match said.filter(s => s.id == entry.id).at(-1) { case some(s) => s, case none => Said(id="", verb="", label="", status="", detail="", missed=0, question="", topic="", task="") }
+  derive folded = entry.kind == "ask" and word.id != "" and word.verb != "note" and word.status != "failed"
+  derive pick = match ask { case some(a) => pickOf(a), case none => "" }
+  derive opens = entry.tiles.filter(t => t.link != "" or t.call != "")
+  derive lead = entry.kind == "ask" ? pick : entry.kind == "stuck" and not entry.sent ? entry.action : entry.kind == "fresh" and not entry.sent ? "Read" : ""
+  action leading
+    if entry.kind == "ask"
+      answer(entry.id, pick)
+    else if entry.kind == "stuck"
+      act(entry.id)
+    else
+      markRead(entry.id)
+  view
+    if folded
+      Folded(said=word, question=entry.title, topic=entry.topic, undo=undo, again=again)
+    else
+      scroll swipeContent=`${entry.id}-row` swipeLeading=(lead != "" ? `${entry.id}-lead` : "") swipeTrailing=`${entry.kind == "ask" ? `${entry.id}-away ` : ""}${range(opens.length).map(i => `${entry.id}-tile-${i}`).join(" ")}` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" padding-right=0 testId=`entry-${entry.id}`
+        if lead != ""
+          button id=`${entry.id}-lead` press=leading accent-color="hex.accent.solid" flex-shrink=0 scroll-snap-align="start" -exact-press-haptic="selection" testId=`lead-${entry.id}`
+            image "symbol:checkmark"
+            text lead
+        row id=`${entry.id}-row` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box" gap=12 align-items="flex-start" padding="10px 16px" press=openPage(entry.page != "" ? entry.page : `topic:${entry.topic}`)
+          Mark(state=entry.mark, size=22)
+          column flex=1 min-width=0 gap=4
+            row gap=10 align-items="baseline"
+              text entry.title font="-exact-body" line-clamp=2 flex=1 min-width=0
+              if entry.meta != ""
+                text entry.meta font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap"
+              text whenOf(entry.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+              row gap=3
+                for t, i in entry.tiles key=`${t.app}${i}`
+                  PlaceTile(place=t, size=14)
+            if why != ""
+              text why markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+            if (entry.kind == "stuck" or entry.kind == "finished") and entry.line != ""
+              text entry.line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+            match ask
+              case some(a)
+                if inline(a)
+                  row gap=8 flex-wrap="wrap" padding-top=4
+                    for o in a.options key=o.label
+                      button press=answer(a.id, o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`inline-${a.id}-${o.label}`
+                        text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
+              case none
+                if entry.action != ""
+                  row padding-top=4
+                    button press=leading disabled=entry.sent appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" testId=`act-${entry.id}`
+                      text (entry.kind == "stuck" and entry.sent ? "Sent to hex" : entry.action) font="-exact-subheadline" font-weight=600
+                else if entry.kind == "stuck" and entry.sent
+                  text "Sent to hex" font="-exact-footnote" color="-exact-secondary-label"
+            if word.status == "failed"
+              text failedWords(word) font="-exact-footnote" color="hex.danger"
+        if entry.kind == "ask"
+          button id=`${entry.id}-away` press=dismiss(entry.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`away-${entry.id}`
+            image "symbol:sf/hand.raised.slash"
+            text "Not needed"
+        for t, i in opens key=`${t.app}${i}`
+          link id=`${entry.id}-tile-${i}` href=tileHref(t) accent-color=appTint(t.app) flex-shrink=0 scroll-snap-align="start" testId=`tile-${entry.id}-${i}`
+            image appSymbol(t.app)
+            text tileLabel(t)
+
+// An ask put away here: what was said, where it went, and Undo.
+component Folded
+  props
+    said: Said
+    question: string
+    topic: string
+    undo: action
+    again: action
+  view
+    row gap=12 align-items="flex-start" padding="10px 16px" testId=`folded-${said.id}`
+      Mark(state="done", size=22)
+      column flex=1 min-width=0 gap=2
+        text (said.question != "" ? said.question : question) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+        text `${said.label} → ${said.detail != "" ? said.detail : said.topic != "" ? said.topic : topic}` font="-exact-body" line-clamp=2 opacity=(said.status == "sending" ? 0.6 : 1)
+        if said.missed > 0
+          row gap=8 align-items="center" flex-wrap="wrap"
+            text unreached(said.missed) font="-exact-footnote" color="hex.ask"
+            button press=again(said.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`again-${said.id}`
+              text "Send again" font="-exact-footnote" font-weight=600
+      button press=undo(said.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
+        text "Undo" font="-exact-subheadline" font-weight=600

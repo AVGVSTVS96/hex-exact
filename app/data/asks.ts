@@ -32,9 +32,10 @@ export const ask = (a: Json): Ask => ({
   was: strings(a.was),
 });
 
-const sent = (r: { ok: boolean; error: string; reply: unknown }): Result<'answerAsk'> => {
+// id: the ask it's about, so the screen knows which question the reply settles.
+const sent = (id: string, r: { ok: boolean; error: string; reply: unknown }): Result<'answerAsk'> => {
   const reply = obj(r.reply);
-  return { ok: r.ok, error: r.error, topic: str(reply.topic), missed: num(reply.missed) };
+  return { id, ok: r.ok, error: r.error, topic: str(reply.topic), missed: num(reply.missed) };
 };
 const done = (r: { ok: boolean; error: string }): Result<'actStuck'> => ({ ok: r.ok, error: r.error });
 
@@ -68,7 +69,7 @@ export const asks: Partial<Sources> = {
   },
   // labels: one, or several for a question that takes more than one. media: ids from POST /media.
   answerAsk: async ([id, labels, media]) =>
-    sent(await write('POST', `/asks/${enc(id)}/answer`, { ...(labels.length === 1 ? { label: labels[0] } : { labels }), ...(media.length ? { media } : {}) })),
+    sent(id, await write('POST', `/asks/${enc(id)}/answer`, { ...(labels.length === 1 ? { label: labels[0] } : { labels }), ...(media.length ? { media } : {}) })),
   // hex's picks taken together, one after another; the first refusal stops the rest.
   answerPicks: async ([ids, labels]) => {
     for (const [i, id] of ids.entries()) {
@@ -77,9 +78,9 @@ export const asks: Partial<Sources> = {
     }
     return { ok: true, error: '' };
   },
-  noteAsk: async ([id, text, media]) => sent(await write('POST', `/asks/${enc(id)}/note`, { text, ...(media.length ? { media } : {}) })),
-  dismissAsk: async ([id]) => sent(await write('POST', `/asks/${enc(id)}/dismiss`)),
-  undoAsk: async ([id]) => sent(await write('POST', `/asks/${enc(id)}/undo`)),
+  noteAsk: async ([id, text, media]) => sent(id, await write('POST', `/asks/${enc(id)}/note`, { text, ...(media.length ? { media } : {}) })),
+  dismissAsk: async ([id]) => sent(id, await write('POST', `/asks/${enc(id)}/dismiss`)),
+  undoAsk: async ([id]) => sent(id, await write('POST', `/asks/${enc(id)}/undo`)),
   actStuck: async ([id]) => done(await write('POST', `/stuck/${enc(id)}/act`)),
   readFresh: async ([id]) => done(await write('POST', `/fresh/${enc(id)}/read`)),
 };

@@ -1,11 +1,17 @@
 // Tasks (§9.1): everything hex is doing and everything that waits on Bassim, in tabs: All, Needs
-// you, Working, Done, Quiet. On a phone it's a sheet over the call, so the call stays in reach.
-use Viewport, Tasks, Asks, Counts, Ask, TaskRow from "./shapes.contract"
+// you, Working, Done, Quiet. Each topic is one row; search finds any question, thread or result by
+// every word. On a phone it's a sheet over the call, so the call stays in reach.
+use Viewport, Tasks, Asks, Counts from "./shapes.contract"
 use Mark, Chip, whenOf from "./parts.contract"
+use Said from "./said.contract"
+use Item, Topic, entriesOf, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
+use ProjectRow, TopicHead, EntryRow from "./rows.contract"
 
 shape TabItem
   id: string
   label: string
+
+fn emptyWords(tab: string): string = tab == "needs" ? "Nothing waits on you" : tab == "working" ? "Nothing is working" : tab == "done" ? "Nothing done in the last day" : tab == "quiet" ? "Nothing is quiet" : "Nothing from hex yet"
 
 component TasksList
   props
@@ -18,6 +24,7 @@ component TasksList
     tasks: Tasks
     asks: Asks
     counts: Counts
+    said: Said[]
     loading: bool
     failed: bool
     inCall: bool
@@ -27,143 +34,80 @@ component TasksList
     answerMany: action
     dismiss: action
     undo: action
+    again: action
     act: action
     markRead: action
     talk: action
     answering: string
     back: action
+  state query = ""
   derive tabs = [TabItem(id="all", label="All"), TabItem(id="needs", label="Needs you"), TabItem(id="working", label="Working"), TabItem(id="done", label="Done"), TabItem(id="quiet", label="Quiet")]
-  derive dayAgo = now - 86400000
-  derive needing = tasks.tasks.filter(t => t.state == "needs" and not asks.asks.map(a => a.task).includes(t.id))
-  derive working = tasks.tasks.filter(t => t.state == "working" or t.running)
-  derive quiet = tasks.tasks.filter(t => t.state == "idle")
-  derive finished = tasks.finished.filter(f => f.at > dayAgo)
-  derive fresh = asks.fresh.filter(f => not f.read or f.at > dayAgo)
-  derive picks = asks.asks.filter(a => a.options.map(o => o.pick).includes(true) and a.tag != "money")
-  derive countOf = [asks.asks.length + asks.stuck.length + needing.length + working.length + finished.length + fresh.length + quiet.length, asks.asks.length + asks.stuck.length + needing.length, working.length, finished.length + fresh.length, quiet.length]
+  derive entries = entriesOf(tasks, asks, now)
+  // An ask put away here leaves the counts at once, and its row folds where it was.
+  derive away = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
+  derive waiting = entries.filter(e => not away.includes(e.id))
+  derive countOf = [waiting.length, waiting.filter(e => e.stage == "needs").length, waiting.filter(e => e.stage == "working").length, waiting.filter(e => e.stage == "done").length, waiting.filter(e => e.stage == "quiet").length]
+  derive words = wordsOf(query)
+  derive searching = words.length > 0
+  derive topics = searching ? topicsOf(entries.filter(e => matches(e, words))) : stageTopics(entries, tab)
+  derive picks = picksOf(asks.asks, said)
+  derive asking = asks.asks.filter(a => not away.includes(a.id)).length
+  derive known = tasks.version > 0 or asks.version > 0
+  derive needsTab = tab == "needs" and not searching
+  action search(v: string)
+    query = v
+  action openPage(page: string)
+    open(path("task", homeOf(page, tasks.tasks)))
+  action goThrough
+    haptic("selection")
+    talk("asks")
   view
     column navigationKey=`${entry.id}` navigationPresentation=(viewport.width < 700 ? "modal" : "push") navigationScroll="tasks-list" position="absolute" inset=0 testId="tasks"
-      header display="flex" align-items="center"
+      header display="flex" flex-wrap="wrap" align-items="center" gap=8
         button id="back" press=back aria-label="Close" testId="tasks-close"
           image "symbol:close"
         text "Tasks" role="heading" aria-level=1 flex=1
-      list id="tasks-list" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        input type="search" value=query input=search placeholder="Tasks, topics, questions" aria-label="Search Tasks" testId="tasks-search" width="100%"
+      list id="tasks-list" appearance="auto" listStyle="plain" flex=1 min-height=0
         section
-          scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none"
-            row gap=8 padding="2px 0"
+          if not searching
+            row role="tablist" aria-label="Stages" gap=6 padding="2px 16px 8px" overflow-x="auto" scrollbar-width="none"
               for t, i in tabs key=t.id
-                button press=pickTab(t.id) appearance="none" padding="7px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" role="tab" aria-selected=(tab == t.id) testId=`tab-${t.id}`
+                button press=pickTab(t.id) appearance="none" padding="6px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" flex-shrink=0 role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic="selection" transition="background-color 160ms ease" testId=`tab-${t.id}`
                   text t.label font="-exact-subheadline" font-weight=600 color=(tab == t.id ? "-exact-background" : "-exact-label") white-space="nowrap"
-                  Chip(n=match countOf.at(i) { case some(n) => n, case none => 0 }, state=(t.id == "needs" ? "needs" : "idle"), loading=loading)
-          if tab == "needs" and picks.length > 1
-            link href=path("picks") testId="open-picks"
-              Mark(state="pick", size=28)
-              text `hex picked for ${picks.length} questions` flex=1
-          if tab == "needs" and asks.check.at > 0
-            link href=path("check") testId="open-check"
-              Mark(state="done", size=28)
-              text `Checked ${whenOf(asks.check.at, now, offset)} · fixed ${asks.check.fixed} · flagged ${asks.check.flagged}` flex=1 font="-exact-subheadline"
-        if failed and tasks.tasks.length == 0
-          section
-            text "Can't reach hex. Trying again…" color="-exact-secondary-label" testId="tasks-offline"
-        if loading and tasks.tasks.length == 0 and not failed
-          section
-            progress aria-label="Loading tasks"
-        if tab == "all" or tab == "needs"
-          section
-            header
-              text "Needs you"
-            for a in asks.asks key=a.id
-              AskRow(ask=a, answering=answering, answer=answer, dismiss=dismiss, openTask=openTask)
-            for s in asks.stuck key=s.id
-              row gap=12 align-items="center" testId=`stuck-${s.id}`
-                Mark(state=s.mark, size=28)
-                column flex=1 min-width=0 gap=2
-                  text s.title
-                  text s.why font="-exact-footnote" color="-exact-secondary-label"
-                button press=act(s.id) buttonStyle="bordered" disabled=s.sent testId=`stuck-act-${s.id}`
-                  text (s.sent ? "Sent to hex" : s.action)
-            for t in needing key=t.id
-              TaskLine(task=t, now=now, offset=offset)
-            if tab == "needs" and asks.asks.length + asks.stuck.length + needing.length == 0
-              text "Nothing waits on you" color="-exact-secondary-label" testId="empty-needs"
-        if tab == "all" or tab == "working"
-          section
-            header
-              text "Working"
-            for t in working key=t.id
-              TaskLine(task=t, now=now, offset=offset)
-            if tab == "working" and working.length == 0
-              text "Nothing is working" color="-exact-secondary-label" testId="empty-working"
-        if tab == "all" or tab == "done"
-          section
-            header
-              text "Done"
-            for f in fresh key=f.id
-              row gap=12 align-items="center" delete=markRead(f.id) testId=`fresh-${f.id}`
-                Mark(state=(f.read ? "read" : "done"), size=28)
-                column flex=1 min-width=0 gap=2
-                  text `${f.title}: ${f.line}`
-                  text `${f.topic} · ${whenOf(f.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
-            for f in finished key=f.id
-              link href=path("task", f.run != "" ? f.run : f.id) testId=`finished-${f.id}`
-                Mark(state="done", size=28)
-                column flex=1 min-width=0 gap=2
-                  text f.title
-                  text `${f.topic} · ${whenOf(f.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
-            if tab == "done" and finished.length + fresh.length == 0
-              text "Nothing done in the last day" color="-exact-secondary-label" testId="empty-done"
-        if tab == "all" or tab == "quiet"
-          section
-            header
-              text "Quiet"
-            for t in quiet key=t.id
-              TaskLine(task=t, now=now, offset=offset)
-            if tab == "quiet" and quiet.length == 0
-              text "Nothing is quiet" color="-exact-secondary-label" testId="empty-quiet"
-        if tab == "needs" and asks.asks.length > 0
-          section
-            button press=talk("asks") testId="go-through"
-              text "Go through them with hex"
-
-// A thread: where it is, what it's doing, how long since.
-component TaskLine
-  props
-    task: TaskRow
-    now: number
-    offset: number
-  view
-    link href=path("task", task.id) testId=`task-${task.id}`
-      Mark(state=(task.running ? "working" : task.state), size=28)
-      column flex=1 min-width=0 gap=2
-        row gap=8
-          text (task.place != "" ? task.place : task.name) flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-          text whenOf(task.at, now, offset) font="-exact-footnote" color="-exact-secondary-label"
-        if task.line != ""
-          text (task.line.startsWith("API Error") ? "Stopped on an API error" : task.line) font="-exact-footnote" color=(task.line.startsWith("API Error") ? "-exact-system-red" : "-exact-secondary-label") line-clamp=2
-        if task.agents.length > 0
-          text `${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"}` font="-exact-caption1" color="-exact-tertiary-label"
-
-// A question in the list: its answers inline when they're few and short.
-component AskRow
-  props
-    ask: Ask
-    answering: string
-    answer: action
-    dismiss: action
-    openTask: action
-  derive inline = ask.options.length <= 3 and not ask.multiple and ask.options.map(o => o.label.length <= 18).includes(false) == false
-  derive sending = answering.startsWith(`${ask.id}|`)
-  view
-    column gap=8 delete=dismiss(ask.id) padding="4px 0" testId=`ask-${ask.id}`
-      row gap=12 align-items="flex-start"
-        Mark(state="needs", size=28)
-        column flex=1 min-width=0 gap=2
-          button press=openTask(ask.task) appearance="none" text-align="left"
-            text ask.topic font="-exact-footnote" font-weight=600 color="AccentColor"
-          text ask.question
-      if inline
-        row gap=8 flex-wrap="wrap" padding-left=40
-          for o in ask.options key=o.label
-            button press=answer(ask.id, o.label) disabled=sending appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "AccentColor" : "-exact-tertiary-fill") -exact-press-haptic="selection" testId=`ask-${ask.id}-${o.label}`
-              text o.label font="-exact-subheadline" color=(o.pick ? "#FFFFFF" : "-exact-label")
+                  if t.id != "all"
+                    text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(t.id == "needs" ? "hex.accent" : tab == t.id ? "-exact-background" : "-exact-secondary-label") opacity=(tab == t.id and t.id != "needs" ? 0.7 : 1)
+          if failed and known
+            text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 16px" testId="tasks-behind"
+          if needsTab and picks.length > 1
+            link href=path("picks") -exact-press-haptic="selection" testId="open-picks"
+              Mark(state="pick", size=22)
+              text `hex picked for ${picks.length} questions` flex=1 font="-exact-body"
+              text "Take them" font="-exact-subheadline" color="hex.accent"
+          for t, i in topics key=(tab == "done" or searching ? `${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : t.name)
+            if not searching and tab == "all" and (i == 0 or match topics.at(i - 1) { case some(p) => match p.entries.at(0) { case some(e) => e.stage, case none => "" } != match t.entries.at(0) { case some(e) => e.stage, case none => "" }, case none => true })
+              text stageWord(match t.entries.at(0) { case some(e) => e.stage, case none => "" }) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.4 padding=(i == 0 ? "4px 16px 2px" : "18px 16px 2px")
+            if searching
+              TopicHead(topic=t, href=path("task", homeOf(pageOf(t), tasks.tasks)))
+              for e in t.entries key=e.id
+                EntryRow(entry=e, asks=asks.asks, said=said, why=whyOf(e, words), now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openPage)
+            else
+              ProjectRow(topic=t, now=now, offset=offset, href=path("task", homeOf(pageOf(t), tasks.tasks)))
+          if needsTab and asks.check.at > 0
+            link href=path("check") -exact-press-haptic="selection" testId="open-check"
+              Mark(state="done", size=22)
+              column flex=1 min-width=0 gap=2
+                text `Checked ${whenOf(asks.check.at, now, offset)}` font="-exact-body"
+                text [asks.check.fixed > 0 ? `fixed ${asks.check.fixed}` : "", asks.check.flagged > 0 ? `flagged ${asks.check.flagged}` : ""].filter(s => s != "").join(" · ") font="-exact-subheadline" color="-exact-secondary-label"
+          if known and topics.length == 0
+            text (searching ? "Nothing matches" : emptyWords(tab)) color="-exact-secondary-label" text-align="center" padding="48px 16px" testId="tasks-empty"
+          if failed and not known
+            text "Can't reach hex. Trying again…" color="-exact-secondary-label" text-align="center" padding="48px 16px" testId="tasks-offline"
+          if loading and not known and not failed
+            progress aria-label="Loading tasks" margin="48px auto"
+          if needsTab and asking > 0
+            box height=72
+      if needsTab and asking > 0
+        button press=goThrough appearance="auto" buttonStyle="glass" position="absolute" left=16 right=16 bottom=(max(viewport.safeAreaBottom, 12) + 4) max-width=420 margin="0 auto" display="flex" flex-direction="row" gap=8 align-items="center" justify-content="center" padding="14px 20px" border-radius=999 testId="go-through"
+          image "symbol:sf/bubble.left.and.bubble.right"
+          text "Go through them with hex"

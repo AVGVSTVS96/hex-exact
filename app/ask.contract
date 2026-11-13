@@ -1,0 +1,150 @@
+// A question from hex (§9.3), as a task's page shows it: flat on the page, no box around it. The
+// question, what it's about and where it came from, then its answers as one kind of row, hex's pick
+// marked in mint; a few short answers sit side by side. Bassim can also answer in his own words, or
+// say it isn't needed. Once answered it folds to what he said, with Undo.
+use Ask, Words from "./shapes.contract"
+use Mark, whenOf from "./parts.contract"
+use Said, unreached, failedWords from "./said.contract"
+
+// A few short answers fit side by side.
+fn evenRow(a: Ask): bool = a.options.length > 0 and a.options.length <= 3 and not a.multiple and a.options.filter(o => o.label.length > 14 or o.detail != "").length == 0
+
+component AskCard
+  props
+    ask: Ask
+    now: number
+    offset: number
+    said: Said
+    draft: string
+    words: Words
+    wordsOpen: bool
+    showWords: action
+    answer: action
+    answerMany: action
+    dismiss: action
+    undo: action
+    again: action
+    reply: action
+    open: action
+  state chosen = [""].slice(0, 0)
+  state folded = false
+  derive answered = said.id == ask.id and said.verb != "note" and said.status != "failed"
+  derive noted = said.id == ask.id and said.verb == "note" and said.status == "sent"
+  derive from = match ask.places.at(0) { case some(p) => p.place, case none => ask.topic }
+  action choose(label: string)
+    if ask.multiple
+      chosen = chosen.includes(label) ? chosen.filter(c => c != label) : chosen.concat([label])
+      haptic("selection")
+    else
+      answer(ask.id, label)
+  action fold
+    folded = not folded
+  view
+    column gap=12 padding="14px 0 10px" testId=`ask-card-${ask.id}`
+      if answered
+        row gap=12 align-items="flex-start"
+          Mark(state="done", size=22)
+          column flex=1 min-width=0 gap=2
+            text ask.question font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+            text (said.verb == "dismiss" ? "Not needed" : said.label) font="-exact-body" font-weight=600 opacity=(said.status == "sending" ? 0.6 : 1)
+            if said.missed > 0
+              row gap=8 align-items="center" flex-wrap="wrap" padding-top=2
+                text unreached(said.missed) font="-exact-footnote" color="hex.ask"
+                button press=again(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`card-again-${ask.id}`
+                  text "Send again" font="-exact-footnote" font-weight=600
+          button press=undo(ask.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" aria-label=`Undo ${said.label}` testId=`card-undo-${ask.id}`
+            text "Undo" font="-exact-subheadline" font-weight=600
+      else
+        row gap=8 align-items="center"
+          text whenOf(ask.at, now, offset) font="-exact-footnote" color="-exact-secondary-label" font-variant-numeric="tabular-nums" flex=1
+          if ask.tag != ""
+            text ask.tag font="-exact-caption1" font-weight=600 color="hex.ask" padding="2px 8px" border-radius=999 background-color="hex.ask.wash"
+          button press=dismiss(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic="selection" testId=`ask-dismiss-${ask.id}`
+            text "Not needed" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+        button press=fold appearance="none" text-align="left" aria-expanded=(not folded) testId=`ask-fold-${ask.id}`
+          text ask.question font="-exact-title3" font-weight=600 line-clamp=(folded ? 2 : 0)
+        if ask.context != "" and not folded
+          text ask.context font="-exact-body" color="-exact-secondary-label" user-select="text"
+        if not folded
+          button press=showWords(ask.id) appearance="none" display="flex" flex-direction="row" gap=4 align-items="center" aria-expanded=wordsOpen testId=`ask-from-${ask.id}`
+            text `From ${from}${ask.at > 0 ? ` · ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-footnote" font-weight=600 color="hex.accent"
+            image (wordsOpen ? "symbol:sf/chevron.up" : "symbol:sf/chevron.down") width=10 height=10 object-fit="contain" color="hex.accent"
+          if wordsOpen
+            column padding="10px 12px" border-radius=12 background-color="-exact-tertiary-fill" gap=4
+              if words.text == ""
+                progress aria-label="Loading the message"
+              else
+                text words.text markup="markdown" font="-exact-subheadline" user-select="text"
+          if ask.links.length > 0
+            row gap=8 flex-wrap="wrap"
+              for l in ask.links key=l.url
+                link href=l.url padding="5px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`ask-link-${l.label}`
+                  text `${l.label} ↗` font="-exact-footnote" font-weight=600
+        if evenRow(ask)
+          row gap=8
+            for o in ask.options key=o.label
+              button press=choose(o.label) appearance="none" flex=1 min-width=0 padding="11px 8px" border-radius=12 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-option-${ask.id}-${o.label}`
+                text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 text-align="center" color=(o.pick ? "hex.accent" : "-exact-label")
+        else
+          column border-top="0.5px solid -exact-separator"
+            for o in ask.options key=o.label
+              button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`ask-option-${ask.id}-${o.label}`
+                if ask.multiple
+                  image (chosen.includes(o.label) ? "symbol:sf/checkmark.circle.fill" : "symbol:sf/circle") width=22 height=22 object-fit="contain" color=(chosen.includes(o.label) ? "AccentColor" : "-exact-tertiary-label")
+                column flex=1 min-width=0 gap=2
+                  text o.label font="-exact-body" font-weight=(o.pick ? 600 : 400) color=(o.pick ? "hex.accent" : "-exact-label")
+                  if o.detail != ""
+                    text o.detail font="-exact-subheadline" color="-exact-secondary-label"
+                if o.pick
+                  text "✦ hex’s pick" font="-exact-caption1" font-weight=600 color="hex.accent" white-space="nowrap"
+        if ask.multiple
+          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=(chosen.length == 0) testId=`ask-answer-${ask.id}`
+            text (chosen.length == 0 ? "Pick one or more" : `Answer with ${chosen.length}`)
+        button press=reply(ask.id) appearance="none" display="flex" flex-direction="row" gap=10 align-items="center" padding="4px 0" text-align="left" testId=`ask-own-${ask.id}`
+          image "symbol:sf/pencil" width=16 height=16 object-fit="contain" color="-exact-secondary-label"
+          text (draft != "" ? draft : "Answer in your own words") font="-exact-subheadline" color=(draft != "" ? "-exact-label" : "-exact-secondary-label") line-clamp=1 flex=1
+        if noted
+          text `Sent to ${said.detail != "" ? said.detail : ask.topic} as a note. The question is still open.` font="-exact-footnote" color="-exact-secondary-label"
+        if said.id == ask.id and said.status == "failed"
+          text failedWords(said) font="-exact-footnote" color="hex.danger" testId=`ask-failed-${ask.id}`
+
+// Bassim's own words to a question, at the page's foot: send them as a note (the question stays
+// open) or as the answer. Closing it keeps the draft.
+component ReplyComposer
+  props
+    ask: Ask
+    draft: string
+    keep: action
+    close: action
+    note: action
+    answer: action
+  state text = ""
+  state started = false
+  derive words = started ? text : draft
+  action edit(v: string)
+    text = v
+    started = true
+    keep(`ask:${ask.id}`, v)
+  action sendNote
+    note(ask.id, words.trim())
+    keep(`ask:${ask.id}`, "")
+    close()
+  action sendAnswer
+    answer(ask.id, words.trim())
+    keep(`ask:${ask.id}`, "")
+    close()
+  action leave
+    if words.trim() == ""
+      close()
+  view
+    column gap=8 padding="10px 16px" testId="reply"
+      row gap=8 align-items="center"
+        text `Replying to ${ask.question}` font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
+        button press=close aria-label="Close, keep the draft" testId="reply-close"
+          image "symbol:close"
+      textarea id="reply-field" value=words input=edit blur=leave autofocus=true rows=3 field-sizing="content" max-height=130 placeholder="Your answer" aria-label="Your answer" testId="reply-field"
+      row gap=8 justify-content="flex-end"
+        button press=sendNote disabled=(words.trim() == "") buttonStyle="bordered" testId="reply-note"
+          text "Send as note"
+        button press=sendAnswer disabled=(words.trim() == "") buttonStyle="filled" testId="reply-answer"
+          text "Answer"

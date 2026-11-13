@@ -1,0 +1,56 @@
+// What Bassim did with a question or a message on this phone, kept while the app runs so a screen
+// can show it at once, before hex answers, and say how it went after: a question answered folds to
+// "label → topic" with Undo; a message waits dimmed under the thread until hex has it.
+//
+// Root state holds only strings, so each is one line of tab-separated fields.
+
+use Ask, Sent from "./shapes.contract"
+
+// A question. verb: answer | dismiss | note. status: sending | sent | failed. detail: where it went
+// (the topic) or why it didn't. missed: places out of reach that still ask it.
+shape Said
+  id: string
+  verb: string
+  label: string
+  status: string
+  detail: string
+  missed: number
+  question: string
+  topic: string
+  task: string
+
+// A message to a thread. status: sending | sent | failed. key: what hex echoes in `waiting`.
+shape Sending
+  task: string
+  key: string
+  text: string
+  status: string
+  error: string
+
+fn field(line: string, i: number): string = match line.split("\t").at(i) { case some(s) => s, case none => "" }
+fn clean(s: string): string = s.replaceAll("\t", " ")
+
+fn saidLine(s: Said): string = [s.id, s.verb, clean(s.label), s.status, clean(s.detail), `${s.missed}`, clean(s.question).slice(0, 160), clean(s.topic), s.task].join("\t")
+fn saidOf(line: string): Said = Said(id=field(line, 0), verb=field(line, 1), label=field(line, 2), status=field(line, 3), detail=field(line, 4), missed=match parseNumber(field(line, 5)) { case some(n) => n, case none => 0 }, question=field(line, 6), topic=field(line, 7), task=field(line, 8))
+
+fn sendingLine(s: Sending): string = [s.task, s.key, clean(s.text), s.status, clean(s.error)].join("\t")
+fn sendingOf(line: string): Sending = Sending(task=field(line, 0), key=field(line, 1), text=field(line, 2), status=field(line, 3), error=field(line, 4))
+
+// The newest word on an ask, if any.
+fn lastSaid(said: Said[], id: string): option<Said> = said.filter(s => s.id == id).at(-1)
+
+// A question this phone has put away: answered or dismissed, sent or on its way.
+fn putAway(said: Said[], id: string): bool = said.filter(s => s.id == id and s.verb != "note" and s.status != "failed").length > 0
+
+// "One place was out of reach and still asks it"
+fn unreached(missed: number): string = missed == 1 ? "One place was out of reach and still asks it" : `${missed} places were out of reach and still ask it`
+
+// How a failed write reads under its item: "Not answered · Cannot reach hex…"
+fn failedWords(s: Said): string = `${s.verb == "dismiss" ? "Not put away" : s.verb == "undo" ? "Not undone" : s.verb == "again" ? "Not sent again" : s.verb == "note" ? "Not sent" : "Not answered"} · ${s.detail}`
+
+// A word on an ask, on its way: the ask's question and topic kept beside it, so the row can fold
+// to "label → topic" after hex lets the ask go.
+fn saidFor(asks: Ask[], id: string, verb: string, label: string): Said = match asks.filter(a => a.id == id).at(0) { case some(a) => Said(id=id, verb=verb, label=label, status="sending", detail="", missed=0, question=a.question, topic=a.topic, task=a.task), case none => Said(id=id, verb=verb, label=label, status="sending", detail="", missed=0, question="", topic="", task="") }
+fn withSaid(said: string[], s: Said): string[] = said.filter(l => field(l, 0) != s.id).concat([saidLine(s)])
+// hex's reply to a word on an ask: where it went, or why it didn't.
+fn settledLines(said: string[], r: Sent): string[] = said.map(l => field(l, 0) == r.id and field(l, 3) == "sending" ? saidLine(Said(saidOf(l), status=(r.ok ? "sent" : "failed"), detail=(r.ok ? r.topic : r.error), missed=r.missed)) : l)

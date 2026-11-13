@@ -16,6 +16,7 @@ use LastCheck from "./last-check.contract"
 use SettingsScreen from "./settings.contract"
 use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
+use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 use UpdateToast from "./toast.contract"
 use paletteColor from "./parts.contract"
 
@@ -54,6 +55,14 @@ component App
   // What's being sent, so a screen can say so beside it: `${askId}|${label}`, a task id, a call id.
   state answering = ""
   state messaging = ""
+  // What Bassim did with each question and message here, as said.contract's lines, so screens show
+  // it at once and say how it went.
+  state said = [""].slice(0, 0)
+  state sends = [""].slice(0, 0)
+  // hex's picks as Bassim leaves them before answering them all: `${askId}\t${label}`, "" for later.
+  state picked = [""].slice(0, 0)
+  // Unsent words, kept across launches: `${key}\t${text}`, key `thread:<task>` or `ask:<id>`.
+  state drafts = [""].slice(0, 0) persist
   state removing = ""
   // Photos and videos added to one composer (attachedTo: `ask:<id>` or `thread:<id>`), uploaded,
   // waiting to go with its next send.
@@ -90,8 +99,10 @@ component App
   derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => "" }
   derive chatOpen = names.includes("thread") or (names.includes("task") and viewport.width >= 700)
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
-  resource task = watchTask(taskId) when taskId != "" as shape TaskPage else empty()
-  resource chat = watchChat(taskId) when taskId != "" and chatOpen as shape Chat else empty()
+  // A topic (`topic:<name>`) or a finished item (`done:<id>`) opens a page made from the lists.
+  derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") ? "" : taskId
+  resource task = watchTask(threadId) when threadId != "" as shape TaskPage else empty()
+  resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
   resource check = loadCheck() when names.includes("check") as shape Check else empty()
   resource settings = loadSettings() when names.includes("settings") as shape Settings else empty()
   resource words = loadWords(wordsAsk) when wordsAsk != "" as shape Words else empty()
@@ -101,15 +112,15 @@ component App
   mutation shared as shape Reply
   mutation retried as shape Reply
   mutation added as shape Attached then gotMedia
-  mutation answered as shape Sent queue
-  mutation answeredAll as shape Reply queue
-  mutation noted as shape Sent queue
-  mutation dismissed as shape Sent queue
-  mutation undone as shape Sent queue
+  mutation answered as shape Sent queue then settle
+  mutation answeredAll as shape Reply queue then settleAll
+  mutation noted as shape Sent queue then settleNote
+  mutation dismissed as shape Sent queue then settleDismiss
+  mutation undone as shape Sent queue then settleUndo
   mutation acted as shape Reply queue
   mutation marked as shape Reply queue
   mutation talked as shape Reply
-  mutation messaged as shape Reply queue
+  mutation messaged as shape Reply queue then settleMessage
   mutation stopped as shape Reply
   mutation removed as shape Reply queue
   mutation saved as shape Reply queue refreshes settings
@@ -189,21 +200,82 @@ component App
       send commanded = callCommand("start", voice, about, phone)
 
   // Asks
+  derive saids = said.map(l => saidOf(l))
+  // Every question on screen: the lists' and the live call's.
+  derive allAsks = asks.asks.concat(activity.asks.map(c => c.ask))
   action answer(id: string, label: string)
     answering = `${id}|${label}`
+    said = withSaid(said, saidFor(allAsks, id, "answer", label))
+    haptic("selection")
     send answered = answerAsk(id, [label], noMedia)
   action answerMany(id: string, labels: string[])
     answering = `${id}|${labels.join(", ")}`
+    said = withSaid(said, saidFor(allAsks, id, "answer", labels.join(", ")))
+    haptic("selection")
     send answered = answerAsk(id, labels, noMedia)
   // hex's picks, all at once: each ask with its answer, in order.
   action answerAll(ids: string[], labels: string[])
+    said = said.filter(l => not ids.includes(field(l, 0))).concat(range(ids.length).map(i => saidLine(saidFor(allAsks, match ids.at(i) { case some(x) => x, case none => "" }, "answer", match labels.at(i) { case some(x) => x, case none => "" }))))
+    picked = [""].slice(0, 0)
+    haptic("success")
     send answeredAll = answerPicks(ids, labels)
   action note(id: string, words: string)
+    said = withSaid(said, saidFor(allAsks, id, "note", words))
     send noted = noteAsk(id, words, noMedia)
   action dismiss(id: string)
+    said = withSaid(said, saidFor(allAsks, id, "dismiss", "Not needed"))
+    haptic("selection")
     send dismissed = dismissAsk(id)
   action undo(id: string)
+    said = said.filter(l => field(l, 0) != id)
     send undone = undoAsk(id)
+  // Answer again where a place was out of reach.
+  action again(id: string)
+    match saids.filter(s => s.id == id).at(-1)
+      case some(s)
+        said = withSaid(said, saidFor(allAsks, id, "answer", s.label))
+        send answered = answerAsk(id, s.label.split(", "), noMedia)
+      case none
+        said = said
+  action settle
+    match answered
+      case some(r)
+        said = settledLines(said, r)
+      case none
+        said = said
+  action settleDismiss
+    match dismissed
+      case some(r)
+        said = settledLines(said, r)
+      case none
+        said = said
+  action settleNote
+    match noted
+      case some(r)
+        said = settledLines(said, r)
+      case none
+        said = said
+  action settleUndo
+    match undone
+      case some(r)
+        if not r.ok
+          said = said.concat([saidLine(Said(id=r.id, verb="undo", label="", status="failed", detail=r.error, missed=0, question="", topic="", task=""))])
+      case none
+        said = said
+  action settleAll
+    match answeredAll
+      case some(r)
+        if not r.ok
+          said = said.map(l => field(l, 3) == "sending" ? saidLine(Said(saidOf(l), status="failed", detail=r.error)) : l)
+        else
+          said = said.map(l => field(l, 3) == "sending" ? saidLine(Said(saidOf(l), status="sent")) : l)
+      case none
+        said = said
+  action pick(id: string, label: string)
+    picked = picked.filter(l => field(l, 0) != id).concat([`${id}\t${label}`])
+    haptic("selection")
+  action keepDraft(key: string, text: string)
+    drafts = drafts.filter(l => field(l, 0) != key).concat(text == "" ? [] : [`${key}\t${text.replaceAll("\t", " ")}`])
   action showWords(id: string)
     wordsAsk = wordsAsk == id ? "" : id
   action act(id: string)
@@ -213,8 +285,26 @@ component App
 
   // Threads
   action message(id: string, words: string)
+    let key = `app-${round(clock.epochAtZero + performanceNow())}`
     messaging = id
-    send messaged = sendChat(id, words, `app-${clock.epochAtZero + performanceNow()}`, noMedia)
+    sends = sends.slice(-30).concat([sendingLine(Sending(task=id, key=key, text=words, status="sending", error=""))])
+    drafts = drafts.filter(l => field(l, 0) != `thread:${id}`)
+    send messaged = sendChat(id, words, key, noMedia)
+  // Try a message again with its own key, so hex doesn't take it twice.
+  action resend(key: string)
+    match sends.map(l => sendingOf(l)).filter(s => s.key == key).at(0)
+      case some(s)
+        sends = sends.map(l => field(l, 1) == key ? sendingLine(Sending(s, status="sending", error="")) : l)
+        send messaged = sendChat(s.task, s.text, key, noMedia)
+      case none
+        sends = sends
+  action settleMessage
+    match messaged
+      case some(r)
+        let first = sends.map(l => field(l, 3)).indexOf("sending")
+        sends = range(sends.length).map(i => i == first ? sendingLine(Sending(sendingOf(match sends.at(i) { case some(l) => l, case none => "" }), status=(r.ok ? "sent" : "failed"), error=r.error)) : match sends.at(i) { case some(l) => l, case none => "" })
+      case none
+        sends = sends
   action stop(id: string)
     send stopped = stopTask(id)
 
@@ -264,7 +354,7 @@ component App
         if e.name == "pastCall"
           PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
-          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, back=back)
+          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, back=back)
         if e.name == "task"
           TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, talk=talk, message=message, answering=answering, back=back)
         if e.name == "thread"

@@ -1,0 +1,87 @@
+// Everything that waits on Bassim or that hex is doing, as one ranked list (§9.1, the stable app's
+// src/live/inbox.ts): questions, threads, stuck runs, fresh results and what finished today, each
+// an entry in a stage (needs, working, done, quiet), grouped by topic. The list, search and a
+// topic's page all read it.
+use Ask, Asks, Tasks, TaskRow, Place, Link from "./shapes.contract"
+use Said from "./said.contract"
+
+// An entry. kind: ask | task | stuck | fresh | finished. page: the thread a tap opens ("" for none). mark:
+// the state its mark draws. title: its headline; line: the words under it. tiles: where it lives.
+shape Item
+  kind: string
+  id: string
+  topic: string
+  app: string
+  stage: string
+  rank: number
+  at: number
+  page: string
+  mark: string
+  title: string
+  line: string
+  meta: string
+  action: string
+  sent: bool
+  words: string
+  tiles: Place[]
+
+shape Topic
+  name: string
+  entries: Item[]
+
+fn rankOf(stage: string): number = stage == "needs" ? 0 : stage == "working" ? 1 : stage == "done" ? 2 : 3
+fn nth(xs: string[], i: number): string = match xs.at(i) { case some(x) => x, case none => "" }
+fn unique(xs: string[]): string[] = range(xs.length).filter(i => xs.indexOf(nth(xs, i)) == i).map(i => nth(xs, i))
+
+fn stageWord(stage: string): string = stage == "needs" ? "Needs you" : stage == "working" ? "Working" : stage == "done" ? "Done" : "Quiet"
+fn stateWord(state: string): string = state == "needs" ? "waiting on you" : state == "working" ? "working" : state == "done" ? "done" : state == "failed" ? "failed" : "quiet"
+
+// A thread that's one part of a bigger topic (its place differs from its name).
+fn isPart(t: TaskRow): bool = t.place != "" and t.place != t.name
+
+// "API Error: …" lines read as what happened.
+fn problemOf(line: string): string = not line.startsWith("API Error") ? "" : line.toLowerCase().includes("limit") ? "Stopped: the server was limiting requests" : "Stopped on an API error"
+
+fn agentsWord(t: TaskRow): string = t.state != "working" ? "" : t.agents.filter(a => a.state == "working").length == 0 ? "" : `${t.agents.filter(a => a.state == "working").length} ${t.agents.filter(a => a.state == "working").length == 1 ? "agent" : "agents"}`
+
+fn appTile(app: string, link: string): Place = Place(app=(app == "telegram" or app == "t3" or app == "buzz" or app == "discord" ? app : "server"), place="", task="", call="", link=link)
+
+// An ask's tiles: where it lives, the ones that open first, and its first link (three at most).
+fn askTiles(a: Ask): Place[] = a.places.filter(p => p.link != "" or p.call != "").concat(a.places.filter(p => p.link == "" and p.call == "")).slice(0, a.links.length > 0 ? 2 : 3).concat(a.links.slice(0, 1).map(l => Place(app="link", place=l.label, task="", call="", link=l.url)))
+
+fn askEntry(a: Ask, tasks: TaskRow[]): Item = Item(kind="ask", id=a.id, topic=match tasks.filter(t => t.id == a.task).at(0) { case some(t) => t.name, case none => a.topic }, app=a.app, stage="needs", rank=0, at=a.at, page=a.task, mark=(a.options.filter(o => o.pick).length > 0 ? "pick" : "asks"), title=a.question, line=a.context, meta="", action="", sent=false, words=`${a.question} ${a.context}`, tiles=askTiles(a))
+
+fn taskEntry(t: TaskRow): Item = Item(kind="task", id=t.id, topic=t.name, app=t.app, stage=(t.state == "needs" or t.state == "working" ? t.state : "quiet"), rank=rankOf(t.state == "needs" or t.state == "working" ? t.state : "quiet"), at=(t.state == "needs" ? t.since : t.at), page=t.id, mark=(problemOf(t.line) != "" ? "failed" : t.state == "done" ? "read" : t.state), title=(isPart(t) ? `${t.place} · ${t.line != "" ? t.line : stateWord(t.state)}` : t.line != "" ? t.line : stateWord(t.state)), line="", meta=agentsWord(t), action="", sent=false, words=`${t.name} ${t.place} ${t.line}`, tiles=[appTile(t.app, t.link)])
+
+// Every entry, ranked: needs, working, done, quiet; the settled ones newest first.
+fn entriesOf(tasks: Tasks, asks: Asks, now: number): Item[] = sortBy(sortBy(asks.asks.map(a => askEntry(a, tasks.tasks)).concat(tasks.tasks.filter(t => t.state == "working" or not asks.asks.map(a => a.task).includes(t.id)).map(t => taskEntry(t))).concat(asks.stuck.map(s => Item(kind="stuck", id=s.id, topic="Stuck", app=s.app, stage="needs", rank=0, at=s.at, page="", mark=s.mark, title=s.title, line=s.why, meta="", action=s.action, sent=s.sent, words=`${s.title} ${s.why}`, tiles=[appTile(s.app, "")]))).concat(asks.fresh.filter(f => not f.read or f.at >= now - 86400000).map(f => Item(kind="fresh", id=f.id, topic=f.topic, app=f.app, stage=(f.at >= now - 86400000 ? "done" : "quiet"), rank=(f.at >= now - 86400000 ? 2 : 3), at=f.at, page="", mark=(f.read ? "read" : "done"), title=`${f.title}: ${f.line}`, line="", meta="", action=(f.read ? "" : "Mark read"), sent=f.read, words=`${f.title} ${f.line}`, tiles=[appTile(f.app, "")]))).concat(tasks.finished.filter(f => f.at >= now - 86400000).map(f => Item(kind="finished", id=f.id, topic=f.topic, app=f.app, stage="done", rank=2, at=f.at, page=f.run, mark="done", title=f.title, line=f.said, meta="", action="", sent=false, words=`${f.title} ${f.said}`, tiles=[appTile(f.app, f.link)].concat(f.links.slice(0, 1).map(l => Place(app=(l.url.startsWith("https://t.me/") ? "telegram" : "link"), place=l.label, task="", call="", link=l.url)))))), e => e.rank >= 2 ? -e.at : 0), e => e.rank)
+
+// What a tab shows: its stage's entries; All shows each topic at its most pressing stage.
+fn tabEntries(entries: Item[], tab: string): Item[] = tab != "all" ? entries.filter(e => e.stage == tab) : entries.filter(e => match entries.filter(x => x.topic == e.topic).at(0) { case some(x) => x.stage == e.stage, case none => true })
+
+fn topicsOf(shown: Item[]): Topic[] = unique(shown.map(e => e.topic)).map(n => Topic(name=n, entries=shown.filter(e => e.topic == n)))
+// The Done tab is one row per finished thing.
+fn stageTopics(entries: Item[], tab: string): Topic[] = tab == "done" ? tabEntries(entries, tab).map(e => Topic(name=e.topic, entries=[e])) : topicsOf(tabEntries(entries, tab))
+
+fn wordsOf(query: string): string[] = query.trim().toLowerCase().split(" ").filter(w => w != "")
+fn appWord(app: string): string = app == "telegram" ? "telegram" : app == "t3" ? "t3 code" : app == "buzz" ? "buzz" : app == "discord" ? "discord" : "on the server"
+// Every word somewhere in the topic, the place or the words.
+fn matches(e: Item, words: string[]): bool = words.filter(w => not `${e.topic} ${appWord(e.app)} ${e.words}`.toLowerCase().includes(w)).length == 0
+
+// Why a row matched when a word isn't in what it shows: a stretch around that word, the words in bold.
+fn whyOf(e: Item, words: string[]): string = match words.filter(w => not `${e.topic} ${e.title}`.toLowerCase().includes(w)).at(0) { case some(w) => boldWords(stretch(e.words, w), words), case none => "" }
+fn stretch(text: string, word: string): string = text.toLowerCase().indexOf(word) < 0 ? "" : `${text.toLowerCase().indexOf(word) > 30 ? "…" : ""}${text.slice(max(0, text.toLowerCase().indexOf(word) - 30), text.toLowerCase().indexOf(word) + word.length + 80).trim()}${text.toLowerCase().indexOf(word) + word.length + 80 < text.length ? "…" : ""}`
+fn boldOnce(text: string, word: string): string = text.toLowerCase().indexOf(word) < 0 ? text : `${text.slice(0, text.toLowerCase().indexOf(word))}**${text.slice(text.toLowerCase().indexOf(word), text.toLowerCase().indexOf(word) + word.length)}**${text.slice(text.toLowerCase().indexOf(word) + word.length)}`
+fn boldWords(text: string, words: string[]): string = words.length == 0 ? text : words.length == 1 ? boldOnce(text, nth(words, 0)) : words.length == 2 ? boldOnce(boldOnce(text, nth(words, 0)), nth(words, 1)) : boldOnce(boldOnce(boldOnce(text, nth(words, 0)), nth(words, 1)), nth(words, 2))
+
+// The page a topic opens: one finished thing its done page, else its first thread, else the topic.
+fn pageOf(t: Topic): string = t.entries.length == 1 and t.entries.filter(e => e.kind == "finished").length == 1 ? `done:${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : match t.entries.filter(e => e.page != "").at(0) { case some(e) => e.page, case none => `topic:${t.name}` }
+
+// The main thread a part opens to (a sub-thread's topic page is its main thread's).
+fn homeOf(page: string, tasks: TaskRow[]): string = match tasks.filter(t => t.id == page).at(0) { case some(t) => isPart(t) ? match tasks.filter(x => x.name == t.name and not isPart(x)).at(0) { case some(x) => x.id, case none => page } : page, case none => page }
+
+// The asks a thread's page shows: its own, or for a main thread every one in its topic.
+fn asksOf(t: TaskRow, asks: Ask[]): Ask[] = asks.filter(a => isPart(t) ? a.task == t.id : a.topic == t.name or a.task == t.id)
+
+// hex's picks Bassim can take: an ask with a pick, not about money, not put away here.
+fn picksOf(asks: Ask[], said: Said[]): Ask[] = asks.filter(a => a.tag != "money" and a.options.filter(o => o.pick).length > 0 and said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0)

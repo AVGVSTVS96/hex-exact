@@ -168,6 +168,7 @@ shape Words
 // The reply to an answer, note, dismissal or undo: ok, or why not. topic and missed say where it
 // went and how many places were out of reach.
 shape Sent
+  id: string
   ok: bool
   error: string
   topic: string
@@ -190,6 +191,8 @@ shape Agent
   line: string
   result: string
   link: string
+  via: string
+  steps: Step[]
 
 // state: needs | working | done | failed | idle
 shape TaskRow
@@ -208,6 +211,7 @@ shape TaskRow
   track: Track[]
   agents: Agent[]
 
+// said: the proof's words with each link named; links: the proof's links.
 shape Finished
   id: string
   title: string
@@ -217,6 +221,8 @@ shape Finished
   at: number
   run: string
   link: string
+  said: string
+  links: Link[]
 
 shape Tasks
   version: number
@@ -250,6 +256,20 @@ shape PlanItem
   text: string
   state: string
 
+// The task's pinned status post, read into sections (data/pinned.ts). mark: done | working |
+// needs | failed | idle. kind: item (a bullet) | code | text. url: the line's link, else "".
+shape PinLine
+  kind: string
+  text: string
+  mark: string
+  url: string
+
+shape PinSection
+  title: string
+  mark: string
+  folded: bool
+  lines: PinLine[]
+
 // A task's page. kind: task (a thread hex works in) | page (a place with no run of its own).
 shape TaskPage
   kind: string
@@ -273,6 +293,7 @@ shape TaskPage
   agents: Agent[]
   track: Track[]
   asks: Ask[]
+  pins: PinSection[]
 
 shape Media
   id: string

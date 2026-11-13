@@ -18,7 +18,8 @@
     "ios": {
       "minimumOS": "18.0",
       "deviceFamily": [
-        "iphone"
+        "iphone",
+        "ipad"
       ]
     }
   },
@@ -27,7 +28,7 @@
       "web": "0",
       "ios": "A"
     },
-    "activate": "immediate",
+    "activate": "app-decides",
     "check": {
       "interval": 60
     },
@@ -43,7 +44,6 @@
       "hexexact"
     ]
   },
-  "userInterfaceStyle": "dark",
   "icons": [
     {
       "src": "assets/icon.png",

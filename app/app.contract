@@ -2,7 +2,7 @@
 // call, Siri and the Live Activity; this root holds everything the screens read and write, as
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
-use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
+use Viewport, Pose, Delivery, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
 use Home from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
@@ -87,6 +87,7 @@ component App
   state tick = 0
 
   resource viewport = exactViewport() as shape Viewport
+  resource pose = devicePose() as shape Pose else empty()
   resource clock = exactTime() as shape Time
 
   // The live call, as the shell holds it, and its words. These follow the shell, not a timer.
@@ -104,6 +105,13 @@ component App
   // comes to the front.
   resource page = exactPage() as shape Page
   resource build = checkBuild() when page.visibilityState == "visible" as shape Build else empty()
+  // A new screen waits until the app is put away with no call on, so nothing changes under Bassim's
+  // hands mid-call or mid-typing.
+  resource delivery = exactDelivery() as shape Delivery
+  task update when delivery.staged and page.visibilityState == "hidden" and call.status == "idle" key=delivery.seq
+    change(applyUpdate)
+  action applyUpdate
+    deliveryActivate()
 
   // What the open screens show; asked only while they are open.
   derive names = stack(nav).map(e => e.name)
@@ -147,7 +155,11 @@ component App
 
   derive place = top(nav)
   derive needsYou = counts.yours
-  derive shownTab = tab != "" ? tab : (needsYou > 0 ? "needs" : "working")
+  // hexexact://go/tasks?stage=working opens Tasks on a stage; hexexact://go/?update=demo shows the
+  // update toast with a made-up build.
+  derive linkStage = match stack(nav).filter(e => e.name == "tasks").at(0) { case some(e) => searchParam(e, "stage"), case none => "" }
+  derive demoUpdate = match stack(nav).at(0) { case some(e) => searchParam(e, "update") == "demo", case none => false }
+  derive shownTab = tab != "" ? tab : linkStage != "" ? linkStage : (needsYou > 0 ? "needs" : "working")
   derive now = clock.epochAtZero + tick
   // Nothing attached: what a send carries until the camera and Photos attach media ids from POST /media.
   derive noMedia = [""].slice(0, 0)
@@ -199,6 +211,10 @@ component App
     openURL(link, "opened")
   action heardOpen(v: string)
     missing = missing.filter(a => a != opening).concat(v == "failed" ? [opening] : [])
+  // Esc closes Tasks, whatever page of it is open.
+  action pressed(k: string, e: KeyboardEvent)
+    if k == "Escape" and names.includes("tasks")
+      nav = go(nav, "/")
   action home
     nav = go(nav, "/")
   action open(location: string)
@@ -210,10 +226,12 @@ component App
     nav = go(nav, path("task", id))
   action besidePage(page: string)
     beside = page
-    haptic("selection")
+    if haptics
+      haptic("selection")
   action pickTab(t: string)
     tab = t
-    haptic("selection")
+    if haptics
+      haptic("selection")
 
   // The call
   action startCall(about: string)
@@ -261,19 +279,22 @@ component App
   action answer(id: string, label: string)
     answering = `${id}|${label}`
     said = withSaid(said, saidFor(allAsks, id, "answer", label))
-    haptic("selection")
+    if haptics
+      haptic("selection")
     send answered = answerAsk(id, label == "" ? [] : [label], (attachedTo == `ask:${id}` ? attached.map(m => m.id) : noMedia))
     attached = attachedTo == `ask:${id}` ? attached.slice(0, 0) : attached
   action answerMany(id: string, labels: string[])
     answering = `${id}|${labels.join(", ")}`
     said = withSaid(said, saidFor(allAsks, id, "answers", labels.join(", ")))
-    haptic("selection")
+    if haptics
+      haptic("selection")
     send answered = answerAsk(id, labels, noMedia)
   // hex's picks, all at once: each ask with its answer, in order.
   action answerAll(ids: string[], labels: string[])
     said = said.filter(l => not ids.includes(field(l, 0))).concat(range(ids.length).map(i => saidLine(saidFor(allAsks, match ids.at(i) { case some(x) => x, case none => "" }, "answer", match labels.at(i) { case some(x) => x, case none => "" }))))
     picked = [""].slice(0, 0)
-    haptic("success")
+    if haptics
+      haptic("success")
     send answeredAll = answerPicks(ids, labels)
   action note(id: string, words: string)
     said = withSaid(said, saidFor(allAsks, id, "note", words))
@@ -281,7 +302,8 @@ component App
     attached = attachedTo == `ask:${id}` ? attached.slice(0, 0) : attached
   action dismiss(id: string)
     said = withSaid(said, saidFor(allAsks, id, "dismiss", "Not needed"))
-    haptic("selection")
+    if haptics
+      haptic("selection")
     send dismissed = dismissAsk(id)
   action undo(id: string)
     said = said.filter(l => field(l, 0) != id)
@@ -335,7 +357,8 @@ component App
         said = said
   action pick(id: string, label: string)
     picked = picked.filter(l => field(l, 0) != id).concat([`${id}\t${label}`])
-    haptic("selection")
+    if haptics
+      haptic("selection")
   action keepDraft(key: string, text: string)
     drafts = drafts.filter(l => field(l, 0) != key).concat(text == "" ? [] : [`${key}\t${text.replaceAll("\t", " ")}`])
   action showWords(id: string)
@@ -391,7 +414,8 @@ component App
   // Calls
   action removeCall(id: string)
     removing = id
-    haptic("impact-medium")
+    if haptics
+      haptic("impact-medium")
     send removed = removeCall(id)
 
   // Settings, on hex (voice, personality, pace, words) and on this phone
@@ -424,8 +448,11 @@ component App
   action giveVoice
     send saved = saveSetting("voice", voice)
 
+  // The Haptics switch, for every screen's taps.
+  provide
+    haptics
   view
-    main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow width="100%" height="100%" testId="app"
+    main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
           Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, trouble=trouble)
@@ -458,4 +485,4 @@ component App
       // Over every screen: a new build is on the install link. Keyed by whether the app is in front,
       // so coming back from an install that didn't happen offers it again.
       for v in [page.visibilityState] key=v
-        UpdateToast(build=build, skipped=skippedBuild, visible=(page.visibilityState == "visible"), live=(call.status != "idle"), place=place.name, viewport=viewport, skip=skipBuild, end=endCall)
+        UpdateToast(build=(demoUpdate ? Build(latest=max(build.running, 1) + 1, running=max(build.running, 1), install=(build.install != "" ? build.install : "demo")) : build), skipped=skippedBuild, visible=(page.visibilityState == "visible"), live=(call.status != "idle"), place=place.name, viewport=viewport, skip=skipBuild, end=endCall)

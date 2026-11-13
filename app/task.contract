@@ -297,7 +297,7 @@ component TaskBody
       if replyAsk.length > 0
         for a in replyAsk key=a.id
           ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach)
-      else if kind == "task" and chat.sends and viewport.width < 700
+      else if kind == "task" and chat.sends
         link href=`${path("thread", id)}#compose` margin="6px 12px 10px" padding="11px 16px" border-radius=22 border="1px solid -exact-separator" testId="task-compose"
           text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1
 

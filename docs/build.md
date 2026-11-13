@@ -27,7 +27,7 @@ the stable app, screen by screen: it is what done means.
 | `app/parts.contract` | the design system: surfaces, marks, chips, place tiles, words for times and endings | shared |
 | `app/data/*.ts`, `app/app.ts` | hex's endpoints (`hex.ts` is the client and the long poll) | shared |
 | `app/call.contract` | Home: the orb, captions, the call's asks, agent line, controls, toolbar | foundation, then (c) for the orb |
-| `app/tasks.contract`, `task.contract`, `thread.contract`, `steps.contract`, `picks.contract`, `pick.contract`, `last-check.contract` | all of parity §9 | (a) Tasks |
+| `app/tasks.contract`, `task.contract`, `thread.contract`, `steps.contract`, `picks.contract`, `pick.contract`, `last-check.contract`, `ask.contract` (a question's card and own-words reply), `inbox.contract` (the ranked list of everything), `rows.contract` (its rows and swipes), `said.contract` (what was answered or sent from here), `app.tamber` (hex's colours) | all of parity §9 | (a) Tasks |
 | `app/calls.contract`, `past-call.contract`, `wrap-up.contract`, `settings.contract`, `voice.contract`, `words.contract`, a new `toast.contract` | §5, 6, 10, 11 | (b) Calls, settings, toast |
 | `shell/**`, `app/modules/apple/Hex.swift` | Live Activity, reconnect, interruptions, sounds, camera and photos, the orb | (c) Swift side |
 
@@ -127,3 +127,13 @@ before a build; builds share it with other work. Commit to main, signed, small.
 - The camera, Photos, the call's Live Activity, its sounds and Siri are the shell's: Exact has no
   camera capture, and the call outlives the screen. Exact's own Live Activities can't follow a
   call the shell holds while the screen sleeps.
+- iOS pushes a list's detail rather than splitting until LLP 1127, so Tasks beside its page (the
+  Duo opened like a book, a window 900 wide) is two panes in the Tasks route, the page beside on
+  the second segment; its thread, Steps and picks still push over both.
+- Root `state` holds only strings, numbers and bools, so what was answered, put away or sent from
+  here, hex's picks as left, and drafts are lines of tab-separated fields (`said.contract`).
+- A phone's Tasks is a sheet that stops at half height during a call, but the call under it
+  stays dimmed and untouchable: Exact's sheets have no undimmed detent (the stable app's
+  `largestUndimmedDetent` at medium).
+- The Esc key closing Tasks isn't wired: Contract's `key` events reach a focused node, not the
+  app, while no field is focused.

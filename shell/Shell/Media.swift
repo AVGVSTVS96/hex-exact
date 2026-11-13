@@ -115,9 +115,9 @@ enum MediaPicker {
     }
     var aspect = 16.0 / 9
     if let track = try? await asset.loadTracks(withMediaType: .video).first,
-      let (size, transform) = try? await track.load(.naturalSize, .preferredTransform)
+      let loaded = try? await track.load(.naturalSize, .preferredTransform)
     {
-      let shown = size.applying(transform)
+      let shown = loaded.0.applying(loaded.1)
       aspect = abs(shown.width) / max(abs(shown.height), 1)
     }
     return Picked(file: out, kind: "video", type: "video/mp4", aspect: aspect)

@@ -4,10 +4,11 @@
 //
 // Root state holds only strings, so each is one line of tab-separated fields.
 
-use Ask, Sent from "./shapes.contract"
+use Ask, Sent, Media from "./shapes.contract"
 
-// A question. verb: answer | answers (several labels, joined by ", ") | dismiss | note. status: sending | sent | failed. detail: where it went
-// (the topic) or why it didn't. missed: places out of reach that still ask it.
+// A question. verb: answer | answers (several labels, joined by ", ") | dismiss | note.
+// status: sending | sent | failed. detail: where it went (the topic) or why it didn't. missed:
+// places out of reach that still ask it.
 shape Said
   id: string
   verb: string
@@ -20,12 +21,14 @@ shape Said
   task: string
 
 // A message to a thread. status: sending | sent | failed. key: what hex echoes in `waiting`.
+// media: the photos and videos it carries, so they show while it sends and go again with a retry.
 shape Sending
   task: string
   key: string
   text: string
   status: string
   error: string
+  media: Media[]
 
 fn field(line: string, i: number): string = match line.split("\t").at(i) { case some(s) => s, case none => "" }
 fn clean(s: string): string = s.replaceAll("\t", " ")
@@ -33,8 +36,12 @@ fn clean(s: string): string = s.replaceAll("\t", " ")
 fn saidLine(s: Said): string = [s.id, s.verb, clean(s.label), s.status, clean(s.detail), `${s.missed}`, clean(s.question).slice(0, 160), clean(s.topic), s.task].join("\t")
 fn saidOf(line: string): Said = Said(id=field(line, 0), verb=field(line, 1), label=field(line, 2), status=field(line, 3), detail=field(line, 4), missed=match parseNumber(field(line, 5)) { case some(n) => n, case none => 0 }, question=field(line, 6), topic=field(line, 7), task=field(line, 8))
 
-fn sendingLine(s: Sending): string = [s.task, s.key, clean(s.text), s.status, clean(s.error)].join("\t")
-fn sendingOf(line: string): Sending = Sending(task=field(line, 0), key=field(line, 1), text=field(line, 2), status=field(line, 3), error=field(line, 4))
+// A message's media as one field: `id kind aspect`, comma between each.
+fn mediaField(media: Media[]): string = media.map(m => `${m.id} ${m.kind} ${m.aspect}`).join(",")
+fn part(s: string, sep: string, i: number): string = match s.split(sep).at(i) { case some(x) => x, case none => "" }
+fn mediaOf(f: string): Media[] = f.split(",").filter(x => x != "").map(x => Media(id=part(x, " ", 0), kind=part(x, " ", 1), aspect=match parseNumber(part(x, " ", 2)) { case some(n) => n, case none => 0 }))
+fn sendingLine(s: Sending): string = [s.task, s.key, clean(s.text), s.status, clean(s.error), mediaField(s.media)].join("\t")
+fn sendingOf(line: string): Sending = Sending(task=field(line, 0), key=field(line, 1), text=field(line, 2), status=field(line, 3), error=field(line, 4), media=mediaOf(field(line, 5)))
 
 // The newest word on an ask, if any.
 fn lastSaid(said: Said[], id: string): option<Said> = said.filter(s => s.id == id).at(-1)

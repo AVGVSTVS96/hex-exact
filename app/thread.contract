@@ -20,6 +20,9 @@ shape Line
 
 fn eventLabel(text: string): string = text.startsWith("(") and text.indexOf(") ") > 1 ? text.slice(1, text.indexOf(") ")) : ""
 fn eventWords(text: string): string = eventLabel(text) != "" ? text.slice(eventLabel(text).length + 3) : text
+// What a turn of Bassim's says it was, as the stable app words it: a voice message is just his words,
+// a Siri turn "Asked Siri" without hex's instruction to itself.
+fn eventShown(label: string): string = label == "" or label.toLowerCase() == "voice message" ? "" : label.startsWith("asked Siri") ? "Asked Siri" : `${label.slice(0, 1).toUpperCase()}${label.slice(1)}`
 fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
 // A refusal hex gave can't be fixed by trying again; a lost connection can.
 fn retries(error: string): bool = error == "" or error.startsWith("Cannot reach hex")
@@ -57,10 +60,10 @@ component Thread
   derive empty = draft.trim() == "" and attached.length == 0
   derive stopping = empty and task.running
   // Sent from here and not yet in the thread: hex echoes a send's key at the end of a waiting key.
-  derive mine = sends.filter(s => s.task == task.id and chat.waiting.map(w => w.key).filter(k => k.endsWith(`:${s.key}`) or k == s.key).length == 0 and not (s.status == "sent" and chat.turns.slice(-6).filter(t => t.source == "me" and t.text == s.text).length > 0))
+  derive mine = sends.filter(s => s.task == task.id and chat.waiting.map(w => w.key).filter(k => k.endsWith(`:${s.key}`) or k == s.key).length == 0 and not (s.status == "sent" and chat.turns.slice(-6).filter(t => t.source == "me" and t.text == s.text and t.media.length == s.media.length).length > 0))
   derive subtitle = task.running ? `working · ${whenOf(task.since, now, offset)}` : `${appName(task.app)}${task.at > 0 ? ` · ${whenOf(task.at, now, offset)}` : ""}`
   derive noMedia = [Media(id="", kind="", aspect=0)].slice(0, 0)
-  derive lines = (chat.total > chat.turns.length ? [Line(id="earlier", kind="earlier", source="", text="", media=noMedia, status="", error="", key="")] : []).concat(chat.turns.map(t => Line(id=`t${t.id}`, kind="turn", source=t.source, text=t.text, media=t.media, status="", error="", key=""))).concat(chat.waiting.map(w => Line(id=`w${w.key}`, kind="waiting", source="me", text=w.text, media=noMedia, status="", error="", key=w.key))).concat(mine.map(m => Line(id=`s${m.key}`, kind="sending", source="me", text=m.text, media=noMedia, status=m.status, error=m.error, key=m.key))).concat(task.running ? [Line(id="working", kind="working", source="", text=task.line, media=noMedia, status="", error="", key="")] : [])
+  derive lines = (chat.total > chat.turns.length ? [Line(id="earlier", kind="earlier", source="", text="", media=noMedia, status="", error="", key="")] : []).concat(chat.turns.map(t => Line(id=`t${t.id}`, kind="turn", source=t.source, text=t.text, media=t.media, status="", error="", key=""))).concat(chat.waiting.map(w => Line(id=`w${w.key}`, kind="waiting", source="me", text=w.text, media=noMedia, status="", error="", key=w.key))).concat(mine.map(m => Line(id=`s${m.key}`, kind="sending", source="me", text=m.text, media=m.media, status=m.status, error=m.error, key=m.key))).concat(task.running ? [Line(id="working", kind="working", source="", text=task.line, media=noMedia, status="", error="", key="")] : [])
   action edit(v: string)
     typed = v
     started = true
@@ -98,8 +101,8 @@ component Thread
                 text l.text font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
                 text `${lengthOf((now - task.since) / 1000)} · Steps ›` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
             else
-              if l.source == "me" and eventLabel(l.text) != "" and eventLabel(l.text) != "Voice message"
-                text eventLabel(l.text) font="-exact-caption1" color="-exact-tertiary-label" padding="0 4px"
+              if l.source == "me" and eventShown(eventLabel(l.text)) != ""
+                text eventShown(eventLabel(l.text)) font="-exact-caption1" color="-exact-tertiary-label" padding="0 4px"
               if l.media.length > 0
                 Album(media=l.media, width=min(viewport.width * 0.6, 260))
               if l.text != "" and l.source == "me"

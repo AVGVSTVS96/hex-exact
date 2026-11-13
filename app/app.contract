@@ -218,7 +218,8 @@ component App
     send answeredAll = answerPicks(ids, labels)
   action note(id: string, words: string)
     said = withSaid(said, saidFor(allAsks, id, "note", words))
-    send noted = noteAsk(id, words, noMedia)
+    send noted = noteAsk(id, words, (attachedTo == `ask:${id}` ? attached.map(m => m.id) : noMedia))
+    attached = attachedTo == `ask:${id}` ? attached.slice(0, 0) : attached
   action dismiss(id: string)
     said = withSaid(said, saidFor(allAsks, id, "dismiss", "Not needed"))
     haptic("selection")
@@ -286,7 +287,8 @@ component App
     messaging = id
     sends = sends.slice(-30).concat([sendingLine(Sending(task=id, key=key, text=words, status="sending", error=""))])
     drafts = drafts.filter(l => field(l, 0) != `thread:${id}`)
-    send messaged = sendChat(id, words, key, noMedia)
+    send messaged = sendChat(id, words, key, (attachedTo == `thread:${id}` ? attached.map(m => m.id) : noMedia))
+    attached = attachedTo == `thread:${id}` ? attached.slice(0, 0) : attached
   // Try a message again with its own key, so hex doesn't take it twice.
   action resend(key: string)
     match sends.map(l => sendingOf(l)).filter(s => s.key == key).at(0)
@@ -355,7 +357,7 @@ component App
         if e.name == "task"
           TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, talk=talk, message=message, answering=answering, back=back)
         if e.name == "thread"
-          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, talk=talk, inCall=(call.status == "live"), open=open, back=back)
+          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
         if e.name == "steps"
           Steps(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), back=back)
         if e.name == "picks"

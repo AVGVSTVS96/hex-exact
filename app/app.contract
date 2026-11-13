@@ -74,6 +74,9 @@ component App
   state addError = ""
   // The live call and what was last tried in it (talk | share), so the call says if it didn't go.
   state tried = ""
+  // Apps a link out found missing on this phone, and the one being opened now.
+  state missing = [""].slice(0, 0)
+  state opening = ""
   // The ask whose original message is open ("From <place>"), read from hex while it is.
   state wordsAsk = ""
   // The live call's agents: those running at hex's last word, and the one that just finished, shown
@@ -189,6 +192,13 @@ component App
     nav = go(nav, url)
   action back
     nav = back(nav)
+  // Out to the app a thread lives in; the hidden "opened" field hears whether it opened.
+  action openOut(link: string, app: string)
+    opening = app
+    haptic("selection")
+    openURL(link, "opened")
+  action heardOpen(v: string)
+    missing = missing.filter(a => a != opening).concat(v == "failed" ? [opening] : [])
   action home
     nav = go(nav, "/")
   action open(location: string)
@@ -425,11 +435,11 @@ component App
           PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
           TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
-            TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, attach=attach, detach=detach, back=back)
+            TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "task"
-          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, attach=attach, detach=detach, back=back)
+          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "thread"
-          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${task.id}` ? addError : ""), stopError=(stopFailed == task.id ? stopWords : ""), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
+          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${task.id}` ? addError : ""), stopError=(stopFailed == task.id ? stopWords : ""), missing=missing, openOut=openOut, attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
         if e.name == "steps"
           Steps(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), back=back)
         if e.name == "picks"
@@ -444,6 +454,7 @@ component App
           VoicePage(entry=e, viewport=viewport, settings=settings, voice=voice, inCall=(call.status != "idle"), loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), set=setSetting, open=open, back=back)
         if e.name == "words"
           YourWords(entry=e, words=settings.words, set=setSetting, back=back)
+      input id="opened" display="none" change=heardOpen
       // Over every screen: a new build is on the install link. Keyed by whether the app is in front,
       // so coming back from an install that didn't happen offers it again.
       for v in [page.visibilityState] key=v

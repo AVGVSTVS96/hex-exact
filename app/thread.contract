@@ -52,6 +52,9 @@ component Thread
     attach: action
     detach: action
     talk: action
+    // Apps a link out didn't open in, and the open that hears it.
+    missing: string[]
+    openOut: action
     inCall: bool
     open: action
     back: action
@@ -86,7 +89,10 @@ component Thread
     column navigationKey=`${entry.id}` navigationScroll="thread" interactive-widget="resizes-content" position="absolute" inset=0 testId="thread"
       header display="flex" align-items="center"
         text title role="heading" aria-level=2
-        text subtitle
+        text (missing.includes(task.app) ? `${appName(task.app)} isn’t on this iPhone` : subtitle)
+        if task.link != ""
+          button press=openOut(task.link, task.app) aria-label=`Open in ${appName(task.app)}` testId="thread-door"
+            image (task.app == "telegram" ? "symbol:sf/paperplane.fill" : task.app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : task.app == "buzz" ? "symbol:sf/bolt.fill" : task.app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : task.app == "server" ? "symbol:sf/terminal.fill" : task.app == "voice" or task.app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right")
         button press=talk(task.id) aria-label="Talk it through" testId="thread-talk"
           image "symbol:sf/phone.and.waveform"
       if loading and chat.turns.length == 0

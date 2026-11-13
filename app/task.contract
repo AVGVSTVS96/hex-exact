@@ -60,12 +60,15 @@ component TaskScreen
     attached: Media[]
     attachedTo: string
     addError: string
+    // Apps a link out didn't open in (not on this iPhone), and the open that hears it.
+    missing: string[]
+    openOut: action
     attach: action
     detach: action
     back: action
   view
     column navigationKey=`${entry.id}` navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 testId="task"
-      TaskBody(id=entry.params.id, pane=false, entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, attach=attach, detach=detach, back=back)
+      TaskBody(id=entry.params.id, pane=false, entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
 
 // The page itself: a route's (TaskScreen), or a pane beside the Tasks list on a wide screen.
 component TaskBody
@@ -106,6 +109,9 @@ component TaskBody
     attached: Media[]
     attachedTo: string
     addError: string
+    // Apps a link out didn't open in (not on this iPhone), and the open that hears it.
+    missing: string[]
+    openOut: action
     attach: action
     detach: action
     back: action
@@ -130,6 +136,9 @@ component TaskBody
   derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
   derive replyAsk = pageAsks.filter(a => a.id == replying)
   derive weekly = places.filter(t => t.track.length > 0)
+  // The door out to where this lives: the thread's own place, the finished item's, or a topic's
+  // first question's.
+  derive door = kind == "task" ? match places.filter(t => t.place == row.place and t.link != "").at(0) { case some(t) => Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), case none => Place(app="", place="", task="", call="", link="") } : kind == "done" ? Place(app=finished.app, place="", task="", call="", link=finished.link) : match pageAsks.map(a => a.places).flat().filter(p => p.link != "").at(0) { case some(p) => p, case none => Place(app="", place="", task="", call="", link="") }
   action reply(askId: string)
     replying = askId
   action closeReply
@@ -143,6 +152,9 @@ component TaskBody
           column flex=1 min-width=0 gap=1
             text title font="-exact-title3" font-weight=700 line-clamp=1
             text subtitle font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
+          if door.link != ""
+            button press=openOut(door.link, door.app) appearance="auto" buttonStyle="glass" aria-label=`Open in ${appName(door.app)}` testId="pane-door"
+              image (door.app == "telegram" ? "symbol:sf/paperplane.fill" : door.app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : door.app == "buzz" ? "symbol:sf/bolt.fill" : door.app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : door.app == "server" ? "symbol:sf/terminal.fill" : door.app == "voice" or door.app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right")
           if kind != "done"
             button press=talk(kind == "task" ? id : "asks") appearance="auto" buttonStyle="glass" aria-label="Talk it through" testId="pane-talk"
               image "symbol:sf/phone.and.waveform"
@@ -150,6 +162,9 @@ component TaskBody
         header display="flex" align-items="center"
           text title role="heading" aria-level=2
           text subtitle
+          if door.link != ""
+            button press=openOut(door.link, door.app) aria-label=`Open in ${appName(door.app)}` testId="task-door-bar"
+              image (door.app == "telegram" ? "symbol:sf/paperplane.fill" : door.app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : door.app == "buzz" ? "symbol:sf/bolt.fill" : door.app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : door.app == "server" ? "symbol:sf/terminal.fill" : door.app == "voice" or door.app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right")
           if kind != "done"
             button press=talk(kind == "task" ? id : "asks") aria-label="Talk it through" testId="task-talk"
               image "symbol:sf/phone.and.waveform"
@@ -254,11 +269,11 @@ component TaskBody
                 text `Places · ${places.length}`
               for t, i in places.slice(0, allPlaces ? places.length : 5) key=t.id
                 if i == 0
-                  link href=t.link testId="task-door"
+                  button press=openOut(t.link, t.app) disabled=(t.link == "") display="flex" flex-direction="row" gap=12 align-items="center" text-align="left" testId="task-door"
                     PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=28)
                     column flex=1 min-width=0 gap=1
-                      text (t.place != "" ? t.place : t.name) line-clamp=1
-                      text `${appName(t.app)} · ${whenOf(t.at, now, offset)}${t.link == "" ? " · no link" : ""}` font="-exact-footnote" color="-exact-secondary-label"
+                      text (t.place != "" ? t.place : t.name) line-clamp=1 color="-exact-label"
+                      text (missing.includes(t.app) ? `${appName(t.app)} isn’t on this iPhone` : `${appName(t.app)} · ${whenOf(t.at, now, offset)}${t.link == "" ? " · no link" : ""}`) font="-exact-footnote" color=(missing.includes(t.app) ? "hex.danger" : "-exact-secondary-label")
                     if t.link != ""
                       image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
                 else

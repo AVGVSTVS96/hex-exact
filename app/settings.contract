@@ -1,0 +1,65 @@
+// Voice and appearance (§10, first page): how hex looks, how much it reacts, its voice, and the
+// call's sounds and haptics.
+use Viewport, Settings from "./shapes.contract"
+
+shape Option
+  id: string
+  label: string
+
+component SettingsScreen
+  props
+    entry: Entry
+    viewport: Viewport
+    settings: Settings
+    persona: string
+    personaColor: string
+    reaction: string
+    sounds: bool
+    haptics: bool
+    setPersona: action
+    setPersonaColor: action
+    setReaction: action
+    setSounds: action
+    setHaptics: action
+    open: action
+    back: action
+  derive personas = [Option(id="opal", label="Opal"), Option(id="obsidian", label="Obsidian"), Option(id="mana", label="Mana"), Option(id="halo", label="Halo"), Option(id="glint", label="Glint"), Option(id="command", label="Command")]
+  derive colors = [Option(id="", label="hex"), Option(id="#FFFFFF", label="White"), Option(id="#FF6B6B", label="Coral"), Option(id="#FFB347", label="Amber"), Option(id="#7CDB8A", label="Mint"), Option(id="#5AC8FA", label="Sky"), Option(id="#7C5CFF", label="Violet"), Option(id="#FF7EB6", label="Rose")]
+  derive voiceLine = settings.voice == "" ? "Marin" : `${settings.voice.slice(0, 1).toUpperCase()}${settings.voice.slice(1)}`
+  view
+    column navigationKey=`${entry.id}` navigationPresentation="modal" navigationScroll="settings" position="absolute" inset=0 testId="settings"
+      header display="flex" align-items="center"
+        text "Voice and appearance" role="heading" aria-level=2
+        button id="back" press=back aria-label="Done" testId="settings-done"
+          image "symbol:checkmark"
+      list id="settings" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        section
+          column align-items="center" padding="8px 0"
+            hex-orb state="idle" silenced="false" tint=personaColor still="false" width=160 height=160 role="img" aria-label="hex" testId="settings-orb"
+          row gap=8 flex-wrap="wrap" justify-content="center"
+            for p in personas key=p.id
+              button press=setPersona(p.id) appearance="none" padding="7px 14px" border-radius=999 background-color=(persona == p.id ? "-exact-label" : "-exact-tertiary-fill") -exact-press-haptic="selection" testId=`persona-${p.id}`
+                text p.label font="-exact-subheadline" color=(persona == p.id ? "-exact-background" : "-exact-label")
+          row gap=10 flex-wrap="wrap" justify-content="center" padding="4px 0"
+            for c in colors key=c.label
+              button press=setPersonaColor(c.id) appearance="none" width=32 height=32 border-radius=16 background-color=(c.id == "" ? "-exact-tertiary-fill" : c.id) border=(personaColor == c.id ? "2px solid -exact-label" : "2px solid transparent") aria-label=c.label -exact-press-haptic="selection" testId=`color-${c.label}`
+        section
+          row
+            text "Reacts to you" flex=1
+            select value=reaction change=setReaction aria-label="Reacts to you" testId="reaction"
+              option value="off"
+                text "Off"
+              option value="subtle"
+                text "Subtle"
+              option value="lively"
+                text "Lively"
+          link href=path("voice") testId="open-voice"
+            text "Voice" flex=1
+            text voiceLine color="-exact-secondary-label"
+        section
+          row
+            text "Call sounds" flex=1
+            input type="checkbox" role="switch" checked=sounds change=setSounds aria-label="Call sounds" testId="sounds"
+          row
+            text "Haptics" flex=1
+            input type="checkbox" role="switch" checked=haptics change=setHaptics aria-label="Haptics" testId="haptics"

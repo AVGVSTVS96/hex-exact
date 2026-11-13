@@ -3,10 +3,8 @@ import ExactUpdates
 import UIKit
 
 /// The shell: a plain UIKit app that holds what Exact defers (the WebRTC call, Siri, the Live
-/// Activity) and shows one Exact session as its whole screen.
-///
-///   Exact screen ──openURL("hexexact://call" | "…/mute" | "…/end")──▶ shell ──▶ Call
-///   Call ──changed──▶ shell ──navigate("/call/<status>/<muted>")──▶ Exact screen
+/// Activity) and shows one Exact session as its whole screen. The call reaches the screen through
+/// `Bridge` and the app's native module; `hexexact://go/<path>` opens a screen (Siri, tests).
 ///
 /// Exact's own delivery stays on (ExactUpdates), so a new plan reaches the screen over the air.
 @main
@@ -21,6 +19,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     NotificationCenter.default.addObserver(forName: EndCall.ended, object: nil, queue: .main) { _ in
       MainActor.assumeIsolated { Call.shared.end() }
     }
+    MainActor.assumeIsolated { Bridge.connect() }
     return true
   }
 
@@ -48,9 +47,6 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     window.rootViewController = screen
     window.makeKeyAndVisible()
     self.window = window
-    NotificationCenter.default.addObserver(forName: Call.changed, object: nil, queue: .main) { [weak self] _ in
-      MainActor.assumeIsolated { self?.show(Call.shared) }
-    }
     options.urlContexts.first.map { open($0.url) }
   }
 
@@ -62,9 +58,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     contexts.first.map { open($0.url) }
   }
 
+  /// An embedded session hands every `openURL` to its host: hex's own scheme stays here, and a link
+  /// out (Telegram, T3 Code, a web page) goes to iOS, its answer back to the screen.
   func exactSession(_ session: ExactSession, command name: String, args: [Any]) {
     guard name == "openURL", let link = args.first as? String, let url = URL(string: link) else { return }
-    MainActor.assumeIsolated { open(url) }
+    MainActor.assumeIsolated {
+      guard url.scheme != "hexexact" else { return open(url) }
+      UIApplication.shared.open(url) { opened in session.answerOpenURL(args, opened: opened) }
+    }
   }
 
   @MainActor
@@ -74,22 +75,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     case "call": Call.shared.start()
     case "mute": Call.shared.toggleMute()
     case "end": Call.shared.end()
+    case "go": session?.navigate(url.path().isEmpty ? "/" : url.path() + (url.query().map { "?" + $0 } ?? ""))
     default: break
-    }
-  }
-
-  @MainActor
-  private func show(_ call: Call) {
-    CallLiveActivity.follow(call)
-    session?.navigate(location(of: call))
-  }
-
-  @MainActor
-  private func location(of call: Call) -> String {
-    switch (call.status, call.failure) {
-    case (.idle, nil): "/"
-    case (.idle, let failure?): "/failed/\(failure.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")"
-    case (let status, _): "/call/\(status.rawValue)/\(call.muted ? "muted" : "open")"
     }
   }
 }

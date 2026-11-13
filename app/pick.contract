@@ -1,0 +1,52 @@
+// One of hex's picks (§9.6): why hex picks it, the other answers, and where the question came from.
+use Viewport, Asks from "./shapes.contract"
+use Surface, whenOf from "./parts.contract"
+
+component Pick
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    asks: Asks
+    answer: action
+    open: action
+    back: action
+  derive found = asks.asks.filter(a => a.id == entry.params.id)
+  view
+    column navigationKey=`${entry.id}` navigationScroll="pick" position="absolute" inset=0 testId="pick"
+      header display="flex" align-items="center"
+        text "Question" role="heading" aria-level=2
+      list id="pick" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        if found.length == 0
+          section
+            text "This question is answered" color="-exact-secondary-label" testId="pick-answered"
+        for a in found key=a.id
+          section
+            text a.question font="-exact-title3" font-weight=600
+            if a.why != ""
+              column gap=4 padding=12 border-radius=14 background-color="-exact-tertiary-fill"
+                text "Why hex picks it" font="-exact-footnote" font-weight=600 color="AccentColor"
+                text a.why font="-exact-subheadline"
+          section
+            header
+              text "Your answer"
+            for o in a.options key=o.label
+              button press=answer(a.id, o.label) appearance="none" text-align="left" display="flex" flex-direction="column" gap=2 testId=`pick-option-${o.label}`
+                text (o.pick ? `✦ ${o.label}` : o.label) font-weight=600 color=(o.pick ? "AccentColor" : "-exact-label")
+                if o.detail != ""
+                  text o.detail font="-exact-footnote" color="-exact-secondary-label"
+            button press=back testId="pick-later"
+              text "Decide later"
+          if a.context != ""
+            section
+              header
+                text "What it's about"
+              text a.context font="-exact-subheadline" user-select="text"
+          section
+            header
+              text "From the thread"
+            text `${a.topic} · ${whenOf(a.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label"
+            for l in a.links key=l.url
+              link href=l.url
+                text `${l.label} ↗`

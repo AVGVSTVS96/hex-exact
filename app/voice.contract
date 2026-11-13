@@ -1,0 +1,49 @@
+// Voice (§10, second page): which of hex's voices answers, its personality and pace, and Bassim's
+// own words on how it should talk. Kept on hex, so every call hears them, phone calls too.
+use Viewport, Settings from "./shapes.contract"
+
+component VoicePage
+  props
+    entry: Entry
+    viewport: Viewport
+    settings: Settings
+    voice: string
+    inCall: bool
+    loading: bool
+    failed: bool
+    set: action
+    open: action
+    back: action
+  derive voices = ["alloy", "ash", "ballad", "beacon", "bossa", "cedar", "cinder", "coral", "delta", "echo", "gleam", "marin", "meridian", "quartz", "ripple", "sage", "shimmer", "stone", "tempo", "verse", "vesper", "willow"]
+  derive chosen = settings.voice != "" ? settings.voice : voice
+  view
+    column navigationKey=`${entry.id}` navigationScroll="voice" position="absolute" inset=0 testId="voice"
+      header display="flex" align-items="center"
+        text "Voice" role="heading" aria-level=2
+      list id="voice" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        section
+          row
+            text "Voice" flex=1
+            select value=chosen change=set("voice") disabled=inCall aria-label="Voice" testId="voice-pick"
+              for v in voices key=v
+                option value=v
+                  text `${v.slice(0, 1).toUpperCase()}${v.slice(1)}`
+          if inCall
+            text "End the conversation to change voices." font="-exact-footnote" color="-exact-secondary-label"
+          row
+            text "Personality" flex=1
+            select value=settings.personality change=set("personality") aria-label="Personality" testId="personality"
+              for p in settings.personalities key=p.id
+                option value=p.id
+                  text p.label
+          row
+            text "Pace" flex=1
+            select value=settings.pace change=set("pace") aria-label="Pace" testId="pace"
+              for p in settings.paces key=p.id
+                option value=p.id
+                  text p.label
+          link href=path("words") testId="open-words"
+            text "Your words" flex=1
+            text (settings.words == "" ? "None" : settings.words) color="-exact-secondary-label" max-width="55%" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+          footer
+            text (failed ? "Can't reach hex right now." : "For every call, phone calls too.") color=(failed ? "-exact-system-red" : "-exact-secondary-label")

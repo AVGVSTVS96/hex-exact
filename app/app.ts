@@ -1,41 +1,13 @@
-import type { Answer, Result, Sources } from './app.contract.d.ts';
-import { HEX_TOKEN, HEX_URL } from './hex.ts';
+import type { Answer, Sources } from './app.contract.d.ts';
+import { asks } from './data/asks.ts';
+import { call } from './data/call.ts';
+import { calls } from './data/calls.ts';
+import { voice } from './data/settings.ts';
+import { tasks } from './data/tasks.ts';
 
-// hex's voice server, on the tailnet. hex.ts is written at build from the stable app's settings
-// (scripts/hex-env), so neither its address nor its token enters the repository; the grant is
-// every https origin because the address isn't known until then.
+// hex's address is written at build (scripts/hex-env), so the grant is every https origin.
 export const grants = 'net.fetch https:';
 
-type CallBody = { id?: unknown; ended?: unknown; title?: unknown; preview?: unknown; turns?: unknown };
-const none: Result<'loadLatest'> = { id: '', title: '', live: false, turns: [] };
+const sources = { ...call, ...calls, ...tasks, ...asks, ...voice } as Sources;
 
-async function read(path: string): Promise<unknown> {
-  const response = await fetch(`${HEX_URL}${path}`, { exactTimeout: 10000, headers: { authorization: `Bearer ${HEX_TOKEN}` } });
-  if (!response.ok) throw new Error(`hex answered ${response.status}`);
-  return response.json();
-}
-
-const text = (value: unknown) => (typeof value === 'string' ? value : '');
-
-const sources: Sources = {
-  // The newest call, and while it's live, what each side has said so far.
-  loadLatest: async () => {
-    const list = (await read('/calls')) as { calls?: CallBody[] };
-    const newest = list.calls?.[0];
-    if (!newest || typeof newest.id !== 'string') return none;
-    const live = newest.ended === undefined;
-    const record = live ? ((await read(`/calls/${encodeURIComponent(newest.id)}`)) as CallBody) : newest;
-    const turns = Array.isArray(record.turns) ? record.turns : [];
-    return {
-      id: newest.id,
-      title: text(newest.title) || text(newest.preview),
-      live,
-      turns: turns.map((turn: { who?: unknown; at?: unknown; text?: unknown }, index: number) => ({
-        id: `${index}`,
-        who: turn.who === 'you' ? 'you' : 'voice',
-        text: text(turn.text),
-      })),
-    };
-  },
-};
 export const answer: Answer = (source, args, store, storage, native) => sources[source](args, store, storage, native);

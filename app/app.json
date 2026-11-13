@@ -5,6 +5,9 @@
   "id": "com.shahidy.hexexact",
   "start_url": "/",
   "display": "standalone",
+  "modules": [
+    "hex-orb"
+  ],
   "app": {
     "id": "com.shahidy.hexexact",
     "name": "hex Exact"

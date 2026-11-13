@@ -37,6 +37,9 @@ targets:
         product: ExactUpdates
       - package: WebRTC
         product: WebRTC
+      - target: ExactModules
+        link: false
+        embed: true
       - target: Activity
     settings:
       base:
@@ -71,6 +74,24 @@ targets:
           for tree in *; do
             case "$tree" in *.a|include|compat.json|capabilities.json|receipt.json) ;; *) cp -R "$tree" "$TARGET_BUILD_DIR/$WRAPPER_NAME/" ;; esac
           done
+  # The app's native module (app/modules/apple: the call's bridge and the orb), built as Exact's own
+  # build builds it: Exact's module seam and glue (scripts/module-glue.mjs writes them to
+  # build/modules) with the app's Swift, one framework ExactKit loads by name at the first view or
+  # call that needs it.
+  ExactModules:
+    type: framework
+    platform: iOS
+    sources:
+      - build/modules
+      - ../app/modules/apple
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shahidy.hexexact.modules
+        PRODUCT_NAME: ExactModules
+        PRODUCT_MODULE_NAME: ExactAppModules
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: NO
+        SKIP_INSTALL: YES
   Activity:
     type: app-extension
     platform: iOS

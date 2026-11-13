@@ -1,0 +1,54 @@
+// The last check (§9.9): when hex last went through everything, what it read, what it fixed on its
+// own and what it flagged for Bassim.
+use Viewport, Check from "./shapes.contract"
+use Mark, whenOf from "./parts.contract"
+
+component LastCheck
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    check: Check
+    loading: bool
+    failed: bool
+    back: action
+  view
+    column navigationKey=`${entry.id}` navigationScroll="last-check" position="absolute" inset=0 testId="last-check"
+      header display="flex" align-items="center"
+        text "Last check" role="heading" aria-level=2
+        text (check.at > 0 ? `${whenOf(check.at, now, offset)} · ${check.why}` : "")
+      list id="last-check" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        if loading and check.at == 0
+          section
+            progress aria-label="Loading"
+        if failed and check.at == 0
+          section
+            text "hex hasn't checked yet, or can't be reached." color="-exact-secondary-label"
+        if check.read.length > 0
+          section
+            row gap=8 flex-wrap="wrap" padding="4px 0"
+              for r in check.read key=r.label
+                column gap=0 padding="8px 12px" border-radius=14 background-color="-exact-tertiary-fill" min-width=72
+                  text `${r.n}` font="-exact-title2" font-weight=700 font-variant-numeric="tabular-nums"
+                  text r.label font="-exact-caption1" color="-exact-secondary-label"
+        if check.flagged.length > 0
+          section
+            header
+              text "For you to look at"
+            for n, i in check.flagged key=`${i}`
+              row gap=12 align-items="flex-start"
+                Mark(state="needs", size=22)
+                column flex=1 gap=2
+                  text n.title font-weight=600
+                  text n.text font="-exact-subheadline" color="-exact-secondary-label"
+        if check.fixed.length > 0
+          section
+            header
+              text "Fixed on its own"
+            for n, i in check.fixed key=`${i}`
+              row gap=12 align-items="flex-start"
+                Mark(state="done", size=22)
+                column flex=1 gap=2
+                  text n.title font-weight=600
+                  text (n.did != "" ? `${n.text} ${n.did}.` : n.text) font="-exact-subheadline" color="-exact-secondary-label"

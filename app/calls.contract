@@ -1,0 +1,56 @@
+// Calls (§5): every call with hex, newest first, grouped by day. A row opens the call; swiping one
+// away deletes it (not the live one).
+use Viewport, Calls, CallRow from "./shapes.contract"
+use whenOf, lengthOf, endingOf, badEnding from "./parts.contract"
+
+fn dayOf(at: number, now: number, offset: number): string = formatDate(at, offset, "iso") == formatDate(now, offset, "iso") ? "Today" : formatDate(at, offset, "iso") == formatDate(now - 86400000, offset, "iso") ? "Yesterday" : "Earlier"
+fn nameOf(c: CallRow): string = c.title != "" ? c.title : c.preview != "" ? c.preview : "A quiet call"
+fn metaOf(c: CallRow, now: number): string = c.live ? "Live now" : `${lengthOf(c.seconds)}${c.tasks > 0 ? ` · ${c.tasks} ${c.tasks == 1 ? "task" : "tasks"}` : ""}${c.title == "" and now - c.ended < 600000 ? " · naming…" : ""}${endingOf(c.ending) != "" and c.ending != "you" ? ` · ${endingOf(c.ending)}` : ""}`
+fn sourceSymbol(source: string): string = source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : "symbol:sf/headphones"
+
+component CallsList
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    calls: Calls
+    failed: bool
+    open: action
+    remove: action
+    removing: string
+    back: action
+  derive shown = calls.calls.filter(c => c.id != removing)
+  derive groups = ["Today", "Yesterday", "Earlier"].filter(d => shown.map(c => dayOf(c.started, now, offset) == d).includes(true))
+  view
+    column navigationKey=`${entry.id}` navigationScroll="calls-list" position="absolute" inset=0 testId="calls"
+      header display="flex" align-items="center"
+        text "Calls" role="heading" aria-level=1 flex=1
+      list id="calls-list" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        if failed and shown.length == 0
+          section
+            column gap=4 padding="24px 0" align-items="center" text-align="center"
+              text "Can't reach hex" font="-exact-headline"
+              text "Check that Tailscale is on, then try again." color="-exact-secondary-label"
+        else
+          if shown.length == 0
+            section
+              column gap=4 padding="24px 0" align-items="center" text-align="center" testId="calls-empty"
+                text "No calls yet" font="-exact-headline"
+                text "When a call ends, it lands here with what was said and what came of it." color="-exact-secondary-label"
+        if failed and shown.length > 0
+          section
+            text "Can't reach hex. These are the calls it last sent." font="-exact-footnote" color="-exact-secondary-label"
+        for d in groups key=d
+          section
+            header
+              text d
+            for c in shown.filter(x => dayOf(x.started, now, offset) == d) key=c.id
+              link href=path("pastCall", c.id) delete=remove(c.id) disabled=c.live testId=`call-${c.id}`
+                column flex=1 min-width=0 gap=2
+                  row gap=6 align-items="center"
+                    if c.source != "app" and c.source != ""
+                      image sourceSymbol(c.source) width=14 height=14 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                    text nameOf(c) font="-exact-body" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                    text (c.live ? "Now" : whenOf(c.started, now, offset)) font="-exact-footnote" color="-exact-secondary-label"
+                  text metaOf(c, now) font="-exact-footnote" color=(c.live ? "AccentColor" : badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label")

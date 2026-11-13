@@ -1,0 +1,58 @@
+// A task's messages (§9.4): the thread as Bassim and hex wrote it, newest at the foot, and a
+// composer that becomes Stop while hex is working and nothing is typed.
+use Viewport, TaskPage, Chat from "./shapes.contract"
+use appName from "./parts.contract"
+
+component Thread
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    task: TaskPage
+    chat: Chat
+    loading: bool
+    failed: bool
+    sending: bool
+    message: action
+    stop: action
+    talk: action
+    inCall: bool
+    open: action
+    back: action
+  state draft = ""
+  derive title = task.place != "" ? task.place : "Messages"
+  action edit(v: string)
+    draft = v
+  action submit
+    if draft.trim() != ""
+      message(task.id, draft.trim())
+      draft = ""
+    else
+      if task.running
+        stop(task.id)
+  view
+    column navigationKey=`${entry.id}` navigationScroll="thread" position="absolute" inset=0 testId="thread"
+      header display="flex" align-items="center"
+        text title role="heading" aria-level=2
+        text (task.running ? "working" : appName(task.app))
+        button press=talk(task.id) aria-label="Talk it through" testId="thread-talk"
+          image "symbol:sf/phone.and.waveform"
+      if loading and chat.turns.length == 0
+        progress aria-label="Loading messages" margin="24px auto"
+      if not loading and chat.turns.length == 0
+        text "Nothing said here yet" color="-exact-secondary-label" text-align="center" padding="24px 0"
+      list id="thread" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="8px 16px"
+        for t in chat.turns key=t.id
+          column padding="4px 0" align-items=(t.source == "me" ? "flex-end" : "stretch")
+            if t.id == "0" and chat.total > chat.turns.length
+              text `Earlier messages are in ${appName(task.app)}` font="-exact-footnote" color="-exact-secondary-label" text-align="center" align-self="stretch" padding="8px 0"
+            text t.text max-width=(t.source == "me" ? "82%" : "100%") padding=(t.source == "me" ? "8px 14px" : "2px 0") border-radius=18 background-color=(t.source == "me" ? "AccentColor" : "transparent") color=(t.source == "me" ? "#FFFFFF" : "-exact-label") user-select="text" white-space="pre-wrap"
+      for w in chat.waiting key=w.key
+        row justify-content="flex-end" padding="4px 16px" opacity=0.55
+          text w.text max-width="82%" padding="8px 14px" border-radius=18 background-color="AccentColor" color="#FFFFFF"
+      if chat.sends
+        row gap=8 align-items="flex-end" padding="8px 12px" border-top="0.5px solid -exact-separator"
+          textarea value=draft input=edit placeholder=`Message ${title}` rows=1 flex=1 min-width=0 aria-label="Message" testId="composer"
+          button press=submit disabled=(draft.trim() == "" and not task.running) buttonStyle="filled" aria-label=(draft.trim() == "" and task.running ? "Stop" : "Send") testId="send"
+            image (draft.trim() == "" and task.running ? "symbol:stop-fill" : "symbol:send")

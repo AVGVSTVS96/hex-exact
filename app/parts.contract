@@ -1,0 +1,62 @@
+// The design system every screen shares: one set of surfaces, radii, marks and words, so hex
+// Exact reads as one app. Colours name the platform's roles; the accent is hex's.
+use Place from "./shapes.contract"
+
+// A grouped surface on the stage (an ask card, a wrap-up, a stats card).
+style Surface
+  background-color="-exact-secondary-background" border-radius=22 padding=16
+
+// The platform's glass circle, for a toolbar's or the call's icon buttons.
+style Glass
+  appearance="auto" buttonStyle="glass" width=44 height=44 flex-shrink=0
+
+// A small capsule of text: an option, a count, a tag.
+style Pill
+  padding="7px 14px" border-radius=999 background-color="-exact-tertiary-fill"
+
+// The colour a state is drawn in, everywhere: needs you, working, done, failed, quiet.
+fn tintOf(state: string): string = state == "needs" or state == "asks" or state == "pick" ? "AccentColor" : state == "working" or state == "running" ? "-exact-system-teal" : state == "done" or state == "read" ? "-exact-system-green" : state == "failed" ? "-exact-system-red" : state == "paused" or state == "stopped" ? "-exact-system-orange" : "-exact-secondary-label"
+
+fn symbolOf(state: string): string = state == "needs" or state == "asks" ? "symbol:sf/questionmark" : state == "pick" ? "symbol:sf/sparkle" : state == "working" or state == "running" ? "symbol:sf/ellipsis" : state == "done" or state == "read" ? "symbol:sf/checkmark" : state == "failed" ? "symbol:sf/exclamationmark" : state == "paused" ? "symbol:sf/pause.fill" : state == "stopped" ? "symbol:stop-fill" : "symbol:sf/circle"
+
+// Where a thread lives, as its tile: Telegram, T3 Code, Buzz, Discord, the server, a call, a link.
+fn appName(app: string): string = app == "telegram" ? "Telegram" : app == "t3" ? "T3 Code" : app == "buzz" ? "Buzz" : app == "discord" ? "Discord" : app == "server" ? "Server" : app == "voice" or app == "call" ? "Call" : app == "link" ? "Link" : app
+fn appSymbol(app: string): string = app == "telegram" ? "symbol:sf/paperplane.fill" : app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : app == "buzz" ? "symbol:sf/bolt.fill" : app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : app == "server" ? "symbol:sf/terminal.fill" : app == "voice" or app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right"
+fn appTint(app: string): string = app == "telegram" ? "#2AABEE" : app == "t3" ? "#7C5CFF" : app == "buzz" ? "#F5A623" : app == "discord" ? "#5865F2" : app == "server" ? "#3A3A3C" : app == "voice" or app == "call" ? "AccentColor" : "#8E8E93"
+
+// When something happened: the time today, else the date.
+fn whenOf(at: number, now: number, offset: number): string = at == 0 ? "" : formatDate(at, offset, "iso") == formatDate(now, offset, "iso") ? formatTime(at, offset, "short") : formatDate(at, offset, "medium")
+
+// A call's length: "45 s", "3 min", "1 h 12 min".
+fn lengthOf(seconds: number): string = seconds < 60 ? `${round(seconds)} s` : seconds < 3600 ? `${round(seconds / 60)} min` : `${floor(seconds / 3600)} h ${round((seconds % 3600) / 60)} min`
+
+// How a call ended, in Bassim's words; a bad ending is drawn red (badEnding).
+fn endingOf(kind: string): string = kind == "you" ? "You hung up" : kind == "hex" ? "hex hung up" : kind == "dropped" ? "The call dropped" : kind == "expired" ? "The call ran out of time" : kind == "no-connect" ? "Couldn't connect" : kind == "no-answer" ? "No answer" : kind == "busy" ? "Busy" : ""
+fn badEnding(kind: string): bool = kind == "dropped" or kind == "no-connect" or kind == "expired"
+
+// A state's round badge (the stable app's marks), its symbol in its tint.
+component Mark
+  props
+    state: string
+    size: number
+  view
+    box width=size height=size border-radius=(size / 2) background-color=tintOf(state) opacity=0.18 position="relative" flex-shrink=0
+      image symbolOf(state) position="absolute" inset=0 margin="auto" width=(size * 0.5) height=(size * 0.5) object-fit="contain" color=tintOf(state) opacity=1 aria-hidden=true
+
+// A count in its state's tint ("–" while loading).
+component Chip
+  props
+    n: number
+    state: string
+    loading: bool
+  view
+    text (loading ? "–" : `${n}`) font="-exact-caption1" font-weight=600 font-variant-numeric="tabular-nums" padding="2px 8px" border-radius=999 color=tintOf(state) background-color="-exact-tertiary-fill"
+
+// A place's brand tile; an unlinked one is a ghost outline.
+component PlaceTile
+  props
+    place: Place
+    size: number
+  view
+    box width=size height=size border-radius=(size * 0.28) flex-shrink=0 position="relative" background-color=(place.link == "" ? "transparent" : appTint(place.app)) border=(place.link == "" ? "1px solid -exact-separator" : "none")
+      image appSymbol(place.app) position="absolute" inset=0 margin="auto" width=(size * 0.48) height=(size * 0.48) object-fit="contain" color=(place.link == "" ? "-exact-secondary-label" : "#FFFFFF") aria-hidden=true

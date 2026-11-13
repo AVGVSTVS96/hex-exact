@@ -1,68 +1,223 @@
-// hex Exact's screen. The Swift shell around it holds the call (WebRTC), Siri and the Live
-// Activity: this screen asks it for a call, mute or End with `openURL("hexexact://…")`, and the
-// shell says where the call is by moving this screen to `/call/<status>/<mic>` or `/failed/<why>`.
-// What hex hears and says comes from hex's voice server, read here every two seconds.
+// hex Exact: the hex voice app, rebuilt in Exact. The Swift shell around it (shell/) holds the live
+// call, Siri and the Live Activity; this root holds everything the screens read and write, as
+// Exact asks: every resource, mutation and the actions that send them live here, and each screen,
+// in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
+use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply from "./shapes.contract"
+use Home from "./call.contract"
+use CallsList from "./calls.contract"
+use PastCall from "./past-call.contract"
+use TasksList from "./tasks.contract"
+use TaskScreen from "./task.contract"
+use Thread from "./thread.contract"
+use Steps from "./steps.contract"
+use Picks from "./picks.contract"
+use Pick from "./pick.contract"
+use LastCheck from "./last-check.contract"
+use SettingsScreen from "./settings.contract"
+use VoicePage from "./voice.contract"
+use YourWords from "./words.contract"
+
+// Every screen and sheet. Home is the call; the rest open over it. hexexact://go/<path> opens any
+// of them from outside (Siri, scripts/sim).
 routes nav
   home "/"
-    call "/call/:status/:mic"
-    failed "/failed/:why"
-
-shape Turn
-  id: string
-  who: string
-  text: string
-
-shape Latest
-  id: string
-  title: string
-  live: bool
-  turns: Turn[]
+    calls "/calls"
+      pastCall "/calls/:id"
+    tasks "/tasks"
+      task "/tasks/t/:id"
+        thread "/tasks/t/:id/messages"
+        steps "/tasks/t/:id/steps"
+      picks "/tasks/picks"
+        pick "/tasks/picks/:id"
+      check "/tasks/check"
+    settings "/settings"
+      voice "/settings/voice"
+        words "/settings/voice/words"
 
 component App
-  resource latest = loadLatest() as shape Latest else empty()
+  // Bassim's choices on this phone, kept across launches (hex keeps voice, personality, pace and
+  // words for every call; the voice is also here so a call can start before hex answers).
+  state voice = "marin" persist
+  state persona = "opal" persist
+  state personaColor = "" persist
+  state reaction = "subtle" persist
+  state sounds = true persist
+  state haptics = true persist
+  // The Tasks tab: all | needs | working | done | quiet ("" until Bassim picks one: Needs if anything
+  // needs him, else Working).
+  state tab = ""
+  // What's being sent, so a screen can say so beside it: `${askId}|${label}`, a task id, a call id.
+  state answering = ""
+  state messaging = ""
+  state removing = ""
+  // The ask whose original message is open ("From <place>"), read from hex while it is.
+  state wordsAsk = ""
+  // Milliseconds since launch, a minute at a time: "Today", "3 min ago" and the like move on.
+  state tick = 0
+
+  resource viewport = exactViewport() as shape Viewport
+  resource clock = exactTime() as shape Time
+
+  // The live call, as the shell holds it, and its words. These follow the shell, not a timer.
+  resource call = callState() as shape CallState else empty()
+  resource captions = captions() as shape Captions else empty()
+
+  // hex, kept current: each holds a request open until hex changes (Exact's long poll).
+  resource activity = watchActivity() as shape Activity else empty()
+  resource counts = watchCounts() as shape Counts else empty()
+  resource calls = watchCalls() as shape Calls else empty()
+  resource tasks = watchTasks() as shape Tasks else empty()
+  resource asks = watchAsks() as shape Asks else empty()
+
+  // What the open screens show; asked only while they are open.
+  derive names = stack(nav).map(e => e.name)
+  derive pastId = match stack(nav).filter(e => e.name == "pastCall").at(-1) { case some(e) => e.params.id, case none => "" }
+  derive pastLive = calls.live != "" and pastId == calls.live
+  derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => "" }
+  derive chatOpen = names.includes("thread") or (names.includes("task") and viewport.width >= 700)
+  resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
+  resource task = watchTask(taskId) when taskId != "" as shape TaskPage else empty()
+  resource chat = watchChat(taskId) when taskId != "" and chatOpen as shape Chat else empty()
+  resource check = loadCheck() when names.includes("check") as shape Check else empty()
+  resource settings = loadSettings() when names.includes("settings") as shape Settings else empty()
+  resource words = loadWords(wordsAsk) when wordsAsk != "" as shape Words else empty()
+
+  // Writes. Each says how it went in its slot; a screen reads `pending(x)` and the reply.
+  mutation commanded as shape Reply
+  mutation answered as shape Sent queue
+  mutation answeredAll as shape Reply queue
+  mutation noted as shape Sent queue
+  mutation dismissed as shape Sent queue
+  mutation undone as shape Sent queue
+  mutation acted as shape Reply queue
+  mutation marked as shape Reply queue
+  mutation talked as shape Reply
+  mutation messaged as shape Reply queue
+  mutation stopped as shape Reply
+  mutation removed as shape Reply queue
+  mutation saved as shape Reply queue refreshes settings
+
   derive place = top(nav)
-  derive status = place.name == "call" ? place.params.status : "idle"
-  derive muted = place.name == "call" and place.params.mic == "muted"
-  derive why = place.name == "failed" ? place.params.why : ""
-  derive lastId = match latest.turns.at(-1) { case some(t) => t.id, case none => "" }
-  derive headline = status == "connecting" ? "Calling hex…" : status == "connected" ? (muted ? "Muted" : "hex is listening") : status == "ending" ? "Hanging up…" : "hex"
-  derive detail = why != "" ? why : status == "idle" ? (latest.title == "" ? "Tap Call to talk with hex." : `Last call: ${latest.title}`) : "Built in Exact, with the call in a Swift shell."
+  derive needsYou = counts.yours
+  derive shownTab = tab != "" ? tab : (needsYou > 0 ? "needs" : "working")
+  derive now = clock.epochAtZero + tick
+  // Nothing attached: what a send carries until the camera and Photos attach media ids from POST /media.
+  derive noMedia = [""].slice(0, 0)
 
-  task poll mount
-    every(2000, pull)
+  task minute mount
+    every(60000, ticked)
+  action ticked
+    tick = performanceNow()
 
-  action pull
-    refresh latest
-  // The shell moves this screen as the call changes; each place replaces the last, so there is no Back.
+  // Places
   action follow(url: string)
-    nav = replace(nav, url)
-  action call
-    openURL("hexexact://call")
-  action mute
-    openURL("hexexact://mute")
-  action end
-    openURL("hexexact://end")
+    nav = go(nav, url)
+  action back
+    nav = back(nav)
+  action home
+    nav = go(nav, "/")
+  action open(location: string)
+    nav = push(nav, location)
+  action openTasks(t: string)
+    tab = t
+    nav = go(nav, path("tasks"))
+  action openTask(id: string)
+    nav = go(nav, path("task", id))
+  action pickTab(t: string)
+    tab = t
+    haptic("selection")
+
+  // The call
+  action startCall(about: string)
+    send commanded = callCommand("start", voice, about)
+  action toggleMute
+    send commanded = callCommand("mute", "", "")
+  action endCall
+    send commanded = callCommand("end", "", "")
+  // Bring a task ("asks": everything that waits) into the live call, or start one about it.
+  action talk(about: string)
+    if call.status == "live"
+      send talked = talkAbout(about)
+    else
+      send commanded = callCommand("start", voice, about)
+
+  // Asks
+  action answer(id: string, label: string)
+    answering = `${id}|${label}`
+    send answered = answerAsk(id, [label], noMedia)
+  action answerMany(id: string, labels: string[])
+    answering = `${id}|${labels.join(", ")}`
+    send answered = answerAsk(id, labels, noMedia)
+  // hex's picks, all at once: each ask with its answer, in order.
+  action answerAll(ids: string[], labels: string[])
+    send answeredAll = answerPicks(ids, labels)
+  action note(id: string, words: string)
+    send noted = noteAsk(id, words, noMedia)
+  action dismiss(id: string)
+    send dismissed = dismissAsk(id)
+  action undo(id: string)
+    send undone = undoAsk(id)
+  action showWords(id: string)
+    wordsAsk = wordsAsk == id ? "" : id
+  action act(id: string)
+    send acted = actStuck(id)
+  action markRead(id: string)
+    send marked = readFresh(id)
+
+  // Threads
+  action message(id: string, words: string)
+    messaging = id
+    send messaged = sendChat(id, words, `app-${clock.epochAtZero + performanceNow()}`, noMedia)
+  action stop(id: string)
+    send stopped = stopTask(id)
+
+  // Calls
+  action removeCall(id: string)
+    removing = id
+    send removed = removeCall(id)
+
+  // Settings, on hex (voice, personality, pace, words) and on this phone
+  action setSetting(field: string, value: string)
+    if field == "voice"
+      voice = value
+    send saved = saveSetting(field, value)
+  action setPersona(p: string)
+    persona = p
+  action setPersonaColor(c: string)
+    personaColor = c
+  action setReaction(r: string)
+    reaction = r
+  action setSounds(on: bool)
+    sounds = on
+  action setHaptics(on: bool)
+    haptics = on
 
   view
-    main navigationKey=`${top(nav).id}` navigate=follow testId="app" width="100%" height="100%"
+    main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
-        column navigationKey=`${e.id}` navigationScroll="transcript" position="absolute" inset=0 padding="24px 20px" gap=16
-          column align-items="center" gap=6 padding-top=24
-            text headline role="heading" aria-level=1 font-size=34 font-weight=700 testId="headline"
-            text detail color="-exact-secondary-label" text-align="center" testId="detail"
-            text "This line came over the air, through Exact's updates." font="-exact-footnote" color="-exact-tertiary-label" text-align="center" testId="over-the-air"
-          list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0
-            for t in (latest.live ? latest.turns : []) key=t.id
-              row justify-content=(t.who == "you" ? "flex-end" : "flex-start") padding="3px 0"
-                text t.text padding="8px 12px" border-radius=18 max-width="80%" overflow-wrap="break-word"
-                  background-color=(t.who == "you" ? "AccentColor" : "-exact-fill") color=(t.who == "you" ? "AccentColorText" : "-exact-label")
-                  testId=`turn-${t.id}`
-          row gap=12 justify-content="center" padding-bottom=12
-            if status == "idle"
-              button press=call buttonStyle="filled" -exact-control-size="large" flex-grow=1 max-width="26.25rem" testId="call"
-                text "Call hex"
-            else
-              button press=mute disabled=(status != "connected") -exact-control-size="large" flex-grow=1 flex-basis="8rem" testId="mute"
-                text (muted ? "Unmute" : "Mute")
-              button press=end buttonStyle="filled" -exact-control-size="large" flex-grow=1 flex-basis="8rem" destructive=true testId="end"
-                text "End"
+        if e.name == "home"
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, persona=persona, personaColor=personaColor, start=startCall(""), mute=toggleMute, end=endCall, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answering=answering)
+        if e.name == "calls"
+          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, failed=failed(calls), open=open, remove=removeCall, removing=removing, back=back)
+        if e.name == "pastCall"
+          PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, openTasks=openTasks, open=open, remove=removeCall, back=back)
+        if e.name == "tasks"
+          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, back=back)
+        if e.name == "task"
+          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, talk=talk, message=message, answering=answering, back=back)
+        if e.name == "thread"
+          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, talk=talk, inCall=(call.status == "live"), open=open, back=back)
+        if e.name == "steps"
+          Steps(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), back=back)
+        if e.name == "picks"
+          Picks(entry=e, viewport=viewport, asks=asks, open=open, answer=answer, answerAll=answerAll, back=back)
+        if e.name == "pick"
+          Pick(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, asks=asks, answer=answer, open=open, back=back)
+        if e.name == "check"
+          LastCheck(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
+        if e.name == "settings"
+          SettingsScreen(entry=e, viewport=viewport, settings=settings, persona=persona, personaColor=personaColor, reaction=reaction, sounds=sounds, haptics=haptics, setPersona=setPersona, setPersonaColor=setPersonaColor, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, open=open, back=back)
+        if e.name == "voice"
+          VoicePage(entry=e, viewport=viewport, settings=settings, voice=voice, inCall=(call.status != "idle"), loading=(not current(settings)), failed=(failed(settings) or failed(saved)), set=setSetting, open=open, back=back)
+        if e.name == "words"
+          YourWords(entry=e, words=settings.words, set=setSetting, back=back)

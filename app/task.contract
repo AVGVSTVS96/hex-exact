@@ -1,0 +1,156 @@
+// A task's page (§9.2–9.3, 9.7–9.8): what it needs from Bassim, what it's doing now, what it did,
+// its pinned post, its messages and every place it lives.
+use Viewport, TaskPage, Chat, Asks, Tasks, Ask, Place from "./shapes.contract"
+use Mark, Surface, PlaceTile, whenOf, appName from "./parts.contract"
+
+component TaskScreen
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    task: TaskPage
+    chat: Chat
+    asks: Asks
+    tasks: Tasks
+    loading: bool
+    failed: bool
+    inCall: bool
+    open: action
+    openTask: action
+    answer: action
+    answerMany: action
+    note: action
+    dismiss: action
+    undo: action
+    talk: action
+    message: action
+    answering: string
+    back: action
+  derive title = task.place != "" ? task.place : task.name
+  derive subtitle = task.state == "needs" ? `waiting on you since ${whenOf(task.since, now, offset)}` : task.running ? `working since ${whenOf(task.since, now, offset)}` : task.state == "done" ? `done ${whenOf(task.at, now, offset)}` : whenOf(task.at, now, offset)
+  derive siblings = tasks.tasks.filter(t => t.name == task.name and t.id != task.id)
+  view
+    column navigationKey=`${entry.id}` navigationScroll="task-page" position="absolute" inset=0 testId="task"
+      header display="flex" align-items="center"
+        text title role="heading" aria-level=2
+        text subtitle
+        button press=talk(task.id) aria-label="Talk it through" testId="task-talk"
+          image "symbol:sf/phone.and.waveform"
+      list id="task-page" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        if loading and task.id == ""
+          section
+            progress aria-label="Loading"
+        if failed and task.id == ""
+          section
+            text "hex didn't answer, so this can't open yet." color="-exact-secondary-label"
+        if task.asks.length > 0
+          section
+            header
+              text "Needs you"
+            for a in task.asks key=a.id
+              AskCard(ask=a, now=now, offset=offset, answering=answering, answer=answer, answerMany=answerMany, dismiss=dismiss)
+        if task.needs != "" and task.asks.length == 0
+          section
+            header
+              text "Needs you"
+            column gap=2
+              text task.needs
+              text `Waiting on you since ${whenOf(task.since, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
+        if task.running
+          section
+            header
+              text "Working"
+            link href=path("steps", task.id) testId="task-now"
+              Mark(state="working", size=28)
+              text `Now: ${task.line}` flex=1 line-clamp=2
+        if task.steps.length > 0
+          section
+            header
+              text "Last run"
+            for s in task.steps.slice(-3) key=s.id
+              text (s.brief != "" ? s.brief : s.text) font="-exact-subheadline" line-clamp=2
+            link href=path("steps", task.id) testId="task-steps"
+              text `All steps${task.agents.length > 0 ? ` · ${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"}` : ""}` flex=1
+        if task.pin != ""
+          section
+            header
+              text "Pinned"
+            text task.pin font="-exact-subheadline" white-space="pre-wrap" user-select="text"
+        if chat.turns.length > 0
+          section
+            header
+              text "Messages"
+            for t in chat.turns.slice(-2) key=t.id
+              text t.text font="-exact-subheadline" line-clamp=3 color=(t.source == "me" ? "-exact-secondary-label" : "-exact-label")
+            link href=path("thread", task.id) testId="task-messages"
+              text `All messages · ${chat.total}` flex=1
+        else
+          section
+            link href=path("thread", task.id) testId="task-messages"
+              text `Message ${title}` flex=1 color="-exact-secondary-label"
+        section
+          header
+            text `Places · ${siblings.length + 1}`
+          link href=task.link testId="task-door"
+            PlaceTile(place=Place(app=task.app, place=title, task=task.id, call="", link=task.link), size=30)
+            column flex=1 min-width=0
+              text title
+              text `${appName(task.app)} · ${whenOf(task.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
+          for s in siblings.slice(0, 5) key=s.id
+            link href=path("task", s.id)
+              PlaceTile(place=Place(app=s.app, place=s.place, task=s.id, call="", link=s.link), size=30)
+              column flex=1 min-width=0
+                text s.place
+                text `${appName(s.app)} · ${whenOf(s.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
+        if task.lately.length > 0
+          section
+            header
+              text "Lately"
+            for l, i in task.lately.slice(0, 8) key=`${i}`
+              row gap=12 align-items="center"
+                Mark(state=l.state, size=22)
+                text l.text flex=1 font="-exact-subheadline" line-clamp=2
+                text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-secondary-label"
+
+// A question on a task's page: hex's pick tinted, few short answers in a row, the rest as blocks.
+component AskCard
+  props
+    ask: Ask
+    now: number
+    offset: number
+    answering: string
+    answer: action
+    answerMany: action
+    dismiss: action
+  state chosen = []
+  derive sending = answering.startsWith(`${ask.id}|`)
+  derive even = ask.options.length <= 3 and not ask.multiple and not ask.options.map(o => o.label.length > 18 or o.detail != "").includes(true)
+  action choose(label: string)
+    if ask.multiple
+      chosen = chosen.includes(label) ? chosen.filter(c => c != label) : chosen.concat([label])
+    else
+      answer(ask.id, label)
+  view
+    column gap=10 padding="6px 0" testId=`ask-card-${ask.id}`
+      row gap=8 align-items="center"
+        text whenOf(ask.at, now, offset) font="-exact-footnote" color="-exact-secondary-label" flex=1
+        button press=dismiss(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`ask-dismiss-${ask.id}`
+          text "Not needed" font="-exact-caption1"
+      text ask.question font="-exact-headline"
+      if ask.context != ""
+        text ask.context font="-exact-subheadline" color="-exact-secondary-label"
+      if even
+        row gap=8
+          for o in ask.options key=o.label
+            button press=answer(ask.id, o.label) disabled=sending appearance="none" flex=1 padding="10px 8px" border-radius=14 background-color=(o.pick ? "AccentColor" : "-exact-tertiary-fill") -exact-press-haptic="selection" testId=`ask-option-${ask.id}-${o.label}`
+              text o.label font="-exact-subheadline" font-weight=600 text-align="center" color=(o.pick ? "#FFFFFF" : "-exact-label")
+      else
+        for o in ask.options key=o.label
+          button press=choose(o.label) disabled=sending appearance="none" padding="12px 14px" border-radius=14 background-color=(chosen.includes(o.label) ? "AccentColor" : o.pick ? "-exact-tertiary-fill" : "-exact-quaternary-fill") border=(o.pick ? "1px solid AccentColor" : "none") text-align="left" display="flex" flex-direction="column" gap=2 testId=`ask-option-${ask.id}-${o.label}`
+            text (o.pick ? `✦ ${o.label} · hex’s pick` : o.label) font="-exact-subheadline" font-weight=600 color=(chosen.includes(o.label) ? "#FFFFFF" : "-exact-label")
+            if o.detail != ""
+              text o.detail font="-exact-footnote" color=(chosen.includes(o.label) ? "#FFFFFF" : "-exact-secondary-label")
+        if ask.multiple
+          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=(chosen.length == 0 or sending) testId=`ask-answer-${ask.id}`
+            text (chosen.length == 0 ? "Pick one or more" : `Answer with ${chosen.length}`)

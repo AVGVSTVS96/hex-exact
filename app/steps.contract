@@ -1,0 +1,52 @@
+// Steps (§9.5): the plan, the agents, and every step of the run, newest first.
+use Viewport, TaskPage from "./shapes.contract"
+use Mark, whenOf, appName from "./parts.contract"
+
+fn kindSymbol(kind: string): string = kind == "think" ? "symbol:sf/brain" : kind == "say" ? "symbol:sf/text.bubble" : kind == "plan" ? "symbol:sf/list.number" : kind == "run" ? "symbol:sf/terminal" : kind == "read" ? "symbol:sf/doc.text" : kind == "edit" ? "symbol:sf/pencil" : kind == "search" ? "symbol:sf/magnifyingglass" : kind == "web" ? "symbol:sf/globe" : kind == "agent" ? "symbol:sf/person.2" : "symbol:sf/wrench.and.screwdriver"
+
+component Steps
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    task: TaskPage
+    loading: bool
+    failed: bool
+    back: action
+  derive done = task.plan.filter(p => p.state == "done").length
+  view
+    column navigationKey=`${entry.id}` navigationScroll="steps" position="absolute" inset=0 testId="steps"
+      header display="flex" align-items="center"
+        text "Steps" role="heading" aria-level=2
+        text `${task.place} · ${appName(task.app)}`
+      list id="steps" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        if task.plan.length > 0
+          section
+            header
+              text `Plan · ${done} of ${task.plan.length}`
+            for p, i in task.plan key=`${i}`
+              row gap=12 align-items="center"
+                Mark(state=(p.state == "done" ? "done" : p.state == "working" ? "working" : "pending"), size=22)
+                text p.text flex=1 font="-exact-subheadline"
+        if task.agents.length > 0
+          section
+            header
+              text "Agents"
+            for a in task.agents key=a.id
+              row gap=12 align-items="center"
+                Mark(state=a.state, size=22)
+                column flex=1 min-width=0 gap=2
+                  text a.label
+                  text (a.line != "" ? a.line : `${a.who} · ${whenOf(a.since, now, offset)}`) font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
+        section
+          header
+            text "Steps"
+          if task.steps.length == 0
+            text (task.running ? "Steps show while it works" : loading ? "Loading…" : failed ? "These steps aren't there any more." : "No steps yet") color="-exact-secondary-label"
+          for s in sortBy(task.steps, s => s.at, "desc") key=s.id
+            row gap=12 align-items="flex-start"
+              image kindSymbol(s.kind) width=16 height=16 object-fit="contain" color=(s.state == "failed" ? "-exact-system-red" : "-exact-secondary-label") aria-hidden=true margin-top=2
+              column flex=1 min-width=0 gap=2
+                text s.text font="-exact-subheadline" line-clamp=(s.kind == "think" or s.kind == "say" ? 3 : 2) color=(s.state == "failed" ? "-exact-system-red" : "-exact-label")
+                text whenOf(s.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label"

@@ -1,0 +1,51 @@
+// A past call (§5–6): its wrap-up, then everything said, with the tasks it started and what
+// happened along the way, and how it ended. The live call opens here too, following as it goes.
+use Viewport, CallRecord, Turn from "./shapes.contract"
+use whenOf, lengthOf, endingOf, badEnding from "./parts.contract"
+use WrapUp from "./wrap-up.contract"
+
+fn clockOf(ms: number): string = `${floor(ms / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}`
+
+component PastCall
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    offset: number
+    record: CallRecord
+    loading: bool
+    failed: bool
+    live: bool
+    openTasks: action
+    open: action
+    remove: action
+    back: action
+  derive c = record.call
+  derive name = c.title != "" ? c.title : c.preview != "" ? c.preview : "A quiet call"
+  view
+    column navigationKey=`${entry.id}` navigationScroll="past-call" position="absolute" inset=0 testId="past-call"
+      header display="flex" align-items="center"
+        text name role="heading" aria-level=2
+        text (live ? "Live now" : `${whenOf(c.started, now, offset)} · ${lengthOf(c.seconds)}`)
+      list id="past-call" appearance="none" flex=1 min-height=0 padding="8px 20px 32px"
+        if loading and c.id == ""
+          progress aria-label="Loading the call" margin="40px auto"
+        if failed and c.id == ""
+          text "hex didn't answer, so this call can't open yet." color="-exact-secondary-label" text-align="center" padding="40px 0" testId="past-call-failed"
+        if c.id != ""
+          text `You called from the ${c.source == "app" ? "app" : c.source} · ${whenOf(c.started, now, offset)}` font="-exact-footnote" color="-exact-secondary-label" padding-bottom=12
+          if c.title != "" or c.summary != ""
+            box padding-bottom=16
+              WrapUp(call=c, whole=true, more=0, openTasks=openTasks, open=open)
+          for t, i in record.turns key=`${i}`
+            row justify-content=(t.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
+              text t.text user-select="text" max-width=(t.who == "you" ? "82%" : "100%") color=(t.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(t.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(t.who == "you" ? "-exact-tertiary-fill" : "transparent")
+          for k in record.tasks key=k.id
+            row gap=8 padding="6px 0" align-items="center"
+              image (k.state == "done" ? "symbol:select-fill" : k.state == "failed" ? "symbol:alert-fill" : "symbol:sf/circle.dotted") width=14 height=14 object-fit="contain" color=(k.state == "failed" ? "-exact-system-red" : k.state == "done" ? "-exact-system-green" : "-exact-system-teal") aria-hidden=true
+              text k.text font="-exact-footnote" flex=1
+              text clockOf(k.at) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+          if c.ended > 0
+            row gap=8 padding="16px 0 0" align-items="center" justify-content="center"
+              image "symbol:sf/phone.down.fill" width=14 height=14 object-fit="contain" color=(badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label") aria-hidden=true
+              text `${endingOf(c.ending)} · ${clockOf(c.seconds * 1000)}` font="-exact-footnote" color=(badEnding(c.ending) ? "-exact-system-red" : "-exact-secondary-label")

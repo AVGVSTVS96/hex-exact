@@ -13,7 +13,7 @@ enum CallLiveActivity {
       guard let activity = current else { return }
       current = nil
       Task { await activity.end(nil, dismissalPolicy: .immediate) }
-    case .connecting, .connected:
+    case .connecting, .live:
       let state = CallAttributes.ContentState(line: "hex", muted: call.muted, since: call.started)
       if let activity = current {
         Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }

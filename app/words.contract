@@ -1,0 +1,23 @@
+// Your words (§10): a short note on how hex should talk, saved when the sheet closes.
+component YourWords
+  props
+    entry: Entry
+    words: string
+    set: action
+    back: action
+  state draft = ""
+  state touched = false
+  action edit(v: string)
+    draft = v
+    touched = true
+  action done
+    if touched
+      set("words", draft.trim())
+    back()
+  view
+    column navigationKey=`${entry.id}` navigationPresentation="modal" navigationDetent="medium" position="absolute" inset=0 testId="words"
+      header display="flex" align-items="center"
+        text "Your words" role="heading" aria-level=2
+        button id="back" press=done buttonStyle="bordered-prominent" aria-label="Done" testId="words-done"
+          image "symbol:checkmark"
+      textarea value=(touched ? draft : words) input=edit maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." margin=16 flex=1 aria-label="Your words" autofocus=true testId="words-field"

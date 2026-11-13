@@ -1,0 +1,38 @@
+// hex's picks (§9.6): the questions where hex already knows what it would choose. Take its picks,
+// change one, or leave one for later, then answer them all at once.
+use Viewport, Asks, Ask from "./shapes.contract"
+
+fn pickOf(a: Ask): string = match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
+
+component Picks
+  props
+    entry: Entry
+    viewport: Viewport
+    asks: Asks
+    open: action
+    answer: action
+    answerAll: action
+    back: action
+  derive picks = asks.asks.filter(a => pickOf(a) != "" and a.tag != "money")
+  action takeAll
+    answerAll(picks.map(a => a.id), picks.map(a => pickOf(a)))
+    back()
+  view
+    column navigationKey=`${entry.id}` navigationScroll="picks" position="absolute" inset=0 testId="picks"
+      header display="flex" align-items="center"
+        text "hex’s picks" role="heading" aria-level=2
+        text `${picks.length} ${picks.length == 1 ? "question" : "questions"}`
+      list id="picks" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        section
+          if picks.length == 0
+            text "Nothing left to take" color="-exact-secondary-label" testId="picks-empty"
+          for a in picks key=a.id
+            link href=path("pick", a.id) testId=`pick-${a.id}`
+              column flex=1 min-width=0 gap=2
+                text `${a.topic}${a.tag != "" ? ` · ${a.tag}` : ""}` font="-exact-footnote" color="-exact-secondary-label"
+                text a.question
+                text `✦ ${pickOf(a)}` font="-exact-subheadline" color="AccentColor"
+        if picks.length > 0
+          section
+            button press=takeAll testId="picks-answer"
+              text `Answer ${picks.length} ${picks.length == 1 ? "question" : "questions"}`

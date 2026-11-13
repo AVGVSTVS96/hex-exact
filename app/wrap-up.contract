@@ -1,0 +1,33 @@
+// The wrap-up a call leaves (§6): what it was, what came of it, and what now waits on Bassim. Under
+// the orb once a call has ended, and at the top of a past call, whole there.
+use CallRow from "./shapes.contract"
+
+component WrapUp
+  props
+    call: CallRow
+    whole: bool
+    more: number
+    openTasks: action
+    open: action
+  derive lead = call.summary != "" ? call.summary : call.why != "" ? `hex called because: ${call.why}` : ""
+  derive shown = whole ? call.waiting : call.waiting.slice(0, 3)
+  derive left = whole ? 0 : max(0, call.waiting.length - 3) + more
+  view
+    column gap=8 align-items=(whole ? "stretch" : "center") text-align=(whole ? "left" : "center") max-width="26.25rem" testId="wrap-up"
+      if call.title != "" and whole
+        text call.title font="-exact-headline" testId="wrap-up-title"
+      if call.title != "" and not whole
+        button press=open(path("pastCall", call.id)) appearance="none" testId="open-wrap-up"
+          text call.title font="-exact-headline" color="-exact-label" testId="wrap-up-title"
+      if lead != ""
+        text lead color="-exact-secondary-label" line-clamp=(whole ? 0 : 4) user-select=(whole ? "text" : "none")
+      if shown.length > 0
+        column gap=4 align-items="flex-start" padding-top=4 text-align="left"
+          text "Waiting on you" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+          for w, i in shown key=`${i}`
+            row gap=8 align-items="baseline"
+              box width=6 height=6 border-radius=3 background-color="AccentColor" flex-shrink=0 transform="translateY(-2px)"
+              text w
+      if left > 0
+        button press=openTasks("needs") testId="wrap-up-more"
+          text `${left} more in Tasks`

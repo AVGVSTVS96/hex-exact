@@ -1,0 +1,385 @@
+// Every shape the app reads: what app.ts answers for each resource and mutation, and the device's
+// own facts. Instants are epoch milliseconds; app.ts turns hex's ISO strings into them. A field hex
+// leaves out comes as "" , 0, false or [].
+
+// The device
+
+shape Segment
+  x: number
+  y: number
+  width: number
+  height: number
+
+shape Viewport
+  width: number
+  height: number
+  devicePosture: string
+  horizontalViewportSegments: number
+  verticalViewportSegments: number
+  segments: Segment[]
+  safeAreaTop: number
+  safeAreaBottom: number
+  safeAreaLeft: number
+  safeAreaRight: number
+  keyboardHeight: number
+  prefersReducedMotion: bool
+
+shape Time
+  epochAtZero: number
+  utcOffset: number
+
+// The live call, held by the Swift shell (app/modules/apple/Hex.swift)
+
+// status: idle | connecting | live | ending. ending: how the last call ended (you, hex, dropped,
+// expired, no-connect), with its length in seconds. shell is false where no Swift shell holds calls
+// (a plain Exact build, the web, the agent).
+shape CallState
+  status: string
+  id: string
+  muted: bool
+  hexMuted: bool
+  interrupted: bool
+  started: number
+  error: string
+  ending: string
+  seconds: number
+  shell: bool
+
+// who: you | hex
+shape Caption
+  id: string
+  who: string
+  text: string
+  at: number
+
+shape Captions
+  call: string
+  turns: Caption[]
+
+// Asks: hex's open questions (GET /asks, a task page, a call's cards)
+
+// pick: hex's own pick. shot: the screenshot an option points at, else -1. aspect: width over height, else 0.
+shape AskOption
+  label: string
+  value: string
+  pick: bool
+  detail: string
+  shot: number
+  aspect: number
+
+shape Link
+  label: string
+  url: string
+
+shape Picture
+  id: string
+  aspect: number
+
+// One place a thread lives: app is telegram | t3 | buzz | discord | server | call | link.
+shape Place
+  app: string
+  place: string
+  task: string
+  call: string
+  link: string
+
+// kind: ask | do | pick … as hex names it. was: this ask's earlier ids (a draft carries over).
+shape Ask
+  id: string
+  kind: string
+  task: string
+  app: string
+  topic: string
+  at: number
+  question: string
+  context: string
+  why: string
+  tag: string
+  multiple: bool
+  options: AskOption[]
+  links: Link[]
+  pictures: Picture[]
+  places: Place[]
+  was: string[]
+
+// mark: paused | failed. sent: hex has already been asked to act.
+shape Stuck
+  id: string
+  app: string
+  title: string
+  why: string
+  action: string
+  mark: string
+  at: number
+  request: string
+  sent: bool
+
+shape Fresh
+  id: string
+  app: string
+  topic: string
+  title: string
+  line: string
+  at: number
+  read: bool
+
+// at is 0 when hex hasn't checked yet.
+shape CheckBrief
+  at: number
+  why: string
+  fixed: number
+  flagged: number
+
+shape Asks
+  version: number
+  asks: Ask[]
+  stuck: Stuck[]
+  fresh: Fresh[]
+  check: CheckBrief
+
+shape Note
+  title: string
+  text: string
+  did: string
+
+shape Count
+  label: string
+  n: number
+
+// GET /asks/check: the last time hex went through everything.
+shape Check
+  at: number
+  why: string
+  read: Count[]
+  fixed: Note[]
+  flagged: Note[]
+
+// GET /asks/:id/words: the message an ask came from.
+shape Words
+  place: string
+  at: number
+  text: string
+
+// The reply to an answer, note, dismissal or undo: ok, or why not. topic and missed say where it
+// went and how many places were out of reach.
+shape Sent
+  ok: bool
+  error: string
+  topic: string
+  missed: number
+
+// Tasks (GET /tasks, /tasks/summary, /tasks/:id, /tasks/:id/chat)
+
+shape Track
+  at: number
+  state: string
+
+// state: working | done | failed | stopped
+shape Agent
+  id: string
+  label: string
+  state: string
+  who: string
+  since: number
+  ended: number
+  line: string
+  result: string
+  link: string
+
+// state: needs | working | done | failed | idle
+shape TaskRow
+  id: string
+  app: string
+  thread: string
+  name: string
+  where: string
+  place: string
+  state: string
+  running: bool
+  line: string
+  since: number
+  at: number
+  link: string
+  track: Track[]
+  agents: Agent[]
+
+shape Finished
+  id: string
+  title: string
+  topic: string
+  app: string
+  proof: string
+  at: number
+  run: string
+  link: string
+
+shape Tasks
+  version: number
+  tasks: TaskRow[]
+  finished: Finished[]
+
+shape Counts
+  needs: number
+  working: number
+  yours: number
+
+shape Lately
+  at: number
+  state: string
+  text: string
+
+// kind: think | say | plan | run | read | edit | search | web | agent | tool
+shape Step
+  id: string
+  at: number
+  ended: number
+  kind: string
+  text: string
+  state: string
+  detail: string
+  result: string
+  agent: string
+  brief: string
+
+shape PlanItem
+  text: string
+  state: string
+
+// A task's page. kind: task (a thread hex works in) | page (a place with no run of its own).
+shape TaskPage
+  kind: string
+  id: string
+  app: string
+  thread: string
+  name: string
+  where: string
+  place: string
+  state: string
+  running: bool
+  line: string
+  needs: string
+  since: number
+  at: number
+  link: string
+  pin: string
+  lately: Lately[]
+  steps: Step[]
+  plan: PlanItem[]
+  agents: Agent[]
+  track: Track[]
+  asks: Ask[]
+
+shape Media
+  id: string
+  kind: string
+  aspect: number
+
+// source: me | hex
+shape ChatTurn
+  id: string
+  source: string
+  text: string
+  media: Media[]
+
+shape Waiting
+  key: string
+  text: string
+  at: number
+
+// sends: Bassim can write here. total: every turn, of which the newest 100 come.
+shape Chat
+  version: number
+  sends: bool
+  total: number
+  turns: ChatTurn[]
+  waiting: Waiting[]
+
+// Calls (GET /calls, /calls/:id, /activity)
+
+// source: app | phone-in | phone-out | web …; ending: you | hex | dropped | expired | no-connect | no-answer | busy
+shape CallRow
+  id: string
+  started: number
+  ended: number
+  ending: string
+  source: string
+  voice: string
+  title: string
+  reason: string
+  why: string
+  summary: string
+  waiting: string[]
+  seconds: number
+  tasks: number
+  preview: string
+  live: bool
+
+shape Calls
+  version: number
+  live: string
+  calls: CallRow[]
+
+// who: you | voice. at: milliseconds into the call.
+shape Turn
+  who: string
+  at: number
+  text: string
+
+shape CallTask
+  id: string
+  state: string
+  at: number
+  text: string
+
+// kind: paused | resumed | warned | muted | unmuted | stopped | photo | video | ask | answered …
+shape Moment
+  at: number
+  kind: string
+  text: string
+  media: string
+
+shape CallRecord
+  call: CallRow
+  turns: Turn[]
+  tasks: CallTask[]
+  moments: Moment[]
+
+// What hex is doing for the live call (the agent line). state: running | done | failed
+shape AgentLine
+  id: string
+  state: string
+  text: string
+  to: string
+  line: string
+
+// An ask hex put on screen during the call, and Bassim's answer once given.
+shape CallAsk
+  at: number
+  ask: Ask
+  answer: string
+  answered: bool
+
+shape Activity
+  version: number
+  call: string
+  tasks: AgentLine[]
+  asks: CallAsk[]
+
+// Voice settings (GET/PUT /settings)
+
+shape Choice
+  id: string
+  label: string
+
+shape Settings
+  voice: string
+  personality: string
+  pace: string
+  words: string
+  personalities: Choice[]
+  paces: Choice[]
+
+// A write's reply that carries nothing but whether it went.
+shape Reply
+  ok: bool
+  error: string

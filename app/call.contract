@@ -1,0 +1,182 @@
+// Home: the call with hex (§1–4, 7). The orb in the middle, what each side says as it's said, the
+// questions hex puts on screen during the call, what hex is doing for it, and the controls. The
+// toolbar opens Calls, Tasks and Settings over it.
+//
+// On the Duo it follows the fold: folded like a book, the orb and controls take the left screen and
+// the words the right; like a laptop, the orb sits above the fold and the words below; folded shut,
+// or on a phone, one column, the orb rising to make room for the words.
+use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallAsk, Ask, AgentLine from "./shapes.contract"
+use Glass, Surface, endingOf, badEnding, lengthOf from "./parts.contract"
+use WrapUp from "./wrap-up.contract"
+
+// One line of the live transcript: a caption, or the call's ask at index `ask` (-1 for a caption).
+shape Line
+  id: string
+  at: number
+  who: string
+  text: string
+  ask: number
+
+component Home
+  props
+    entry: Entry
+    viewport: Viewport
+    now: number
+    call: CallState
+    captions: Captions
+    activity: Activity
+    counts: Counts
+    calls: Calls
+    persona: string
+    personaColor: string
+    start: action
+    mute: action
+    end: action
+    open: action
+    openTasks: action
+    openTask: action
+    answer: action
+    answerMany: action
+    answering: string
+
+  derive status = call.status
+  derive live = status == "live"
+  derive busy = status == "connecting" or status == "ending"
+  derive book = viewport.horizontalViewportSegments == 2
+  derive laptop = viewport.verticalViewportSegments == 2
+  derive single = not book and not laptop
+  derive top = viewport.safeAreaTop
+  derive bottom = max(viewport.safeAreaBottom, 12)
+
+  // The call's words and its asks, in the order they came. The last call's stay until the next.
+  derive lines = sortBy(captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1)).concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=c.at, who="hex", text="", ask=i)) : []), l => l.at)
+  derive talking = lines.length > 0
+
+  // The wrap-up of the call that just ended here, once hex has named it.
+  derive last = match calls.calls.at(0) { case some(c) => c, case none => CallRow(id="", started=0, ended=0, ending="", source="", voice="", title="", reason="", why="", summary="", waiting=[], seconds=0, tasks=0, preview="", live=false) }
+  derive wrapped = status == "idle" and call.ending != "" and last.title != "" and not last.live
+
+  // What hex is doing for the call: the first running task, or the newest that finished.
+  derive running = activity.tasks.filter(t => t.state == "running")
+  derive agent = match running.at(0) { case some(t) => t, case none => match activity.tasks.at(-1) { case some(t) => t, case none => AgentLine(id="", state="", text="", to="", line="") } }
+
+  derive label = status == "connecting" ? "Connecting" : status == "ending" ? "Ending conversation" : live ? (call.muted and call.hexMuted ? "Microphone and hex muted" : call.muted ? "Microphone muted" : call.hexMuted ? "hex muted" : "Conversation active") : "Ready to start a conversation"
+  derive footer = call.error != "" ? call.error : live and call.hexMuted ? "hex muted · say “unmute”" : status == "idle" and call.ending != "" ? `${endingOf(call.ending)}${call.seconds > 0 ? ` · ${lengthOf(call.seconds)}` : ""}` : ""
+  derive footerBad = call.error != "" or (status == "idle" and badEnding(call.ending))
+  action primary
+    if status == "idle"
+      start()
+    else
+      end()
+  derive orbSize = book ? min(viewport.width / 2 - 64, viewport.height - top - 200) : laptop ? min(viewport.height / 2 - top - 48, viewport.width - 120) : talking ? min(viewport.width * 0.42, 200) : min(min(viewport.width - 96, viewport.height * 0.42), 320)
+
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" position="absolute" inset=0 background-color="-exact-background" testId="home"
+      // Toolbar: Calls on the leading edge; Tasks and Settings in one capsule on the trailing one.
+      row position="absolute" top=(top + 6) left=16 right=(book ? "calc(100% - env(viewport-segment-right 0 0) + 16px)" : "16px") justify-content="space-between" align-items="center" z-index=2
+        button press=open(path("calls")) class=Glass aria-label="Calls" testId="open-calls"
+          image "symbol:sf/clock.arrow.circlepath"
+        row backgroundMaterial="glass" border-radius=22 height=44 align-items="center" padding="0 4px" gap=2 position="relative"
+          button press=openTasks("") appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${counts.yours} need you, ${counts.working} working` -exact-press-haptic="selection" testId="open-tasks"
+            image "symbol:list" width=20 height=20 object-fit="contain" color="-exact-label"
+          button press=open(path("settings")) appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" -exact-press-haptic="selection" testId="open-settings"
+            image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
+          if counts.yours > 0
+            box position="absolute" top=-2 left=34 width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
+
+      // The stage: the orb's half and the words' half, placed by the fold.
+      column position="absolute" top=(top + 56) bottom=(laptop ? "calc(100% - env(viewport-segment-bottom 0 0))" : `${bottom + 88}px`) left=0 right=(book ? "calc(100% - env(viewport-segment-right 0 0))" : "0px") height=(single and talking ? `${orbSize + 72}px` : "auto") align-items="center" justify-content="center" gap=10 -exact-layout-transition="420ms cubic-bezier(0.2, 0.8, 0.2, 1)" testId="stage"
+        hex-orb state=status silenced=(call.muted or call.hexMuted ? "true" : "false") tint=personaColor still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label -exact-layout-transition="420ms cubic-bezier(0.2, 0.8, 0.2, 1)" testId="orb"
+        if live
+          row gap=6 align-items="center" testId="elapsed"
+            if call.muted
+              image "symbol:sf/mic.slash.fill" width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+            time datetime=call.started format="timer" font="-exact-subheadline" color="-exact-secondary-label"
+        if status == "connecting"
+          text "Calling hex…" font="-exact-subheadline" color="-exact-secondary-label" testId="connecting"
+        if footer != ""
+          text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
+        if wrapped and not talking
+          box padding="8px 32px"
+            WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
+
+      // The words: under the orb on a phone, on the right screen of a book fold, below a laptop fold.
+      column position="absolute" top=(book ? `${top + 56}px` : laptop ? "env(viewport-segment-top 0 1)" : `${top + 56 + orbSize + 72}px`) bottom=(book or laptop ? `${bottom + (laptop ? 88 : 0)}px` : `${bottom + 88}px`) left=(book ? "env(viewport-segment-left 1 0)" : "0px") right=0 opacity=(talking or live ? 1 : 0) transition="opacity 300ms" -exact-layout-transition="420ms cubic-bezier(0.2, 0.8, 0.2, 1)" testId="words"
+        if live and not talking
+          text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
+        list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 20px" mask-image="linear-gradient(to bottom, transparent 0, #000 24px, #000 94%, transparent 100%)"
+          for l in lines key=l.id
+            column
+              if l.ask >= 0
+                for c in activity.asks.slice(l.ask, l.ask + 1) key=c.ask.id
+                  CallAskCard(card=c, answering=answering, answer=answer, answerMany=answerMany, openTask=openTask)
+              else
+                row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
+                  text l.text user-select="text" max-width=(l.who == "you" ? "82%" : "100%") font=(l.who == "you" ? "-exact-body" : "-exact-title3") font-weight=(l.who == "you" ? 400 : 500) color=(l.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(l.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(l.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word" testId=`line-${l.id}`
+
+        // The agent line: what hex is doing for this call; tap for the Working tab.
+        if live and activity.tasks.length > 0
+          for a in activity.tasks.slice(0, 1) key="agent"
+            button press=openTasks("working") appearance="none" height=36 margin="4px 20px 0" padding="0 14px" border-radius=18 background-color="-exact-tertiary-fill" display="flex" flex-direction="row" align-items="center" gap=8 aria-live="polite" testId="agent-line"
+              if running.length > 0
+                progress width=14 height=14 aria-label="Working"
+              else
+                image (agent.state == "failed" ? "symbol:alert-fill" : "symbol:select-fill") width=14 height=14 object-fit="contain" color=(agent.state == "failed" ? "-exact-system-red" : "-exact-system-green") aria-hidden=true
+              text (agent.line != "" ? agent.line : agent.text) font="-exact-footnote" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" color=(agent.line != "" ? "-exact-label" : "-exact-secondary-label")
+              if agent.to != "" or running.length > 1
+                text `${agent.to}${running.length > 1 ? ` +${running.length - 1}` : ""}` font="-exact-caption1" color="-exact-secondary-label" white-space="nowrap"
+
+      // The controls: mute beside the call button, at the foot of the orb's side.
+      row position="absolute" bottom=(bottom + 12) left=(book ? "env(viewport-segment-left 0 0)" : "0px") width=(book ? "env(viewport-segment-width 0 0)" : "100%") justify-content="center" align-items="center" gap=28 testId="controls"
+        if status == "idle"
+          box width=60 height=60
+        else
+          button press=mute disabled=(not live or not call.shell) appearance="none" width=60 height=60 border-radius=30 backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" -exact-press-haptic="selection" aria-label=(call.muted ? "Unmute microphone" : call.hexMuted ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
+            image (call.muted ? "symbol:sf/mic.slash.fill" : call.hexMuted ? "symbol:sf/speaker.slash.fill" : "symbol:sf/mic.fill") width=22 height=22 object-fit="contain" color=(call.muted ? "-exact-system-red" : "-exact-label")
+        button press=primary disabled=(status == "ending") appearance="none" width=72 height=72 border-radius=36 background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") display="flex" align-items="center" justify-content="center" -exact-press-haptic="impact-light" aria-label=(status == "idle" ? (call.error != "" ? "Retry conversation" : "Start conversation") : status == "connecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
+          if busy
+            progress width=24 height=24 color="#FFFFFF" aria-label="Connecting"
+          else
+            image (status == "idle" ? "symbol:waveform" : "symbol:close") width=26 height=26 object-fit="contain" color=(status == "idle" ? "-exact-background" : "#FFFFFF")
+        box width=60 height=60
+
+// A question hex put on screen during the call (§7): tap an answer, or say it.
+component CallAskCard
+  props
+    card: CallAsk
+    answering: string
+    answer: action
+    answerMany: action
+    openTask: action
+  state chosen = []
+  derive ask = card.ask
+  derive sending = answering.startsWith(`${ask.id}|`)
+  action choose(label: string)
+    if ask.multiple
+      chosen = chosen.includes(label) ? chosen.filter(c => c != label) : chosen.concat([label])
+    else
+      answer(ask.id, label)
+  view
+    column class=Surface gap=10 margin="8px 0" testId=`call-ask-${ask.id}`
+      if card.answered
+        row gap=8 align-items="center"
+          image "symbol:select-fill" width=18 height=18 object-fit="contain" color="-exact-system-green" aria-hidden=true
+          text `Sent “${card.answer}” to ${ask.topic}` font="-exact-subheadline" flex=1
+      else
+        row gap=8 align-items="center"
+          button press=openTask(ask.task) appearance="none" testId=`call-ask-topic-${ask.id}`
+            text `${ask.topic} ›` font="-exact-footnote" font-weight=600 color="AccentColor"
+          if ask.tag != ""
+            text ask.tag font="-exact-caption1" padding="2px 8px" border-radius=999 background-color="-exact-tertiary-fill" color="-exact-secondary-label"
+        text ask.question font="-exact-headline"
+        row gap=8 flex-wrap="wrap"
+          for o in ask.options key=o.label
+            button press=choose(o.label) disabled=sending appearance="none" padding="8px 14px" border-radius=999 background-color=(chosen.includes(o.label) or o.pick ? "AccentColor" : "-exact-tertiary-fill") opacity=(sending and answering != `${ask.id}|${o.label}` ? 0.45 : 1) -exact-press-haptic="selection" testId=`call-ask-option-${o.label}`
+              text (o.pick and not ask.multiple ? `${o.label} · hex’s pick` : o.label) font="-exact-subheadline" color=(chosen.includes(o.label) or o.pick ? "#FFFFFF" : "-exact-label")
+          for l in ask.links key=l.url
+            link href=l.url padding="8px 14px" border-radius=999 background-color="-exact-tertiary-fill"
+              text `${l.label} ↗` font="-exact-subheadline"
+        if ask.multiple and chosen.length > 0
+          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=sending testId=`call-ask-answer-${ask.id}`
+            text `Answer with ${chosen.length}`
+        text (sending ? `Sending ${answering.slice(ask.id.length + 1)}…` : ask.multiple ? "Pick one or more, or just say it" : "Tap, or just say it") font="-exact-caption1" color="-exact-secondary-label"

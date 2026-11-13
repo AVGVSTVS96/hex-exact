@@ -100,3 +100,13 @@ before a build; builds share it with other work. Commit to main, signed, small.
 - A long poll's mapper can't touch storage, so lists aren't kept offline yet; a failed read keeps
   its last answer while the app runs.
 - `openURL` in an embedded session goes to the shell, which opens links out (Telegram, T3 Code).
+- Exact has no colour well (`input type="color"`), so Settings offers the eight preset colours
+  and Opal's nine palettes, without the stable app's custom colour.
+- Voice previews are Exact sound effects (WAV, 10 s at most), converted from the stable app's
+  m4a files into `assets/voices/`. Exact's audio session is app-wide (`audio_session` in
+  app.json); it stays the default `ambient`, so previews follow the silent switch, because a
+  `playback` session could take the shell's call audio away mid-call.
+- An `image` can't carry hex's token, so a photo or video shared in a past call shows as a line
+  ("You shared a photo · 0:42"), not its thumbnail.
+- The orb takes `persona` and `reaction` beside `tint` (Settings passes them); drawing each
+  persona is the orb's (shell side).

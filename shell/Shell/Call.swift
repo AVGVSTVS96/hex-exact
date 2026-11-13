@@ -37,7 +37,8 @@ final class Call: NSObject {
   private let hex = HexServer()
   private let factory: RTCPeerConnectionFactory
   private var link: Link?
-  private var voice = "marin"
+  /// The voice Bassim picked on this phone, or none to let hex use the one it keeps.
+  private var voice: String?
   /// Each start and stop moves it on, so what an older attempt finishes late is dropped.
   private var generation = 0
   private var startup: Task<Void, Never>?
@@ -89,8 +90,9 @@ final class Call: NSObject {
 
   // MARK: Start
 
-  /// `about` is a task id, or `asks` to go through what waits on Bassim.
-  func start(voice: String = "marin", about: String = "") {
+  /// `about` is a task id, or `asks` to go through what waits on Bassim. Without a `voice` (Siri),
+  /// hex speaks in the one it keeps for every call.
+  func start(voice: String? = nil, about: String = "") {
     guard status == .idle, !closing else { return }
     begin(demo: false)
     self.voice = voice
@@ -312,7 +314,7 @@ final class Call: NSObject {
         guard reconnecting() else { return link.close() }
         self.link = link
         link.microphone(on: !(muted || interrupted))
-        let opened = try await hex.open(sdp: try await link.offer(), voice: voice, about: "", continues: call)
+        let opened = try await hex.open(sdp: try await link.offer(), voice: nil, about: "", continues: call)
         guard reconnecting() else { return }
         startup = after(25, generation) { $0.retry() }
         try await link.answer(opened.sdp)
@@ -430,9 +432,23 @@ final class Call: NSObject {
   /// Photos and videos Bassim sends into the live call: shown at once as sending, uploaded, then
   /// handed to the call, where hex has a look.
   func share(_ picked: [Picked]) {
-    guard status == .live, let id, !picked.isEmpty else { return }
-    let at = Date().timeIntervalSince1970 * 1000
-    let key = captions.sending(picked, at: at)
+    guard status == .live, !picked.isEmpty else { return }
+    deliver(captions.sending(picked, at: Date().timeIntervalSince1970 * 1000), picked)
+  }
+
+  /// A share that didn't arrive goes again where it sits; once the call has ended, it says so.
+  func retryShare(_ key: String) {
+    guard let picked = captions.picked(key) else { return }
+    guard status == .live else {
+      captions.unsent(key, "The call has ended")
+      return Bridge.captionsChanged()
+    }
+    captions.resend(key)
+    deliver(key, picked)
+  }
+
+  private func deliver(_ key: String, _ picked: [Picked]) {
+    guard let id else { return }
     Bridge.captionsChanged()
     Task {
       do {
@@ -445,12 +461,6 @@ final class Call: NSObject {
       }
       Bridge.captionsChanged()
     }
-  }
-
-  func retryShare(_ key: String) {
-    guard let picked = captions.picked(key) else { return }
-    captions.drop(key)
-    share(picked)
   }
 
   // MARK: Levels
@@ -468,12 +478,18 @@ final class Call: NSObject {
     meter = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { _ in
       MainActor.assumeIsolated { Call.shared.measure() }
     }
+    guard !demo else { return }
+    Tone.shared.start { pitch, tone in
+      Task { @MainActor in Call.shared.hear(pitch: pitch, tone: tone) }
+    }
   }
 
   private func stopMeter() {
     meter?.invalidate()
     meter = nil
+    Tone.shared.stop()
     hear(input: 0, output: 0)
+    hear(pitch: 0, tone: 0)
   }
 
   private func measure() {
@@ -488,6 +504,12 @@ final class Call: NSObject {
         call.hear(input: call.muted || call.interrupted ? 0 : min(1, input * 5), output: min(1, output * 5))
       }
     }
+  }
+
+  /// His voice's lift and brightness, still while the mic is off.
+  private func hear(pitch: Float, tone: Float) {
+    let quiet = muted || interrupted || status != .live
+    Bridge.toneChanged(pitch: quiet ? 0 : pitch, tone: quiet ? 0 : tone)
   }
 
   private func hear(input: Float? = nil, output: Float? = nil) {
@@ -706,7 +728,10 @@ struct Captions {
 
   func picked(_ key: String) -> [Picked]? { turns.first { $0.id == key }?.picked }
 
-  mutating func drop(_ key: String) { turns.removeAll { $0.id == key } }
+  mutating func resend(_ key: String) {
+    guard let i = turns.firstIndex(where: { $0.id == key }) else { return }
+    turns[i].note = "sending"
+  }
 
   private mutating func tidy() {
     turns.sort { $0.start < $1.start }
@@ -736,8 +761,9 @@ struct HexServer: Sendable {
   let token = Bundle.main.object(forInfoDictionaryKey: "HexToken") as? String ?? ""
 
   /// A new call, or with `continues` a new session for a call that dropped (410: it's gone).
-  func open(sdp: String, voice: String, about: String, continues: String? = nil) async throws -> Opened {
-    var body = ["sdp": sdp, "voice": voice, "from": "app"]
+  func open(sdp: String, voice: String?, about: String, continues: String? = nil) async throws -> Opened {
+    var body = ["sdp": sdp, "from": "app"]
+    if let voice, !voice.isEmpty { body["voice"] = voice }
     if !about.isEmpty { body["about"] = about }
     if let continues { body["continues"] = continues }
     let (data, status) = try await request("POST", "/session", json: body)

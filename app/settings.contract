@@ -48,10 +48,13 @@ component SettingsScreen
       setOpalPalette(id)
     else
       setPersonaColor(id)
+  // Each pick plays a short phrase on the orb, so its amount shows.
+  state spoken = 0
   action pickReaction(r: string)
     if haptics
       haptic("selection")
     setReaction(r)
+    spoken = spoken + 1
   view
     column navigationKey=`${entry.id}` navigationPresentation=(book ? "fullscreen" : "modal") navigationScroll="settings" position="absolute" inset=0 testId="settings"
       header
@@ -61,7 +64,7 @@ component SettingsScreen
       row flex=1 min-height=0
         if book
           column width="env(viewport-segment-width 0 0)" flex-shrink=0 align-items="center" justify-content="center" gap=20 padding-bottom=40 testId="settings-persona-pane"
-            hex-orb state="idle" silenced="false" persona=persona tint=chosenColor palette=(opalPalette == "original" ? "" : opalPalette) reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=220 height=220 role="img" aria-label=`hex as ${persona}` testId="settings-orb"
+            hex-orb state="idle" silenced="false" persona=persona tint=chosenColor palette=(opalPalette == "original" ? "" : opalPalette) reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") speak=`${spoken}` width=220 height=220 role="img" aria-label=`hex as ${persona}` testId="settings-orb"
             Pager(options=personas(), value=persona, pick=pickPersona, replay=pickPersona, width=paneWidth, locked=false, note="", label="Persona", testKey="persona")
             Swatches(persona=persona, colors=colors(), palettes=palettes(), chosen=(persona == "opal" ? opalPalette : chosenColor), pick=pickSwatch)
           box width="calc(env(viewport-segment-left 1 0) - env(viewport-segment-width 0 0))" flex-shrink=0
@@ -69,7 +72,7 @@ component SettingsScreen
           if not book
             section
               column align-items="center" gap=14 padding="8px 0 4px" testId="settings-persona"
-                hex-orb state="idle" silenced="false" persona=persona tint=chosenColor palette=(opalPalette == "original" ? "" : opalPalette) reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=160 height=160 role="img" aria-label=`hex as ${persona}` testId="settings-orb"
+                hex-orb state="idle" silenced="false" persona=persona tint=chosenColor palette=(opalPalette == "original" ? "" : opalPalette) reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") speak=`${spoken}` width=160 height=160 role="img" aria-label=`hex as ${persona}` testId="settings-orb"
                 Pager(options=personas(), value=persona, pick=pickPersona, replay=pickPersona, width=paneWidth, locked=false, note="", label="Persona", testKey="persona")
                 Swatches(persona=persona, colors=colors(), palettes=palettes(), chosen=(persona == "opal" ? opalPalette : chosenColor), pick=pickSwatch)
           section

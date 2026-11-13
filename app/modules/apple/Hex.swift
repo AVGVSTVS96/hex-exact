@@ -15,8 +15,8 @@ import UIKit
 ///   app.ts  native.watch('call');     native.call({op: 'call'})      → the call's state
 ///           native.watch('captions'); native.call({op: 'captions'})  → its words and shared media
 ///           native.watch('pose');     native.call({op: 'pose'})      → the Duo's bar side, fold, occlusions
-///           native.later({op: start | mute | end | demo | share | attach | retry, …})
-///   views   hex-orb state=… silenced=… persona=… tint=… palette=… reaction=… still=…
+///           native.later({op: start | mute | end | share | attach | retry, …})
+///   views   hex-orb state=… silenced=… persona=… tint=… palette=… reaction=… still=… speak=…
 ///           hex-media media=<id> kind=photo|video anchor=top|center  → an authed thumbnail; tap to look
 final class Hex: ExactModule {
   override class var views: [String: ExactNativeFactory] {
@@ -104,21 +104,29 @@ private let tinted: Set<String> = ["obsidian", "halo", "glint", "command"]
 /// `hex-orb`: hex, as the persona Bassim picked (Obsidian, Mana, Opal, Halo, Glint, Command; the
 /// stable app's Rive files). It listens while you talk, thinks while the call connects or ends,
 /// speaks with hex's voice, and rests when muted or idle. Around it, the stable app's motion: it
-/// breathes while idle, wakes with a spring as the call goes live, and swells with your voice by the
-/// "Reacts to you" amount. Levels come from the shell many times a second, so they never cross into
-/// the Contract.
+/// breathes while idle, wakes with a spring as the call goes live, swells with your voice and rises
+/// and squashes with its pitch and tone, by the "Reacts to you" amount. Levels and tone come from the
+/// shell many times a second, so they never cross into the Contract. A new `speak` plays a short
+/// phrase's worth of it, so Settings shows what each amount looks like.
 final class OrbInstance: ExactNativeInstance {
   private let orb = OrbView()
-  private var observer: NSObjectProtocol?
+  private var observers: [NSObjectProtocol] = []
+  private var spoken: String?
 
   init(_ props: [String: String], _ events: ExactNativeEvents) {
     super.init(events: events)
     try? setProps(props)
-    observer = NotificationCenter.default.addObserver(forName: Notification.Name("HexCallLevels"), object: nil, queue: .main) { [weak self] note in
+    let center = NotificationCenter.default
+    observers.append(center.addObserver(forName: Notification.Name("HexCallLevels"), object: nil, queue: .main) { [weak self] note in
       let input = (note.userInfo?["input"] as? NSNumber)?.floatValue ?? 0
       let output = (note.userInfo?["output"] as? NSNumber)?.floatValue ?? 0
       self?.orb.levels(input: CGFloat(input), output: CGFloat(output))
-    }
+    })
+    observers.append(center.addObserver(forName: Notification.Name("HexCallTone"), object: nil, queue: .main) { [weak self] note in
+      let pitch = (note.userInfo?["pitch"] as? NSNumber)?.floatValue ?? 0
+      let tone = (note.userInfo?["tone"] as? NSNumber)?.floatValue ?? 0
+      self?.orb.voiced(pitch: CGFloat(pitch), tone: CGFloat(tone))
+    })
     events.intrinsicSize(CGSize(width: 240, height: 240))
   }
 
@@ -131,18 +139,23 @@ final class OrbInstance: ExactNativeInstance {
       persona: personas.contains(props["persona"] ?? "") ? props["persona"]! : "opal",
       tint: (props["tint"] ?? "").isEmpty ? "#FFFFFF" : props["tint"]!.uppercased(),
       palette: Int(props["palette"] ?? ""), reaction: reaction, still: props["still"] == "true")
+    let speak = props["speak"] ?? ""
+    if let spoken, speak != spoken { orb.speak() }
+    spoken = speak
   }
 
   override func destroy() {
-    observer.map(NotificationCenter.default.removeObserver)
+    observers.forEach(NotificationCenter.default.removeObserver)
   }
 }
 
 final class OrbView: UIView {
-  /// wake → breath → heard → the persona, so each motion scales on its own layer.
+  /// wake → breath → heard (loudness) → voice (pitch and tone) → the persona, so each motion moves
+  /// on its own layer.
   private let wake = UIView()
   private let breath = UIView()
   private let heard = UIView()
+  private let voice = UIView()
   private var face: UIView?
   #if canImport(RiveRuntime)
     private var rive: RiveViewModel?
@@ -159,22 +172,24 @@ final class OrbView: UIView {
   private var still = false
   private var speaking = false
   private var level: CGFloat = 0
+  private var tone = (pitch: CGFloat(0), tone: CGFloat(0))
+  private var phrase = 0
 
   override init(frame: CGRect) {
     super.init(frame: frame)
     isUserInteractionEnabled = false
-    for (outer, inner) in [(self, wake), (wake, breath), (breath, heard)] { outer.addSubview(inner) }
+    for (outer, inner) in [(self, wake), (wake, breath), (breath, heard), (heard, voice)] { outer.addSubview(inner) }
   }
 
   required init?(coder: NSCoder) { fatalError() }
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    for view in [wake, breath, heard] {
+    for view in [wake, breath, heard, voice] {
       view.bounds = CGRect(origin: .zero, size: bounds.size)
       view.center = CGPoint(x: bounds.midX, y: bounds.midY)
     }
-    face?.frame = heard.bounds
+    face?.frame = voice.bounds
   }
 
   override func traitCollectionDidChange(_ previous: UITraitCollection?) {
@@ -198,7 +213,10 @@ final class OrbView: UIView {
     paint()
     act()
     if woke || swapped { move() }
+    if !reacting, phrase == 0 { react(level: 0, pitch: 0, tone: 0) }
   }
+
+  private var reacting: Bool { status == "live" && !silenced && !still && reaction > 0 }
 
   /// The Rive persona, or (without Rive, as in a plain Exact build) hex's drawn sphere.
   private func load() {
@@ -233,9 +251,9 @@ final class OrbView: UIView {
       drawn = nil
     }
     if let face {
-      face.frame = heard.bounds
+      face.frame = voice.bounds
       face.alpha = 0
-      heard.addSubview(face)
+      voice.addSubview(face)
       UIView.animate(withDuration: old == nil ? 0 : 0.15) {
         face.alpha = 1
         old?.alpha = 0
@@ -321,13 +339,48 @@ final class OrbView: UIView {
       act()
     }
     drawn?.levels(input: input, output: output)
-    let reacting = status == "live" && !silenced && !still && reaction > 0
-    let loudness = reacting ? max(0, input - 0.06) / 0.94 : 0
-    guard abs(loudness - level) > 0.005 else { return }
-    level = loudness
-    let scale = 1 + reaction * loudness
-    UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-      self.heard.transform = CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: 0, y: -0.15 * reaction * self.bounds.height * loudness)
+    guard phrase == 0 else { return }
+    react(level: reacting ? max(0, input - 0.06) / 0.94 : 0, pitch: tone.pitch, tone: tone.tone)
+  }
+
+  /// His voice's pitch lifts the orb and its tone stretches it tall (bright) or wide (dark).
+  func voiced(pitch: CGFloat, tone: CGFloat) {
+    guard phrase == 0 else { return }
+    react(level: level, pitch: reacting ? pitch : 0, tone: reacting ? tone : 0)
+  }
+
+  /// A short spoken phrase's loudness, pitch and tone, as the stable app's Settings plays it when
+  /// "Reacts to you" changes.
+  func speak() {
+    guard !still, reaction > 0 else { return }
+    phrase += 1
+    let take = phrase
+    let steps: [(CGFloat, CGFloat, CGFloat)] = [(0.9, -0.2, 0.2), (0.35, -0.35, -0.1), (0.75, 0.1, 0.3), (0.25, 0.35, 0), (0.6, 0.9, 0.5), (0, 0, 0)]
+    for (i, step) in steps.enumerated() {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2 * Double(i)) { [weak self] in
+        guard let self, self.phrase == take else { return }
+        self.react(level: step.0, pitch: step.1, tone: step.2, force: true)
+        if i == steps.count - 1 { self.phrase = 0 }
+      }
+    }
+  }
+
+  /// The stable app's `heard`: scale with loudness, a lift of 0.4 of its size with pitch, and up to
+  /// 30% taller and narrower with tone, each times the reaction amount.
+  private func react(level: CGFloat, pitch: CGFloat, tone: CGFloat, force: Bool = false) {
+    let amount = reaction
+    if force || abs(level - self.level) > 0.005 {
+      self.level = level
+      let scale = 1 + amount * level
+      UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+        self.heard.transform = CGAffineTransform(scaleX: scale, y: scale)
+      }
+    }
+    guard force || abs(pitch - self.tone.pitch) > 0.004 || abs(tone - self.tone.tone) > 0.004 else { return }
+    self.tone = (pitch, tone)
+    let lift = -0.4 * amount * bounds.height * pitch
+    UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+      self.voice.transform = CGAffineTransform(translationX: 0, y: lift).scaledBy(x: 1 - 0.3 * amount * tone, y: 1 + 0.3 * amount * tone)
     }
   }
 }

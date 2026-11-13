@@ -1,6 +1,7 @@
 // A past call (§5–6): its wrap-up, then everything said in order, with the tasks it started and what
 // happened along the way, and how it ended. The live call opens here too, following as it goes.
-use Viewport, CallRecord, CallTask from "./shapes.contract"
+use Viewport, CallRecord, CallTask, Media from "./shapes.contract"
+use Thumb from "./media.contract"
 use lengthOf, endingOf, badEnding from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 
@@ -96,7 +97,11 @@ component PastCall
                   image (b.state == "failed" ? "symbol:sf/exclamationmark" : b.state == "running" ? "symbol:sf/circle.dotted" : "symbol:checkmark") position="absolute" width=11 height=11 margin="5.5px" object-fit="contain" color=(b.state == "failed" ? "-exact-system-red" : b.state == "running" ? "-exact-system-teal" : "-exact-secondary-label") aria-hidden=true
                   text b.text font="-exact-subheadline" font-weight=500 flex=1 min-width=0 user-select="text" padding-top=1
                   text clockOf(b.at) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" padding-top=3
-              if b.kind == "mark" or b.kind == "media"
+              if b.kind == "media"
+                column align-items="flex-end" gap=4
+                  Thumb(media=Media(id=b.key.slice(6), kind=b.state, aspect=0), width=160, square=true)
+                  text clockOf(b.at) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+              if b.kind == "mark"
                 row gap=6 align-items="center" justify-content="center"
                   image markSymbol(b.state) width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
                   text `${b.text} · ${clockOf(b.at)}` font="-exact-footnote" color="-exact-secondary-label"

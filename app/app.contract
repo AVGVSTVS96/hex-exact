@@ -18,7 +18,6 @@ use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 use UpdateToast from "./toast.contract"
-use paletteColor from "./parts.contract"
 
 // Every screen and sheet. Home is the call; the rest open over it. hexexact://go/<path> opens any
 // of them from outside (Siri, scripts/sim).
@@ -137,8 +136,6 @@ component App
   // elsewhere's words and clock.
   derive liveId = call.status != "idle" and call.id != "" and not call.demo ? call.id : (call.status == "idle" ? activity.call : "")
   resource liveRecord = loadCall(liveId, true) when liveId != "" as shape CallRecord else empty()
-  // How the orb is tinted: Opal by its palette, Mana by its own colour, the rest by the colour picked.
-  derive orbTint = persona == "opal" ? paletteColor(opalPalette) : persona == "mana" ? "" : (personaColor == "" ? "#FFFFFF" : personaColor)
   derive removeError = pending(removed) ? "" : match removed { case some(r) => r.error, case none => "" }
 
   task minute mount
@@ -368,7 +365,7 @@ component App
         if e.name == "check"
           LastCheck(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
         if e.name == "settings"
-          SettingsScreen(entry=e, viewport=viewport, settings=settings, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, tint=orbTint, reaction=reaction, sounds=sounds, haptics=haptics, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, open=open, back=back)
+          SettingsScreen(entry=e, viewport=viewport, settings=settings, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, haptics=haptics, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, open=open, back=back)
         if e.name == "voice"
           VoicePage(entry=e, viewport=viewport, settings=settings, voice=voice, inCall=(call.status != "idle"), loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), set=setSetting, open=open, back=back)
         if e.name == "words"

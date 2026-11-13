@@ -1,0 +1,67 @@
+// Photos and videos (§8): the thumbnails hex's pictures show as, a sent group of them, the "+" that
+// opens the Camera or Photos, and the strip of what waits in a composer. Each picture is the shell's
+// `hex-media` view: it reads hex's copy with its token and opens full screen on a tap.
+use Media from "./shapes.contract"
+
+// A picture's height for its width, its shape kept between 3:4 and 4:3.
+fn heightFor(width: number, aspect: number): number = aspect <= 0 ? width : width / min(4 / 3, max(3 / 4, aspect))
+
+// One picture at a width, with a hairline edge.
+component Thumb
+  props
+    media: Media
+    width: number
+    square: bool
+  view
+    box width=width height=(square ? width : heightFor(width, media.aspect)) border-radius=14 overflow="hidden" border="0.5px solid -exact-separator" flex-shrink=0
+      hex-media media=media.id kind=media.kind width="100%" height="100%" testId=`media-${media.id}`
+
+// A sent group: one picture at the full width, more as a two-up grid of squares.
+component Album
+  props
+    media: Media[]
+    width: number
+  derive cell = (width - 4) / 2
+  view
+    if media.length == 1
+      for m in media key=m.id
+        Thumb(media=m, width=width, square=false)
+    else
+      row flex-wrap="wrap" gap=4 width=width
+        for m in media key=m.id
+          Thumb(media=m, width=cell, square=true)
+
+// The "+" that adds a photo or video: a menu of Camera and Photos. `menu` names it on the screen.
+component AddMedia
+  props
+    menu: string
+    label: string
+    glass: bool
+    size: number
+    disabled: bool
+    add: action
+  view
+    row
+      button popovertarget=menu disabled=disabled appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial=(glass ? "glass" : "none") background-color=(glass ? "transparent" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" aria-label=label -exact-press-haptic="selection" testId=menu
+        image "symbol:sf/plus" width=(size * 0.38) height=(size * 0.38) object-fit="contain" color="-exact-label"
+      column id=menu popover="auto" role="menu"
+        button press=add("camera") popovertarget=menu popovertargetaction="hide" testId=`${menu}-camera`
+          image "symbol:sf/camera"
+          text "Camera"
+        button press=add("photos") popovertarget=menu popovertargetaction="hide" testId=`${menu}-photos`
+          image "symbol:sf/photo.on.rectangle"
+          text "Photos"
+
+// What waits to go with a composer's next send, each with a × to take it out.
+component Waiting
+  props
+    media: Media[]
+    remove: action
+  view
+    if media.length > 0
+      row gap=8 padding="4px 0" testId="waiting"
+        for m in media key=m.id
+          box position="relative"
+            Thumb(media=m, width=56, square=true)
+            button press=remove(m.id) appearance="none" position="absolute" top=-6 right=-6 width=22 height=22 border-radius=11 background-color="-exact-label" display="flex" align-items="center" justify-content="center" aria-label="Remove" testId=`waiting-remove-${m.id}`
+              image "symbol:sf/xmark" width=9 height=9 object-fit="contain" color="-exact-background"

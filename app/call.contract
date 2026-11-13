@@ -5,17 +5,25 @@
 // On the Duo it follows the fold: folded like a book, the orb and controls take the left screen and
 // the words the right; like a laptop, the orb sits above the fold and the words below; folded shut,
 // or on a phone, one column, the orb rising to make room for the words.
-use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallAsk, Ask, AgentLine from "./shapes.contract"
+use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media from "./shapes.contract"
 use Glass, Surface, endingOf, badEnding, lengthOf from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
+use Album, AddMedia from "./media.contract"
 
-// One line of the live transcript: a caption, or the call's ask at index `ask` (-1 for a caption).
+// One line of the live transcript: a caption, photos and videos Bassim sent (media, and note:
+// "sending", why not, or ""), or the call's ask at index `ask` (-1 for anything else).
 shape Line
   id: string
   at: number
   who: string
   text: string
   ask: number
+  media: Media[]
+  note: string
+
+// Where a call held elsewhere is, and how it started, as the stable app says it.
+fn whereOf(source: string): string = source == "web" ? "On the web page" : source == "phone-in" or source == "phone-out" ? "On your phone" : "In the app"
+fn startedOf(source: string): string = source == "web" ? "You called from the web page" : source == "phone-in" ? "You called hex" : source == "phone-out" ? "hex called you" : "You called from the app"
 
 component Home
   props
@@ -27,11 +35,20 @@ component Home
     activity: Activity
     counts: Counts
     calls: Calls
+    // The live call's record (here or elsewhere): hex muting itself, a call elsewhere's words.
+    liveRecord: CallRecord
     persona: string
     personaColor: string
+    palette: string
+    reaction: string
+    haptics: bool
     start: action
     mute: action
     end: action
+    hangUp: action
+    leaving: bool
+    share: action
+    reshare: action
     open: action
     openTasks: action
     openTask: action
@@ -39,9 +56,15 @@ component Home
     answerMany: action
     answering: string
 
-  derive status = call.status
+  // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
+  derive elsewhere = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0
+  derive status = elsewhere ? (leaving ? "ending" : "live") : call.status
   derive live = status == "live"
-  derive busy = status == "connecting" or status == "ending"
+  derive here = live and not elsewhere
+  derive busy = status == "connecting" or status == "reconnecting" or status == "ending"
+  // hex muted itself: the last mute or unmute in the call's record says so.
+  derive hushed = live and match liveRecord.moments.filter(m => m.kind == "muted" or m.kind == "unmuted").at(-1) { case some(m) => m.kind == "muted", case none => false }
+  derive micOff = call.muted or call.interrupted
   derive book = viewport.horizontalViewportSegments == 2
   derive laptop = viewport.verticalViewportSegments == 2
   derive single = not book and not laptop
@@ -49,7 +72,8 @@ component Home
   derive bottom = max(viewport.safeAreaBottom, 12)
 
   // The call's words and its asks, in the order they came. The last call's stay until the next.
-  derive lines = sortBy(captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1)).concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=c.at, who="hex", text="", ask=i)) : []), l => l.at)
+  derive spoken = elsewhere ? liveRecord.turns.map((t, i) => Line(id=`r${i}`, at=t.at, who=(t.who == "you" ? "you" : "hex"), text=t.text, ask=-1, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1, media=t.media, note=t.note))
+  derive lines = sortBy(spoken.concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=c.at, who="hex", text="", ask=i, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : []), l => l.at)
   derive talking = lines.length > 0
 
   // The wrap-up of the call that just ended here, once hex has named it.
@@ -60,11 +84,13 @@ component Home
   derive running = activity.tasks.filter(t => t.state == "running")
   derive agent = match running.at(0) { case some(t) => t, case none => match activity.tasks.at(-1) { case some(t) => t, case none => AgentLine(id="", state="", text="", to="", line="") } }
 
-  derive label = status == "connecting" ? "Connecting" : status == "ending" ? "Ending conversation" : live ? (call.muted and call.hexMuted ? "Microphone and hex muted" : call.muted ? "Microphone muted" : call.hexMuted ? "hex muted" : "Conversation active") : "Ready to start a conversation"
-  derive footer = call.error != "" ? call.error : live and call.hexMuted ? "hex muted · say “unmute”" : status == "idle" and call.ending != "" ? `${endingOf(call.ending)}${call.seconds > 0 ? ` · ${lengthOf(call.seconds)}` : ""}` : ""
+  derive label = status == "connecting" ? "Connecting" : status == "reconnecting" ? "Reconnecting" : status == "ending" ? "Ending conversation" : elsewhere ? `${startedOf(liveRecord.call.source)}, ${whereOf(liveRecord.call.source).toLowerCase()}` : live ? (micOff and hushed ? "Microphone and hex muted" : micOff ? "Microphone muted" : hushed ? "hex muted" : "Conversation active") : "Ready to start a conversation"
+  derive footer = call.error != "" ? call.error : hushed ? (call.muted ? "hex muted" : "hex muted · say “unmute”") : elsewhere ? `${whereOf(liveRecord.call.source)} · ${startedOf(liveRecord.call.source)}` : call.interrupted and live ? "Paused while another app has the audio" : status == "idle" and call.ending != "" ? (call.ending == "no-connect" ? endingOf(call.ending) : `${endingOf(call.ending)} · ${lengthOf(call.seconds)}`) : ""
   derive footerBad = call.error != "" or (status == "idle" and badEnding(call.ending))
   action primary
-    if status == "idle"
+    if elsewhere
+      hangUp(activity.call)
+    else if status == "idle"
       start()
     else
       end()
@@ -86,14 +112,14 @@ component Home
 
       // The stage: the orb's half and the words' half, placed by the fold.
       column position="absolute" top=(top + 56) bottom=(laptop ? "calc(100% - env(viewport-segment-bottom 0 0))" : `${bottom + 88}px`) left=0 right=(book ? "calc(100% - env(viewport-segment-right 0 0))" : "0px") height=(single and talking ? `${orbSize + 72}px` : "auto") align-items="center" justify-content="center" gap=10 -exact-layout-transition="420ms cubic-bezier(0.2, 0.8, 0.2, 1)" testId="stage"
-        hex-orb state=status silenced=(call.muted or call.hexMuted ? "true" : "false") tint=personaColor still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label -exact-layout-transition="420ms cubic-bezier(0.2, 0.8, 0.2, 1)" testId="orb"
+        hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label -exact-layout-transition="420ms cubic-bezier(0.2, 0.8, 0.2, 1)" testId="orb"
         if live
           row gap=6 align-items="center" testId="elapsed"
             if call.muted
               image "symbol:sf/mic.slash.fill" width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-            time datetime=call.started format="timer" font="-exact-subheadline" color="-exact-secondary-label"
-        if status == "connecting"
-          text "Calling hex…" font="-exact-subheadline" color="-exact-secondary-label" testId="connecting"
+            time datetime=(elsewhere ? liveRecord.call.started : call.started) format="timer" font="-exact-subheadline" color="-exact-secondary-label"
+        if status == "connecting" or status == "reconnecting"
+          text (status == "reconnecting" ? "Reconnecting…" : "Calling hex…") font="-exact-subheadline" color="-exact-secondary-label" testId="connecting"
         if footer != ""
           text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
         if wrapped and not talking
@@ -110,6 +136,15 @@ component Home
               if l.ask >= 0
                 for c in activity.asks.slice(l.ask, l.ask + 1) key=c.ask.id
                   CallAskCard(card=c, answering=answering, answer=answer, answerMany=answerMany, openTask=openTask)
+              else if l.media.length > 0
+                column align-items="flex-end" gap=4 padding="4px 0" testId=`line-${l.id}`
+                  box opacity=(l.note == "sending" ? 0.6 : 1)
+                    Album(media=l.media, width=min(viewport.width * 0.6, 260))
+                  if l.note == "sending"
+                    text "Sending" font="-exact-caption1" color="-exact-secondary-label"
+                  else if l.note != ""
+                    button press=reshare(l.id.slice(1)) appearance="none" testId=`reshare-${l.id}`
+                      text `Not sent · ${l.note} · Tap to try again` font="-exact-caption1" color="-exact-system-red" text-align="end"
               else
                 row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
                   text l.text user-select="text" max-width=(l.who == "you" ? "82%" : "100%") font=(l.who == "you" ? "-exact-body" : "-exact-title3") font-weight=(l.who == "you" ? 400 : 500) color=(l.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(l.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(l.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word" testId=`line-${l.id}`
@@ -131,14 +166,17 @@ component Home
         if status == "idle"
           box width=60 height=60
         else
-          button press=mute disabled=(not live or not call.shell) appearance="none" width=60 height=60 border-radius=30 backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" -exact-press-haptic="selection" aria-label=(call.muted ? "Unmute microphone" : call.hexMuted ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
-            image (call.muted ? "symbol:sf/mic.slash.fill" : call.hexMuted ? "symbol:sf/speaker.slash.fill" : "symbol:sf/mic.fill") width=22 height=22 object-fit="contain" color=(call.muted ? "-exact-system-red" : "-exact-label")
-        button press=primary disabled=(status == "ending") appearance="none" width=72 height=72 border-radius=36 background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") display="flex" align-items="center" justify-content="center" -exact-press-haptic="impact-light" aria-label=(status == "idle" ? (call.error != "" ? "Retry conversation" : "Start conversation") : status == "connecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
+          button press=mute disabled=(not here or not call.shell) appearance="none" width=60 height=60 border-radius=30 backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(micOff ? "Unmute microphone" : hushed ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
+            image (micOff ? "symbol:sf/mic.slash.fill" : hushed ? "symbol:sf/speaker.slash.fill" : "symbol:sf/mic.fill") width=22 height=22 object-fit="contain" color=(micOff ? "-exact-system-red" : "-exact-label")
+        button press=primary disabled=(status == "ending") appearance="none" width=72 height=72 border-radius=36 background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (call.error != "" ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
           if busy
             progress width=24 height=24 color="#FFFFFF" aria-label="Connecting"
           else
             image (status == "idle" ? "symbol:waveform" : "symbol:close") width=26 height=26 object-fit="contain" color=(status == "idle" ? "-exact-background" : "#FFFFFF")
-        box width=60 height=60
+        if here and call.shell
+          AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=60, disabled=false, add=share)
+        else
+          box width=60 height=60
 
 // A question hex put on screen during the call (§7): tap an answer, or say it.
 component CallAskCard

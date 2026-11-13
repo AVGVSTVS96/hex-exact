@@ -2,7 +2,7 @@
 # Runs on the server: builds hex Exact for the simulator on the Mac (BUILT=1 reuses the last build),
 # installs it on its own iPhone Duo simulator ("hexexact Duo"), and screenshots each screen in each
 # pose and appearance. A screen is a path (`/`, `/tasks`, `/tasks/t/<id>`), opened through
-# hexexact://go/<path>; `call:<path>` starts the demo call first (none yet: the shell needs a mic).
+# hexexact://go/<path>; `call:<path>` starts the demo call first (DEMO_WAIT seconds in, 12 unless set).
 #   scripts/sim [path…]                        (default: / /calls /tasks /settings)
 #   POSES="cover-up open-up open-side cover-side" APPEARANCES="dark light" scripts/sim /tasks
 # Shots land in $SHOTS (~/hex/scratch/hex-exact/shots/<commit>/), named <path>-<pose>-<appearance>.png.
@@ -78,8 +78,11 @@ for pose in $poses; do
     xcrun simctl launch --terminate-running-process "$id" com.shahidy.hexexact >/dev/null
     sleep 4
     for path in "$@"; do
-      xcrun simctl openurl "$id" "hexexact://go$path"
-      sleep 3
+      case $path in
+        # The demo call, then the screen: its live state shot a few lines in.
+        call:*) xcrun simctl openurl "$id" "hexexact://demo${path#call:}"; sleep ${DEMO_WAIT:-12} ;;
+        *) xcrun simctl openurl "$id" "hexexact://go$path"; sleep 3 ;;
+      esac
       name=$(echo "${path#/}" | tr '/:' '__'); name=${name:-home}
       xcrun simctl io "$id" screenshot --display=$display "$out/$name-$pose-$appearance.png" >/dev/null 2>&1
     done

@@ -348,7 +348,7 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, persona=persona, personaColor=orbTint, start=startCall(""), mute=toggleMute, end=endCall, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answering=answering)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answering=answering)
         if e.name == "calls"
           CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(calls)), failed=failed(calls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"

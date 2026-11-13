@@ -90,7 +90,7 @@ component AskCard
             for o in ask.options key=o.label
               button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`ask-option-${ask.id}-${o.label}`
                 if ask.multiple
-                  image (chosen.includes(o.label) ? "symbol:sf/checkmark.circle.fill" : "symbol:sf/circle") width=22 height=22 object-fit="contain" color=(chosen.includes(o.label) ? "AccentColor" : "-exact-tertiary-label")
+                  image (chosen.includes(o.label) ? "symbol:select-fill" : "symbol:circle") width=22 height=22 object-fit="contain" color=(chosen.includes(o.label) ? "AccentColor" : "-exact-tertiary-label")
                 column flex=1 min-width=0 gap=2
                   text o.label font="-exact-body" font-weight=(o.pick ? 600 : 400) color=(o.pick ? "hex.accent" : "-exact-label")
                   if o.detail != ""
@@ -115,7 +115,7 @@ component ReplyComposer
     ask: Ask
     draft: string
     keep: action
-    close: action
+    dismissed: action
     note: action
     answer: action
   state text = ""
@@ -128,19 +128,19 @@ component ReplyComposer
   action sendNote
     note(ask.id, words.trim())
     keep(`ask:${ask.id}`, "")
-    close()
+    dismissed()
   action sendAnswer
     answer(ask.id, words.trim())
     keep(`ask:${ask.id}`, "")
-    close()
+    dismissed()
   action leave
     if words.trim() == ""
-      close()
+      dismissed()
   view
     column gap=8 padding="10px 16px" testId="reply"
       row gap=8 align-items="center"
         text `Replying to ${ask.question}` font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
-        button press=close aria-label="Close, keep the draft" testId="reply-close"
+        button press=dismissed aria-label="Close, keep the draft" testId="reply-close"
           image "symbol:close"
       textarea id="reply-field" value=words input=edit blur=leave autofocus=true rows=3 field-sizing="content" max-height=130 placeholder="Your answer" aria-label="Your answer" testId="reply-field"
       row gap=8 justify-content="flex-end"

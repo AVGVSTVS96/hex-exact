@@ -1,7 +1,29 @@
-// A task's page (§9.2–9.3, 9.7–9.8): what it needs from Bassim, what it's doing now, what it did,
-// its pinned post, its messages and every place it lives.
-use Viewport, TaskPage, Chat, Asks, Tasks, Ask, Place from "./shapes.contract"
-use Mark, Surface, PlaceTile, whenOf, appName from "./parts.contract"
+// A task's page (§9.2, 9.7, 9.8): what it needs from Bassim, what it's doing now, what it did, its
+// pinned post, its messages, every place it lives, its week and its history. The same route opens
+// a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
+use Viewport, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection from "./shapes.contract"
+use Mark, PlaceTile, whenOf, appName, lengthOf from "./parts.contract"
+use Said from "./said.contract"
+use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
+use EntryRow from "./rows.contract"
+use AskCard, ReplyComposer from "./ask.contract"
+
+// A working stretch of a thread's week, as fractions of the lane (log-like: the last hour is a
+// fifth of it, the week before three days ago another).
+shape Span
+  start: number
+  end: number
+
+fn hoursAgo(at: number, now: number): number = max(0, (now - at) / 3600000)
+fn laneX(h: number): number = h <= 1 ? 1 - 0.2 * h : h <= 6 ? 0.8 - 0.2 * (h - 1) / 5 : h <= 24 ? 0.6 - 0.2 * (h - 6) / 18 : h <= 72 ? 0.4 - 0.2 * (h - 24) / 48 : h <= 168 ? 0.2 - 0.2 * (h - 72) / 96 : 0
+fn trackAt(track: Track[], i: number, now: number): number = match track.at(i) { case some(t) => t.at, case none => now }
+fn spansOf(track: Track[], now: number): Span[] = range(track.length).filter(i => match track.at(i) { case some(t) => t.state == "working", case none => false }).map(i => Span(start=laneX(hoursAgo(trackAt(track, i, now), now)), end=laneX(hoursAgo(trackAt(track, i + 1, now), now))))
+fn failsOf(track: Track[], now: number): number[] = track.filter(t => t.state == "failed").map(t => laneX(hoursAgo(t.at, now)))
+fn blankSaid(): Said = Said(id="", verb="", label="", status="", detail="", missed=0, question="", topic="", task="")
+fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
+fn kindWord(kind: string): string = kind == "think" ? "Thought" : kind == "say" ? "Said" : kind == "run" ? "Ran" : kind == "read" ? "Read" : kind == "edit" ? "Edited" : kind == "search" ? "Searched" : kind == "web" ? "Looked up" : kind == "agent" ? "Agent" : kind == "plan" ? "Planned" : "Used a tool"
+// "(Asked Siri) words" from Bassim is an event: its label and its words.
+fn eventOf(text: string): string = text.startsWith("(") and text.indexOf(") ") > 1 ? text.slice(1, text.indexOf(") ")) : ""
 
 component TaskScreen
   props
@@ -13,6 +35,10 @@ component TaskScreen
     chat: Chat
     asks: Asks
     tasks: Tasks
+    said: Said[]
+    drafts: string[]
+    words: Words
+    wordsAsk: string
     loading: bool
     failed: bool
     inCall: bool
@@ -23,134 +49,233 @@ component TaskScreen
     note: action
     dismiss: action
     undo: action
+    again: action
+    act: action
+    markRead: action
+    showWords: action
+    keepDraft: action
     talk: action
     message: action
     answering: string
     back: action
-  derive title = task.place != "" ? task.place : task.name
-  derive subtitle = task.state == "needs" ? `waiting on you since ${whenOf(task.since, now, offset)}` : task.running ? `working since ${whenOf(task.since, now, offset)}` : task.state == "done" ? `done ${whenOf(task.at, now, offset)}` : whenOf(task.at, now, offset)
-  derive siblings = tasks.tasks.filter(t => t.name == task.name and t.id != task.id)
+  state replying = ""
+  state allPlaces = false
+  derive id = entry.params.id
+  derive topicName = id.startsWith("topic:") ? id.slice(6) : ""
+  derive doneId = id.startsWith("done:") ? id.slice(5) : ""
+  derive kind = topicName != "" ? "topic" : doneId != "" ? "done" : "task"
+  // The thread as the list knows it, until the page's own answer comes.
+  derive row = match tasks.tasks.filter(t => t.id == id).at(0) { case some(t) => t, case none => TaskRow(id=task.id, app=task.app, thread=task.thread, name=task.name, where=task.where, place=task.place, state=task.state, running=task.running, line=task.line, since=task.since, at=task.at, link=task.link, track=task.track, agents=task.agents) }
+  derive known = task.id == id
+  derive title = kind == "topic" ? topicName : kind == "done" ? finished.title : (row.place != "" ? row.place : row.name)
+  derive parent = isPart(row) ? row.name : ""
+  derive pageAsks = kind == "topic" ? asks.asks.filter(a => a.topic == topicName) : asksOf(row, asks.asks)
+  derive waiting = pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).length
+  derive siblings = sortBy(tasks.tasks.filter(t => t.name == row.name and t.id != row.id), t => t.at, "desc")
+  derive places = [row].concat(siblings)
+  derive working = siblings.filter(t => t.state == "working")
+  derive busyAgents = task.agents.filter(a => a.state == "working")
+  derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${waiting > 0 ? `${waiting} need you · ` : ""}${row.state == "needs" ? `waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `working for ${lengthOf((now - row.since) / 1000)}` : row.state == "done" ? `done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}`
+  derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
+  derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
+  derive replyAsk = pageAsks.filter(a => a.id == replying)
+  derive weekly = places.filter(t => t.track.length > 0)
+  action reply(askId: string)
+    replying = askId
+  action closeReply
+    replying = ""
+  action morePlaces
+    allPlaces = not allPlaces
   view
-    column navigationKey=`${entry.id}` navigationScroll="task-page" position="absolute" inset=0 testId="task"
+    column navigationKey=`${entry.id}` navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 testId="task"
       header display="flex" align-items="center"
         text title role="heading" aria-level=2
         text subtitle
-        button press=talk(task.id) aria-label="Talk it through" testId="task-talk"
-          image "symbol:sf/phone.and.waveform"
+        if kind != "done"
+          button press=talk(kind == "task" ? id : "asks") aria-label="Talk it through" testId="task-talk"
+            image "symbol:sf/phone.and.waveform"
       list id="task-page" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        if loading and task.id == ""
+        if kind == "done"
           section
-            progress aria-label="Loading"
-        if failed and task.id == ""
-          section
-            text "hex didn't answer, so this can't open yet." color="-exact-secondary-label"
-        if task.asks.length > 0
-          section
-            header
-              text "Needs you"
-            for a in task.asks key=a.id
-              AskCard(ask=a, now=now, offset=offset, answering=answering, answer=answer, answerMany=answerMany, dismiss=dismiss)
-        if task.needs != "" and task.asks.length == 0
-          section
-            header
-              text "Needs you"
-            column gap=2
-              text task.needs
-              text `Waiting on you since ${whenOf(task.since, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
-        if task.running
-          section
-            header
-              text "Working"
-            link href=path("steps", task.id) testId="task-now"
-              Mark(state="working", size=28)
-              text `Now: ${task.line}` flex=1 line-clamp=2
-        if task.steps.length > 0
-          section
-            header
-              text "Last run"
-            for s in task.steps.slice(-3) key=s.id
-              text (s.brief != "" ? s.brief : s.text) font="-exact-subheadline" line-clamp=2
-            link href=path("steps", task.id) testId="task-steps"
-              text `All steps${task.agents.length > 0 ? ` · ${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"}` : ""}` flex=1
-        if task.pin != ""
-          section
-            header
-              text "Pinned"
-            text task.pin font="-exact-subheadline" white-space="pre-wrap" user-select="text"
-        if chat.turns.length > 0
-          section
-            header
-              text "Messages"
-            for t in chat.turns.slice(-2) key=t.id
-              text t.text font="-exact-subheadline" line-clamp=3 color=(t.source == "me" ? "-exact-secondary-label" : "-exact-label")
-            link href=path("thread", task.id) testId="task-messages"
-              text `All messages · ${chat.total}` flex=1
+            row gap=12 align-items="flex-start" padding="4px 0"
+              Mark(state="done", size=26)
+              text finished.title font="-exact-title3" font-weight=600 flex=1
+          if finished.said != ""
+            section
+              header
+                text "Proof"
+              text finished.said font="-exact-body" user-select="text"
+              for l in finished.links key=l.url
+                link href=l.url testId=`proof-${l.label}`
+                  text l.label flex=1
+                  image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
+          if finished.run != ""
+            section
+              header
+                text "Project"
+              link href=path("task", finished.run) testId="done-project"
+                PlaceTile(place=Place(app=finished.app, place=finished.topic, task=finished.run, call="", link=finished.link), size=28)
+                text finished.topic flex=1
         else
-          section
-            link href=path("thread", task.id) testId="task-messages"
-              text `Message ${title}` flex=1 color="-exact-secondary-label"
-        section
-          header
-            text `Places · ${siblings.length + 1}`
-          link href=task.link testId="task-door"
-            PlaceTile(place=Place(app=task.app, place=title, task=task.id, call="", link=task.link), size=30)
-            column flex=1 min-width=0
-              text title
-              text `${appName(task.app)} · ${whenOf(task.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
-          for s in siblings.slice(0, 5) key=s.id
-            link href=path("task", s.id)
-              PlaceTile(place=Place(app=s.app, place=s.place, task=s.id, call="", link=s.link), size=30)
-              column flex=1 min-width=0
-                text s.place
-                text `${appName(s.app)} · ${whenOf(s.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
-        if task.lately.length > 0
-          section
-            header
-              text "Lately"
-            for l, i in task.lately.slice(0, 8) key=`${i}`
-              row gap=12 align-items="center"
-                Mark(state=l.state, size=22)
-                text l.text flex=1 font="-exact-subheadline" line-clamp=2
-                text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-secondary-label"
+          if kind == "task" and loading and not known and row.id == ""
+            section
+              progress aria-label="Loading"
+          if kind == "task" and failed and not known and row.id == ""
+            section
+              text "hex didn't answer, so this can't open yet." color="-exact-secondary-label"
+          if pageAsks.length > 0
+            section
+              header
+                text "Needs you"
+              for a in pageAsks key=a.id
+                AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=draftOf(drafts, `ask:${a.id}`), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open)
+          if kind == "topic" and topicEntries.length > 0
+            section
+              for e in topicEntries key=e.id
+                EntryRow(entry=e, asks=asks.asks, said=said, why="", now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openTask)
+          if kind == "task" and task.needs != "" and pageAsks.length == 0
+            section
+              header
+                text "Needs you"
+              row gap=12 align-items="flex-start"
+                Mark(state="needs", size=22)
+                column flex=1 gap=2
+                  text task.needs font="-exact-body"
+                  text `Waiting on you since ${whenOf(row.since, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
+          if kind == "task" and (row.state == "working" or working.length > 0 or busyAgents.length > 0)
+            section
+              header
+                text "Working"
+              if row.state == "working"
+                link href=path("steps", id) testId="task-now"
+                  Mark(state="working", size=22)
+                  column flex=1 min-width=0 gap=2
+                    text `Now: ${row.line != "" ? row.line : "working"}` font="-exact-body" line-clamp=2
+                    text `for ${lengthOf((now - row.since) / 1000)}` font="-exact-footnote" color="-exact-secondary-label" font-variant-numeric="tabular-nums"
+              if working.length + busyAgents.length > 0
+                scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory"
+                  row gap=10 padding="4px 0"
+                    for t in working key=t.id
+                      link href=path("task", t.id) width="13.75rem" flex-shrink=0 scroll-snap-align="start" padding=12 border-radius=14 background-color="-exact-tertiary-fill" display="flex" flex-direction="column" gap=4 testId=`working-${t.id}`
+                        row gap=6 align-items="center"
+                          Mark(state="working", size=16)
+                          text t.place font="-exact-subheadline" font-weight=600 line-clamp=1 flex=1
+                        text t.line font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
+                    for a in busyAgents key=a.id
+                      link href=path("steps", id) width="13.75rem" flex-shrink=0 scroll-snap-align="start" padding=12 border-radius=14 background-color="-exact-tertiary-fill" display="flex" flex-direction="column" gap=4 testId=`agent-${a.id}`
+                        row gap=6 align-items="center"
+                          Mark(state="working", size=16)
+                          text a.label font="-exact-subheadline" font-weight=600 line-clamp=1 flex=1
+                        text (a.line != "" ? a.line : `since ${whenOf(a.since, now, offset)}`) font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
+          if kind == "task" and task.steps.length > 0
+            section
+              header
+                text "Last run"
+              for s in sortBy(task.steps, s => s.at, "desc").slice(0, 3) key=s.id
+                row gap=10 align-items="baseline"
+                  text kindWord(s.kind) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" width="5.5rem" flex-shrink=0
+                  text (s.brief != "" and s.kind != "say" and s.kind != "think" ? s.text : s.text) font="-exact-subheadline" line-clamp=2 flex=1 color=(s.state == "failed" ? "hex.danger" : "-exact-label")
+              link href=path("steps", id) testId="task-steps"
+                text (task.agents.length > 0 ? `All steps · ${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : "All steps") flex=1 line-clamp=1
+          if kind == "task"
+            for p, i in task.pins key=`${p.title}${i}`
+              Pinned(section=p, first=(i == 0))
+          if kind == "task" and chat.turns.length > 0
+            section
+              header
+                text "Messages"
+              for t in chat.turns.slice(-2) key=t.id
+                row justify-content=(t.source == "me" ? "flex-end" : "flex-start")
+                  text (eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-subheadline" line-clamp=3 max-width=(t.source == "me" ? "85%" : "100%") padding=(t.source == "me" ? "6px 12px" : "0") border-radius=16 background-color=(t.source == "me" ? "-exact-tertiary-fill" : "transparent")
+              link href=path("thread", id) testId="task-messages"
+                text `All messages${chat.total > 0 ? ` · ${chat.total}` : ""}` flex=1
+          if kind == "task" and row.id != ""
+            section
+              header
+                text `Places · ${places.length}`
+              for t, i in places.slice(0, allPlaces ? places.length : 5) key=t.id
+                if i == 0
+                  link href=t.link testId="task-door"
+                    PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=28)
+                    column flex=1 min-width=0 gap=1
+                      text (t.place != "" ? t.place : t.name) line-clamp=1
+                      text `${appName(t.app)} · ${whenOf(t.at, now, offset)}${t.link == "" ? " · no link" : ""}` font="-exact-footnote" color="-exact-secondary-label"
+                    if t.link != ""
+                      image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
+                else
+                  link href=path("task", t.id) testId=`place-${t.id}`
+                    PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=28)
+                    column flex=1 min-width=0 gap=1
+                      text (t.place != "" ? t.place : t.name) line-clamp=1
+                      text `${appName(t.app)} · ${whenOf(t.at, now, offset)} · ${stateWord(t.state)}` font="-exact-footnote" color="-exact-secondary-label"
+              if places.length > 5
+                button press=morePlaces testId="more-places"
+                  text (allPlaces ? "Show fewer" : `Show ${places.length - 5} more threads`)
+          if kind == "task" and weekly.length > 0
+            section
+              header
+                text "This week"
+              column gap=6 padding="4px 0"
+                for t in weekly.slice(0, 6) key=t.id
+                  row gap=8 align-items="center"
+                    text (t.place != "" ? t.place : t.name) font="-exact-caption1" color="-exact-secondary-label" width="5.5rem" flex-shrink=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                    svg flex=1 height=12 viewBox="0 0 1000 12" preserveAspectRatio="none" aria-hidden=true
+                      rect x=0 y=5 width=1000 height=2 rx=1 fill="-exact-quaternary-fill"
+                      for s, j in spansOf(t.track, now) key=`${j}`
+                        rect x=(s.start * 1000) y=2 width=max(6, (s.end - s.start) * 1000) height=8 rx=4 fill="hex.progress"
+                      for x, j in failsOf(t.track, now) key=`f${j}`
+                        rect x=(x * 1000 - 2) y=0 width=4 height=12 rx=2 fill="hex.danger"
+                row padding-left="6.0rem"
+                  for l, j in ["1w", "3d", "1d", "6h", "1h", "now"] key=l
+                    text l font="-exact-caption2" color="-exact-tertiary-label" flex=(j == 5 ? 0 : 1) font-variant-numeric="tabular-nums"
+          if kind == "task" and task.lately.length > 0
+            section
+              header
+                text "Lately"
+              for l, i in task.lately.slice(0, 8) key=`${l.at}${i}`
+                row gap=12 align-items="flex-start"
+                  Mark(state=l.state, size=20)
+                  text l.text flex=1 font="-exact-subheadline" line-clamp=2
+                  text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+      if replyAsk.length > 0
+        for a in replyAsk key=a.id
+          ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer)
+      else if kind == "task" and chat.sends and viewport.width < 700
+        link href=`${path("thread", id)}#compose` margin="6px 12px 10px" padding="11px 16px" border-radius=22 border="1px solid -exact-separator" testId="task-compose"
+          text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1
 
-// A question on a task's page: hex's pick tinted, few short answers in a row, the rest as blocks.
-component AskCard
+// A section of the pinned post: its mark and title, its items with their own marks, links that
+// open, code in a box. Done sections start folded to "Title · N".
+component Pinned
   props
-    ask: Ask
-    now: number
-    offset: number
-    answering: string
-    answer: action
-    answerMany: action
-    dismiss: action
-  state chosen = []
-  derive sending = answering.startsWith(`${ask.id}|`)
-  derive even = ask.options.length <= 3 and not ask.multiple and not ask.options.map(o => o.label.length > 18 or o.detail != "").includes(true)
-  action choose(label: string)
-    if ask.multiple
-      chosen = chosen.includes(label) ? chosen.filter(c => c != label) : chosen.concat([label])
-    else
-      answer(ask.id, label)
+    section: PinSection
+    first: bool
+  state flipped = false
+  derive folded = section.folded != flipped
+  action fold
+    flipped = not flipped
+    haptic("selection")
   view
-    column gap=10 padding="6px 0" testId=`ask-card-${ask.id}`
-      row gap=8 align-items="center"
-        text whenOf(ask.at, now, offset) font="-exact-footnote" color="-exact-secondary-label" flex=1
-        button press=dismiss(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`ask-dismiss-${ask.id}`
-          text "Not needed" font="-exact-caption1"
-      text ask.question font="-exact-headline"
-      if ask.context != ""
-        text ask.context font="-exact-subheadline" color="-exact-secondary-label"
-      if even
-        row gap=8
-          for o in ask.options key=o.label
-            button press=answer(ask.id, o.label) disabled=sending appearance="none" flex=1 padding="10px 8px" border-radius=14 background-color=(o.pick ? "AccentColor" : "-exact-tertiary-fill") -exact-press-haptic="selection" testId=`ask-option-${ask.id}-${o.label}`
-              text o.label font="-exact-subheadline" font-weight=600 text-align="center" color=(o.pick ? "#FFFFFF" : "-exact-label")
-      else
-        for o in ask.options key=o.label
-          button press=choose(o.label) disabled=sending appearance="none" padding="12px 14px" border-radius=14 background-color=(chosen.includes(o.label) ? "AccentColor" : o.pick ? "-exact-tertiary-fill" : "-exact-quaternary-fill") border=(o.pick ? "1px solid AccentColor" : "none") text-align="left" display="flex" flex-direction="column" gap=2 testId=`ask-option-${ask.id}-${o.label}`
-            text (o.pick ? `✦ ${o.label} · hex’s pick` : o.label) font="-exact-subheadline" font-weight=600 color=(chosen.includes(o.label) ? "#FFFFFF" : "-exact-label")
-            if o.detail != ""
-              text o.detail font="-exact-footnote" color=(chosen.includes(o.label) ? "#FFFFFF" : "-exact-secondary-label")
-        if ask.multiple
-          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=(chosen.length == 0 or sending) testId=`ask-answer-${ask.id}`
-            text (chosen.length == 0 ? "Pick one or more" : `Answer with ${chosen.length}`)
+    section
+      header
+        text (section.title != "" ? section.title : first ? "Pinned" : "")
+      if section.folded
+        button press=fold appearance="none" display="flex" flex-direction="row" gap=10 align-items="center" text-align="left" aria-expanded=(not folded) testId=`pin-fold-${section.title}`
+          Mark(state=section.mark, size=18)
+          text `${section.title} · ${section.lines.length}` flex=1 font="-exact-subheadline" color="-exact-secondary-label"
+          image (folded ? "symbol:sf/chevron.down" : "symbol:sf/chevron.up") width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+      if not folded
+        for l, i in section.lines key=`${i}`
+          if l.kind == "code"
+            text l.text font-family="ui-monospace" font="-exact-footnote" padding="8px 10px" border-radius=10 background-color="-exact-tertiary-fill" white-space="pre-wrap" user-select="text"
+          else if l.url != ""
+            link href=l.url
+              if l.kind == "item"
+                Mark(state=l.mark, size=18)
+              text l.text markup="markdown" font="-exact-subheadline" flex=1
+              image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+          else
+            row gap=10 align-items="flex-start"
+              if l.kind == "item"
+                Mark(state=l.mark, size=18)
+              text l.text markup="markdown" font="-exact-subheadline" flex=1 user-select="text"

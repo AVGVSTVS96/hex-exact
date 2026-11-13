@@ -96,7 +96,7 @@ component App
   derive pastId = match stack(nav).filter(e => e.name == "pastCall").at(-1) { case some(e) => e.params.id, case none => "" }
   derive pastLive = calls.live != "" and pastId == calls.live
   derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => "" }
-  derive chatOpen = names.includes("thread") or (names.includes("task") and viewport.width >= 700)
+  derive chatOpen = names.includes("thread") or names.includes("task")
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
   // A topic (`topic:<name>`) or a finished item (`done:<id>`) opens a page made from the lists.
   derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") ? "" : taskId
@@ -355,7 +355,7 @@ component App
         if e.name == "tasks"
           TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, back=back)
         if e.name == "task"
-          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, talk=talk, message=message, answering=answering, back=back)
+          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, back=back)
         if e.name == "thread"
           Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
         if e.name == "steps"

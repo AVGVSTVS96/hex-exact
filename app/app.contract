@@ -16,9 +16,9 @@ use LastCheck from "./last-check.contract"
 use SettingsScreen from "./settings.contract"
 use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
+use UpdateToast from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
-use UpdateToast from "./toast.contract"
 
 // Every screen and sheet. Home is the call; the rest open over it. hexexact://go/<path> opens any
 // of them from outside (Siri, scripts/sim).
@@ -217,7 +217,8 @@ component App
     answering = `${id}|${label}`
     said = withSaid(said, saidFor(allAsks, id, "answer", label))
     haptic("selection")
-    send answered = answerAsk(id, [label], noMedia)
+    send answered = answerAsk(id, label == "" ? [] : [label], (attachedTo == `ask:${id}` ? attached.map(m => m.id) : noMedia))
+    attached = attachedTo == `ask:${id}` ? attached.slice(0, 0) : attached
   action answerMany(id: string, labels: string[])
     answering = `${id}|${labels.join(", ")}`
     said = withSaid(said, saidFor(allAsks, id, "answer", labels.join(", ")))

@@ -23,7 +23,8 @@ mkdir -p "$shots"
 
 eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer" >&2; exit 1; }
-rsync -a --exclude .git --exclude '/app/target' --exclude '/app/.exact' --exclude '/shell/build' "$here/" "$mac:$folder/"
+# The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
+rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:$folder/"
 # Its own simulator, so other apps' checks keep theirs.
 sim=$(ssh "$mac" bash -s <<'MAC'
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer

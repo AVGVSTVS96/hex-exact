@@ -12,7 +12,8 @@ mac=${HEX_EXACT_MAC:-mac}
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
 url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
 "$here/scripts/hex-env" >/dev/null
-rsync -a --exclude '/app/target' --exclude '/app/.exact' "$here/" "$mac:Developer/hex-exact/"
+# The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
+rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:Developer/hex-exact/"
 rsync -a "$link/updates/" "$mac:Developer/hex-exact-origin/"
 ssh "$mac" ". Developer/hex-exact/scripts/mac-env && cd Developer/hex-exact/app && ../scripts/mac-app-json app.json '$url/updates' &&
   cd ~/Developer/exact && EXACT_APP_DIR=\$HOME/Developer/hex-exact/app bun scripts/deploy.mjs app --origin ~/Developer/hex-exact-origin --platform ios --dirty --yes" </dev/null 2>&1 |

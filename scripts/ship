@@ -6,6 +6,8 @@
 # revoke that certificate to make its own.
 #   scripts/ship
 set -euo pipefail
+# One Mac build or simulator run at a time: builders share its one folder and simulator.
+mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/mac.lock && flock 9
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 folder=Developer/hex-exact

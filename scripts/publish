@@ -5,6 +5,8 @@
 # every minute while it's open. A change to app.ts or the shell needs scripts/ship instead.
 #   scripts/publish
 set -euo pipefail
+# One Mac build or simulator run at a time: builders share its one folder and simulator.
+mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/mac.lock && flock 9
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}

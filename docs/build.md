@@ -117,7 +117,13 @@ before a build; builds share it with other work. Commit to main, signed, small.
   m4a files into `assets/voices/`. Exact's audio session is app-wide (`audio_session` in
   app.json); it stays the default `ambient`, so previews follow the silent switch, because a
   `playback` session could take the shell's call audio away mid-call.
-- An `image` can't carry hex's token, so a photo or video shared in a past call shows as a line
-  ("You shared a photo · 0:42"), not its thumbnail.
-- The orb takes `persona` and `reaction` beside `tint` (Settings passes them); drawing each
-  persona is the orb's (shell side).
+- An `image` can't carry hex's token, so hex's photos and videos are the module's `hex-media`
+  view (media.contract `Thumb`, `Album`): it fetches with the token and opens Quick Look on a tap.
+- The orb is the stable app's six Rive personas, drawn by RiveRuntime in the module
+  (`hex-orb persona= tint= palette= reaction=`); a plain `exact ios` build has no Rive and draws
+  hex's own sphere instead.
+- The orb's squash and stretch with the pitch of Bassim's voice (the stable app's C audio tap on
+  the mic) isn't here: WebRTC owns the mic in the shell, so the orb follows its input level only.
+- The camera, Photos, the call's Live Activity, its sounds and Siri are the shell's: Exact has no
+  camera capture, and the call outlives the screen. Exact's own Live Activities can't follow a
+  call the shell holds while the screen sleeps.

@@ -1,8 +1,28 @@
-// A task's messages (§9.4): the thread as Bassim and hex wrote it, newest at the foot, and a
-// composer that becomes Stop while hex is working and nothing is typed.
+// A task's messages (§9.4): the thread as Bassim and hex wrote it, opening at the newest, and a
+// composer that becomes Stop while hex is working and nothing is typed. What Bassim sends shows at
+// once, dimmed until hex has it; one that didn't go says why, and a tap tries again.
 use Viewport, TaskPage, Chat, Media from "./shapes.contract"
-use appName from "./parts.contract"
+use Mark, appName, whenOf, lengthOf from "./parts.contract"
+use Sending from "./said.contract"
 use Album, AddMedia, Waiting from "./media.contract"
+
+// One line of the transcript: a turn, a message hex holds (waiting), one on its way from here
+// (sending), or a note at its top or foot (earlier, empty, working).
+shape Line
+  id: string
+  kind: string
+  source: string
+  text: string
+  media: Media[]
+  status: string
+  error: string
+  key: string
+
+fn eventLabel(text: string): string = text.startsWith("(") and text.indexOf(") ") > 1 ? text.slice(1, text.indexOf(") ")) : ""
+fn eventWords(text: string): string = eventLabel(text) != "" ? text.slice(eventLabel(text).length + 3) : text
+fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
+// A refusal hex gave can't be fixed by trying again; a lost connection can.
+fn retries(error: string): bool = error == "" or error.startsWith("Cannot reach hex")
 
 component Thread
   props
@@ -12,11 +32,15 @@ component Thread
     offset: number
     task: TaskPage
     chat: Chat
+    sends: Sending[]
+    drafts: string[]
     loading: bool
     failed: bool
     sending: bool
     message: action
+    resend: action
     stop: action
+    keepDraft: action
     // Photos and videos waiting to go with the next message (root `attached` while it's this thread's).
     attached: Media[]
     attach: action
@@ -25,49 +49,76 @@ component Thread
     inCall: bool
     open: action
     back: action
-  state draft = ""
-  derive title = task.place != "" ? task.place : "Messages"
-  action edit(v: string)
-    draft = v
+  state typed = ""
+  state started = false
   derive key = `thread:${task.id}`
+  derive draft = started ? typed : draftOf(drafts, key)
+  derive title = task.place != "" ? task.place : task.name != "" ? task.name : "Messages"
+  derive empty = draft.trim() == "" and attached.length == 0
+  derive stopping = empty and task.running
+  // Sent from here and not yet in the thread: hex echoes a send's key at the end of a waiting key.
+  derive mine = sends.filter(s => s.task == task.id and chat.waiting.map(w => w.key).filter(k => k.endsWith(`:${s.key}`) or k == s.key).length == 0 and not (s.status == "sent" and chat.turns.slice(-6).filter(t => t.source == "me" and t.text == s.text).length > 0))
+  derive subtitle = task.running ? `working · ${whenOf(task.since, now, offset)}` : `${appName(task.app)}${task.at > 0 ? ` · ${whenOf(task.at, now, offset)}` : ""}`
+  derive noMedia = [Media(id="", kind="", aspect=0)].slice(0, 0)
+  derive lines = (chat.total > chat.turns.length ? [Line(id="earlier", kind="earlier", source="", text="", media=noMedia, status="", error="", key="")] : []).concat(chat.turns.map(t => Line(id=`t${t.id}`, kind="turn", source=t.source, text=t.text, media=t.media, status="", error="", key=""))).concat(chat.waiting.map(w => Line(id=`w${w.key}`, kind="waiting", source="me", text=w.text, media=noMedia, status="", error="", key=w.key))).concat(mine.map(m => Line(id=`s${m.key}`, kind="sending", source="me", text=m.text, media=noMedia, status=m.status, error=m.error, key=m.key))).concat(task.running ? [Line(id="working", kind="working", source="", text=task.line, media=noMedia, status="", error="", key="")] : [])
+  action edit(v: string)
+    typed = v
+    started = true
+    keepDraft(key, v)
   action add(source: string)
     attach(key, source)
   action submit
-    if draft.trim() != "" or attached.length > 0
+    if not empty
       message(task.id, draft.trim())
-      draft = ""
-    else
-      if task.running
-        stop(task.id)
+      typed = ""
+      started = true
+      haptic("selection")
+    else if task.running
+      stop(task.id)
+      haptic("impact-medium")
   view
-    column navigationKey=`${entry.id}` navigationScroll="thread" position="absolute" inset=0 testId="thread"
+    column navigationKey=`${entry.id}` navigationScroll="thread" interactive-widget="resizes-content" position="absolute" inset=0 testId="thread"
       header display="flex" align-items="center"
         text title role="heading" aria-level=2
-        text (task.running ? "working" : appName(task.app))
+        text subtitle
         button press=talk(task.id) aria-label="Talk it through" testId="thread-talk"
           image "symbol:sf/phone.and.waveform"
       if loading and chat.turns.length == 0
         progress aria-label="Loading messages" margin="24px auto"
-      if not loading and chat.turns.length == 0
-        text "Nothing said here yet" color="-exact-secondary-label" text-align="center" padding="24px 0"
-      list id="thread" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="8px 16px"
-        for t in chat.turns key=t.id
-          column padding="4px 0" align-items=(t.source == "me" ? "flex-end" : "stretch")
-            if t.id == "0" and chat.total > chat.turns.length
-              text `Earlier messages are in ${appName(task.app)}` font="-exact-footnote" color="-exact-secondary-label" text-align="center" align-self="stretch" padding="8px 0"
-            if t.media.length > 0
-              box padding="2px 0"
-                Album(media=t.media, width=min(viewport.width * 0.6, 260))
-            if t.text != ""
-              text t.text max-width=(t.source == "me" ? "82%" : "100%") padding=(t.source == "me" ? "8px 14px" : "2px 0") border-radius=18 background-color=(t.source == "me" ? "AccentColor" : "transparent") color=(t.source == "me" ? "#FFFFFF" : "-exact-label") user-select="text" white-space="pre-wrap"
-      for w in chat.waiting key=w.key
-        row justify-content="flex-end" padding="4px 16px" opacity=0.55
-          text w.text max-width="82%" padding="8px 14px" border-radius=18 background-color="AccentColor" color="#FFFFFF"
+      if not loading and chat.turns.length == 0 and mine.length == 0
+        text (failed ? "hex didn't answer, so these can't show yet." : "Nothing said here yet") color="-exact-secondary-label" text-align="center" padding="48px 0" testId="thread-empty"
+      list id="thread" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0
+        for l in lines key=l.id
+          column padding="5px 16px" gap=4 align-items=(l.source == "me" ? "flex-end" : "stretch") testId=`line-${l.id}`
+            if l.kind == "earlier"
+              text `Earlier messages are in ${appName(task.app)}` font="-exact-footnote" color="-exact-tertiary-label" text-align="center" padding="8px 0"
+            else if l.kind == "working"
+              link href=path("steps", task.id) padding="6px 0" display="flex" flex-direction="row" gap=8 align-items="center" testId="thread-working"
+                Mark(state="working", size=16)
+                text l.text font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
+                text `${lengthOf((now - task.since) / 1000)} · Steps ›` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+            else
+              if l.source == "me" and eventLabel(l.text) != "" and eventLabel(l.text) != "Voice message"
+                text eventLabel(l.text) font="-exact-caption1" color="-exact-tertiary-label" padding="0 4px"
+              if l.media.length > 0
+                Album(media=l.media, width=min(viewport.width * 0.6, 260))
+              if l.text != "" and l.source == "me"
+                text eventWords(l.text) max-width="82%" padding="8px 14px" border-radius=18 background-color="AccentColor" color="ink.on-tile" opacity=(l.kind == "turn" ? 1 : l.kind == "waiting" ? 0.6 : 0.45) user-select="text" white-space="pre-wrap" overflow-wrap="break-word"
+              else if l.text != ""
+                text l.text markup="markdown" font="-exact-body" user-select="text" overflow-wrap="break-word"
+              if l.kind == "sending" and l.status == "failed" and retries(l.error)
+                button press=resend(l.key) appearance="none" testId=`resend-${l.key}`
+                  text "Not sent · Tap to try again" font="-exact-caption1" color="hex.danger"
+              else if l.kind == "sending" and l.status == "failed"
+                text l.error font="-exact-caption1" color="hex.danger" max-width="82%" text-align="right"
+              else if l.kind == "sending"
+                text "Sending" font="-exact-caption1" color="-exact-tertiary-label"
       if chat.sends
         box padding="0 12px"
           Waiting(media=attached, remove=detach)
-        row gap=8 align-items="flex-end" padding="8px 12px" border-top="0.5px solid -exact-separator"
-          AddMedia(menu="thread-add", label="Add a photo or video", glass=false, size=36, disabled=(attached.length >= 4), add=add)
-          textarea value=draft input=edit placeholder=`Message ${title}` rows=1 flex=1 min-width=0 aria-label="Message" testId="composer"
-          button press=submit disabled=(draft.trim() == "" and attached.length == 0 and not task.running) buttonStyle="filled" aria-label=(draft.trim() == "" and attached.length == 0 and task.running ? "Stop" : "Send") testId="send"
-            image (draft.trim() == "" and attached.length == 0 and task.running ? "symbol:stop-fill" : "symbol:send")
+        row gap=8 align-items="flex-end" margin="6px 12px 8px"
+          AddMedia(menu="thread-add", label="Add a photo or video", glass=false, size=40, disabled=(attached.length >= 4), add=add)
+          row flex=1 min-width=0 align-items="flex-end" padding="0 4px 0 14px" border-radius=20 border="1px solid -exact-separator"
+            textarea id="composer" value=draft input=edit autofocus=(fragment(entry) == "compose") rows=1 field-sizing="content" max-height=140 placeholder=`Message ${title}` aria-label="Message" border="none" background-color="transparent" padding="10px 0" flex=1 min-width=0 testId="composer"
+            button press=submit disabled=(empty and not task.running) buttonStyle="filled" retainFocus=true margin="4px 0" aria-label=(stopping ? "Stop" : "Send") testId="send"
+              image (stopping ? "symbol:stop-fill" : "symbol:send")

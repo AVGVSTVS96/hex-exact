@@ -1,38 +1,52 @@
-// hex's picks (§9.6): the questions where hex already knows what it would choose. Take its picks,
-// change one, or leave one for later, then answer them all at once.
+// hex's picks (§9.6): the questions where hex already knows what it would choose. Bassim takes its
+// picks, changes one, or leaves one for later, then answers them all at once.
 use Viewport, Asks, Ask from "./shapes.contract"
+use Mark from "./parts.contract"
+use Said from "./said.contract"
+use picksOf from "./inbox.contract"
 
 fn pickOf(a: Ask): string = match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
+// What Bassim left a question at here: hex's pick until he chose otherwise; "" is for later.
+fn choiceOf(picked: string[], a: Ask): string = match picked.filter(l => l.startsWith(`${a.id}\t`)).at(-1) { case some(l) => l.slice(a.id.length + 1), case none => pickOf(a) }
 
 component Picks
   props
     entry: Entry
     viewport: Viewport
     asks: Asks
+    said: Said[]
+    picked: string[]
     open: action
-    answer: action
     answerAll: action
     back: action
-  derive picks = asks.asks.filter(a => pickOf(a) != "" and a.tag != "money")
+  derive picks = picksOf(asks.asks, said)
+  derive taking = picks.filter(a => choiceOf(picked, a) != "")
+  derive later = picks.length - taking.length
   action takeAll
-    answerAll(picks.map(a => a.id), picks.map(a => pickOf(a)))
+    answerAll(taking.map(a => a.id), taking.map(a => choiceOf(picked, a)))
     back()
   view
     column navigationKey=`${entry.id}` navigationScroll="picks" position="absolute" inset=0 testId="picks"
       header display="flex" align-items="center"
         text "hex’s picks" role="heading" aria-level=2
-        text `${picks.length} ${picks.length == 1 ? "question" : "questions"}`
+        text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""}`
       list id="picks" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        section
-          if picks.length == 0
-            text "Nothing left to take" color="-exact-secondary-label" testId="picks-empty"
-          for a in picks key=a.id
-            link href=path("pick", a.id) testId=`pick-${a.id}`
-              column flex=1 min-width=0 gap=2
-                text `${a.topic}${a.tag != "" ? ` · ${a.tag}` : ""}` font="-exact-footnote" color="-exact-secondary-label"
-                text a.question
-                text `✦ ${pickOf(a)}` font="-exact-subheadline" color="AccentColor"
-        if picks.length > 0
+        if picks.length == 0
           section
-            button press=takeAll testId="picks-answer"
-              text `Answer ${picks.length} ${picks.length == 1 ? "question" : "questions"}`
+            text "Nothing left to take" color="-exact-secondary-label" testId="picks-empty"
+        else
+          section
+            for a in picks key=a.id
+              link href=path("pick", a.id) testId=`pick-${a.id}`
+                column flex=1 min-width=0 gap=3
+                  text `${a.topic}${a.tag != "" ? ` · ${a.tag}` : ""}` font="-exact-footnote" color="-exact-secondary-label"
+                  text a.question font="-exact-body" line-clamp=3
+                  if choiceOf(picked, a) == ""
+                    text "Decide later" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
+                  else if choiceOf(picked, a) == pickOf(a)
+                    text `✦ ${pickOf(a)}` font="-exact-subheadline" font-weight=600 color="hex.accent"
+                  else
+                    text `✓ ${choiceOf(picked, a)}` font="-exact-subheadline" font-weight=600
+      if picks.length > 0
+        button press=takeAll buttonStyle=(taking.length > 0 ? "filled" : "bordered") disabled=(taking.length == 0) margin="8px 16px 12px" testId="picks-answer"
+          text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}`

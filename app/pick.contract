@@ -1,6 +1,9 @@
-// One of hex's picks (§9.6): why hex picks it, the other answers, and where the question came from.
-use Viewport, Asks from "./shapes.contract"
-use Surface, whenOf from "./parts.contract"
+// One of hex's picks (§9.6): the question, why hex picks what it does, every answer with what it
+// means, and where the question came from. Choosing one sets it on hex's picks; nothing is sent
+// until Bassim answers them all there.
+use Viewport, Asks, Words from "./shapes.contract"
+use whenOf from "./parts.contract"
+use pickOf, choiceOf from "./picks.contract"
 
 component Pick
   props
@@ -9,10 +12,17 @@ component Pick
     now: number
     offset: number
     asks: Asks
-    answer: action
+    picked: string[]
+    words: Words
+    wordsAsk: string
+    showWords: action
+    pick: action
     open: action
     back: action
   derive found = asks.asks.filter(a => a.id == entry.params.id)
+  action choose(label: string)
+    pick(entry.params.id, label)
+    back()
   view
     column navigationKey=`${entry.id}` navigationScroll="pick" position="absolute" inset=0 testId="pick"
       header display="flex" align-items="center"
@@ -23,21 +33,28 @@ component Pick
             text "This question is answered" color="-exact-secondary-label" testId="pick-answered"
         for a in found key=a.id
           section
-            text a.question font="-exact-title3" font-weight=600
+            text a.question font="-exact-title3" font-weight=600 padding="4px 0"
             if a.why != ""
-              column gap=4 padding=12 border-radius=14 background-color="-exact-tertiary-fill"
-                text "Why hex picks it" font="-exact-footnote" font-weight=600 color="AccentColor"
+              column gap=4 padding=12 border-radius=14 background-color="hex.accent.wash"
+                text `Why hex picks ${pickOf(a)}` font="-exact-footnote" font-weight=600 color="hex.accent"
                 text a.why font="-exact-subheadline"
           section
             header
               text "Your answer"
             for o in a.options key=o.label
-              button press=answer(a.id, o.label) appearance="none" text-align="left" display="flex" flex-direction="column" gap=2 testId=`pick-option-${o.label}`
-                text (o.pick ? `✦ ${o.label}` : o.label) font-weight=600 color=(o.pick ? "AccentColor" : "-exact-label")
-                if o.detail != ""
-                  text o.detail font="-exact-footnote" color="-exact-secondary-label"
-            button press=back testId="pick-later"
-              text "Decide later"
+              button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" text-align="left" role="radio" aria-checked=(choiceOf(picked, a) == o.label) testId=`pick-option-${o.label}`
+                column flex=1 min-width=0 gap=2
+                  text o.label font="-exact-body" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
+                  if o.detail != ""
+                    text o.detail font="-exact-subheadline" color="-exact-secondary-label"
+                if o.pick
+                  text "✦ hex’s pick" font="-exact-caption1" font-weight=600 color="hex.accent" white-space="nowrap"
+                if choiceOf(picked, a) == o.label
+                  image "symbol:checkmark" width=16 height=16 object-fit="contain" color="AccentColor"
+            button press=choose("") appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" text-align="left" role="radio" aria-checked=(choiceOf(picked, a) == "") testId="pick-later"
+              text "Decide later" font="-exact-body" flex=1 color="-exact-secondary-label"
+              if choiceOf(picked, a) == ""
+                image "symbol:checkmark" width=16 height=16 object-fit="contain" color="AccentColor"
           if a.context != ""
             section
               header
@@ -46,7 +63,14 @@ component Pick
           section
             header
               text "From the thread"
-            text `${a.topic} · ${whenOf(a.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label"
+            text `${a.topic} · ${whenOf(a.at, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
+            if wordsAsk == a.id and words.text != ""
+              text words.text markup="markdown" font="-exact-subheadline" user-select="text"
             for l in a.links key=l.url
               link href=l.url
-                text `${l.label} ↗`
+                text l.label flex=1
+                image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+            for p in a.places.filter(p => p.link != "").slice(0, 2) key=p.link
+              link href=p.link
+                text `Open ${p.place}` flex=1
+                image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"

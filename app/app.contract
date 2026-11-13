@@ -104,7 +104,10 @@ component App
   resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
   resource check = loadCheck() when names.includes("check") as shape Check else empty()
   resource settings = loadSettings() when names.includes("settings") as shape Settings else empty()
-  resource words = loadWords(wordsAsk) when wordsAsk != "" as shape Words else empty()
+  // The message an ask came from: the one opened on a card, else the pick open on screen.
+  derive pickId = match stack(nav).filter(e => e.name == "pick").at(-1) { case some(e) => e.params.id, case none => "" }
+  derive wordsId = wordsAsk != "" ? wordsAsk : pickId
+  resource words = loadWords(wordsId) when wordsId != "" as shape Words else empty()
 
   // Writes. Each says how it went in its slot; a screen reads `pending(x)` and the reply.
   mutation commanded as shape Reply
@@ -357,13 +360,13 @@ component App
         if e.name == "task"
           TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, back=back)
         if e.name == "thread"
-          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
+          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
         if e.name == "steps"
           Steps(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), back=back)
         if e.name == "picks"
-          Picks(entry=e, viewport=viewport, asks=asks, open=open, answer=answer, answerAll=answerAll, back=back)
+          Picks(entry=e, viewport=viewport, asks=asks, said=saids, picked=picked, open=open, answerAll=answerAll, back=back)
         if e.name == "pick"
-          Pick(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, asks=asks, answer=answer, open=open, back=back)
+          Pick(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, asks=asks, picked=picked, words=words, wordsAsk=wordsId, showWords=showWords, pick=pick, open=open, back=back)
         if e.name == "check"
           LastCheck(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
         if e.name == "settings"

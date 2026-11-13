@@ -1,8 +1,31 @@
-// Steps (§9.5): the plan, the agents, and every step of the run, newest first.
-use Viewport, TaskPage from "./shapes.contract"
-use Mark, whenOf, appName from "./parts.contract"
+// Steps (§9.5): how hex is going about a task. Its plan, the agents it started, and every step of
+// the run, newest first, grouped into turns that each end where hex said something. A tap opens a
+// step's detail and result, or an agent's result and its own steps.
+use Viewport, TaskPage, Step, Agent from "./shapes.contract"
+use Mark, whenOf, appName, lengthOf from "./parts.contract"
 
-fn kindSymbol(kind: string): string = kind == "think" ? "symbol:sf/brain" : kind == "say" ? "symbol:sf/text.bubble" : kind == "plan" ? "symbol:sf/list.number" : kind == "run" ? "symbol:sf/terminal" : kind == "read" ? "symbol:sf/doc.text" : kind == "edit" ? "symbol:sf/pencil" : kind == "search" ? "symbol:sf/magnifyingglass" : kind == "web" ? "symbol:sf/globe" : kind == "agent" ? "symbol:sf/person.2" : "symbol:sf/wrench.and.screwdriver"
+fn kindSymbol(kind: string): string = kind == "think" ? "symbol:sf/brain" : kind == "say" ? "symbol:sf/text.bubble" : kind == "plan" ? "symbol:sf/list.number" : kind == "run" ? "symbol:sf/terminal" : kind == "read" ? "symbol:sf/doc.text" : kind == "edit" ? "symbol:sf/pencil" : kind == "search" ? "symbol:search" : kind == "web" ? "symbol:sf/globe" : kind == "agent" ? "symbol:sf/person.2" : "symbol:sf/wrench.and.screwdriver"
+
+// One turn: the steps up to and including something hex said.
+shape Turn
+  n: number
+  title: string
+  steps: Step[]
+  start: number
+  end: number
+
+fn says(steps: Step[]): number = steps.filter(s => s.kind == "say").length
+fn turnIndex(asc: Step[], i: number): number = says(asc.slice(0, i))
+fn turnsOf(steps: Step[], running: bool, now: number, offset: number): Turn[] = range(says(sortBy(steps, s => s.at)) + 1).map(n => turnOf(sortBy(steps, s => s.at), n, says(sortBy(steps, s => s.at)), running, now, offset)).filter(t => t.steps.length > 0).slice(0, 40)
+fn blankStep(): Step = Step(id="", at=0, ended=0, kind="", text="", state="", detail="", result="", agent="", brief="")
+fn stepAt(asc: Step[], i: number): Step = match asc.at(i) { case some(s) => s, case none => blankStep() }
+fn turnSteps(asc: Step[], n: number): Step[] = range(asc.length).filter(i => turnIndex(asc, i) == n).map(i => stepAt(asc, i))
+fn turnOf(asc: Step[], n: number, last: number, running: bool, now: number, offset: number): Turn = Turn(n=n, title=(n == last ? (running ? "Now" : "Since its last message") : match turnSteps(asc, n).at(-1) { case some(s) => `Said ${whenOf(s.at, now, offset)}`, case none => "" }), steps=sortBy(turnSteps(asc, n), s => s.at, "desc"), start=0, end=0)
+fn spanOf(steps: Step[]): number = steps.length == 0 ? 0 : (max(match steps.at(0) { case some(s) => max(s.ended, s.at), case none => 0 }, 0) - match steps.at(-1) { case some(s) => s.at, case none => 0 }) / 1000
+fn stepTime(s: Step, now: number, offset: number): string = s.ended > s.at ? lengthOf((s.ended - s.at) / 1000) : whenOf(s.at, now, offset)
+
+// An agent stopped and started again under the same name: the earlier tries fold under the last.
+fn retried(agents: Agent[], a: Agent): bool = a.state == "stopped" and agents.filter(b => b.label == a.label and b.since > a.since).length > 0
 
 component Steps
   props
@@ -14,39 +37,112 @@ component Steps
     loading: bool
     failed: bool
     back: action
+  state opened = [""].slice(0, 0)
+  state showTries = false
   derive done = task.plan.filter(p => p.state == "done").length
+  derive turns = sortBy(turnsOf(task.steps, task.running, now, offset), t => t.n, "desc")
+  derive agents = task.agents.filter(a => not retried(task.agents, a))
+  derive tries = task.agents.filter(a => retried(task.agents, a))
+  derive agentWords = ["working", "done", "failed", "stopped"].filter(s => task.agents.filter(a => a.state == s).length > 0).map(s => `${task.agents.filter(a => a.state == s).length} ${s}`).join(" · ")
+  derive subtitle = `${task.place != "" ? `${task.place} · ` : ""}${appName(task.app)} · ${task.running ? `working for ${lengthOf((now - task.since) / 1000)}` : task.state}`
+  action flip(id: string)
+    opened = opened.includes(id) ? opened.filter(o => o != id) : opened.concat([id])
+    haptic("selection")
+  action flipTries
+    showTries = not showTries
   view
     column navigationKey=`${entry.id}` navigationScroll="steps" position="absolute" inset=0 testId="steps"
       header display="flex" align-items="center"
         text "Steps" role="heading" aria-level=2
-        text `${task.place} · ${appName(task.app)}`
+        text subtitle
       list id="steps" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
+        if task.id == "" and loading
+          section
+            progress aria-label="Loading steps"
+        if task.id == "" and failed
+          section
+            text "These steps aren't there any more." color="-exact-secondary-label"
         if task.plan.length > 0
           section
             header
               text `Plan · ${done} of ${task.plan.length}`
-            for p, i in task.plan key=`${i}`
-              row gap=12 align-items="center"
-                Mark(state=(p.state == "done" ? "done" : p.state == "working" ? "working" : "pending"), size=22)
-                text p.text flex=1 font="-exact-subheadline"
+            for p, i in task.plan key=`${i}${p.text}`
+              row gap=12 align-items="flex-start"
+                Mark(state=(p.state == "done" ? "done" : p.state == "working" or p.state == "in_progress" ? "working" : "pending"), size=20)
+                text p.text flex=1 font="-exact-subheadline" color=(p.state == "done" ? "-exact-secondary-label" : "-exact-label")
         if task.agents.length > 0
           section
             header
-              text "Agents"
-            for a in task.agents key=a.id
-              row gap=12 align-items="center"
-                Mark(state=a.state, size=22)
-                column flex=1 min-width=0 gap=2
-                  text a.label
-                  text (a.line != "" ? a.line : `${a.who} · ${whenOf(a.since, now, offset)}`) font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
-        section
-          header
-            text "Steps"
-          if task.steps.length == 0
-            text (task.running ? "Steps show while it works" : loading ? "Loading…" : failed ? "These steps aren't there any more." : "No steps yet") color="-exact-secondary-label"
-          for s in sortBy(task.steps, s => s.at, "desc") key=s.id
-            row gap=12 align-items="flex-start"
-              image kindSymbol(s.kind) width=16 height=16 object-fit="contain" color=(s.state == "failed" ? "-exact-system-red" : "-exact-secondary-label") aria-hidden=true margin-top=2
-              column flex=1 min-width=0 gap=2
-                text s.text font="-exact-subheadline" line-clamp=(s.kind == "think" or s.kind == "say" ? 3 : 2) color=(s.state == "failed" ? "-exact-system-red" : "-exact-label")
-                text whenOf(s.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label"
+              text `Agents · ${agentWords}`
+            for a in agents key=a.id
+              AgentRow(agent=a, now=now, offset=offset, open=opened.includes(a.id), flip=flip)
+            if tries.length > 0
+              button press=flipTries testId="agent-tries"
+                text `${tries.length} earlier ${tries.length == 1 ? "try" : "tries"}, stopped`
+              if showTries
+                for a in tries key=a.id
+                  AgentRow(agent=a, now=now, offset=offset, open=opened.includes(a.id), flip=flip)
+        if task.id != "" and task.steps.length == 0
+          section
+            text (task.running ? "Steps show while it works" : "No steps yet") color="-exact-secondary-label" testId="steps-empty"
+        for t in turns key=`${t.n}`
+          section
+            header
+              text t.title
+            button press=flip(`turn${t.n}`) appearance="none" display="flex" flex-direction="row" gap=6 align-items="center" aria-expanded=(not opened.includes(`turn${t.n}`)) testId=`turn-${t.n}`
+              text `${t.steps.length} ${t.steps.length == 1 ? "step" : "steps"}${spanOf(t.steps) >= 1 ? ` · ${lengthOf(spanOf(t.steps))}` : ""}` font="-exact-footnote" color="-exact-secondary-label" flex=1
+              image (opened.includes(`turn${t.n}`) ? "symbol:sf/chevron.down" : "symbol:sf/chevron.up") width=10 height=10 object-fit="contain" color="-exact-tertiary-label"
+            if not opened.includes(`turn${t.n}`)
+              for s in t.steps key=s.id
+                StepRow(step=s, now=now, offset=offset, open=opened.includes(s.id), flip=flip)
+
+// One step: its kind, what it did, how long; a tap shows its detail and result.
+component StepRow
+  props
+    step: Step
+    now: number
+    offset: number
+    open: bool
+    flip: action
+  derive live = step.state == "running" or (step.ended == 0 and step.state == "" and step.kind != "say" and step.kind != "think")
+  view
+    button press=flip(step.id) appearance="none" display="flex" flex-direction="row" gap=12 align-items="flex-start" text-align="left" aria-expanded=open testId=`step-${step.id}`
+      image kindSymbol(step.kind) width=15 height=15 object-fit="contain" color=(step.state == "failed" ? "hex.danger" : "-exact-secondary-label") margin-top=2 aria-hidden=true
+      column flex=1 min-width=0 gap=3
+        row gap=8 align-items="baseline"
+          text step.text font="-exact-subheadline" line-clamp=(open ? 0 : step.kind == "think" or step.kind == "say" ? 3 : 1) flex=1 min-width=0 color=(step.state == "failed" ? "hex.danger" : "-exact-label")
+          text (step.state == "running" ? "…" : stepTime(step, now, offset)) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+        if open and step.detail != ""
+          text step.detail font-family="ui-monospace" font="-exact-caption1" color="-exact-secondary-label" line-clamp=4 user-select="text"
+        if open and step.result != ""
+          text step.result font-family="ui-monospace" font="-exact-caption1" padding="6px 8px" border-radius=8 background-color="-exact-tertiary-fill" color=(step.state == "failed" ? "hex.danger" : "-exact-label") line-clamp=6 user-select="text"
+
+// An agent hex started: what it's called, who runs it, its newest line; a tap opens its result,
+// its own steps and where it runs.
+component AgentRow
+  props
+    agent: Agent
+    now: number
+    offset: number
+    open: bool
+    flip: action
+  view
+    column gap=6
+      button press=flip(agent.id) appearance="none" display="flex" flex-direction="row" gap=12 align-items="flex-start" text-align="left" aria-expanded=open testId=`agent-${agent.id}`
+        Mark(state=agent.state, size=20)
+        column flex=1 min-width=0 gap=2
+          text agent.label font="-exact-body" line-clamp=2
+          text `${agent.who != "" ? `${agent.who} · ` : ""}${agent.state == "working" ? `for ${lengthOf((now - agent.since) / 1000)}` : agent.ended > 0 ? `took ${lengthOf((agent.ended - agent.since) / 1000)}` : whenOf(agent.since, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
+          if agent.state == "working" and agent.line != ""
+            text agent.line font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
+      if open
+        column gap=8 padding-left=32
+          if agent.result != ""
+            text agent.result markup="markdown" font="-exact-subheadline" color=(agent.state == "failed" ? "hex.danger" : "-exact-label") user-select="text"
+          for s in sortBy(agent.steps, s => s.at, "desc").slice(0, 30) key=s.id
+            row gap=8 align-items="baseline"
+              image kindSymbol(s.kind) width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+              text s.text font="-exact-footnote" color="-exact-secondary-label" line-clamp=2 flex=1
+          if agent.link != ""
+            link href=agent.link testId=`agent-open-${agent.id}`
+              text (agent.via == "t3" or agent.link.startsWith("t3code:") ? "Open in T3 Code ↗" : "Open ↗") font="-exact-subheadline" color="hex.accent"

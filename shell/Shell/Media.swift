@@ -97,7 +97,7 @@ enum MediaPicker {
     }
   }
 
-  static func scratch(_ ext: String) -> URL {
+  nonisolated static func scratch(_ ext: String) -> URL {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("hex-media", isDirectory: true)
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     return folder.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext.lowercased())

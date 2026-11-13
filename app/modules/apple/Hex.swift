@@ -194,6 +194,7 @@ final class OrbView: UIView {
   /// The Rive persona, or (without Rive, as in a plain Exact build) hex's drawn sphere.
   private func load() {
     let old = face
+    face = nil
     #if canImport(RiveRuntime)
       if Bundle.main.url(forResource: persona, withExtension: "riv") != nil {
         let model = RiveViewModel(fileName: persona, in: .main, stateMachineName: "default", fit: .contain, autoPlay: true)
@@ -506,13 +507,15 @@ final class MediaThumb: UIView, QLPreviewControllerDataSource {
     }
     let origin = Bundle.main.object(forInfoDictionaryKey: "HexURL") as? String ?? ""
     let token = Bundle.main.object(forInfoDictionaryKey: "HexToken") as? String ?? ""
-    guard !origin.isEmpty, let url = URL(string: "\(origin)/media/\(id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)") else { return nil }
+    // An id that is a path (an ask's screenshot, `/asks/<id>/shots/<n>`) is read from there.
+    let path = id.hasPrefix("/") ? id : "/media/\(id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)"
+    guard !origin.isEmpty, let url = URL(string: "\(origin)\(path)") else { return nil }
     var request = URLRequest(url: url, timeoutInterval: 90)
     if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
     guard let (data, response) = try? await URLSession.shared.data(for: request),
       (response as? HTTPURLResponse)?.statusCode == 200, let image = UIImage(data: data)
     else { return nil }
-    let file = FileManager.default.temporaryDirectory.appendingPathComponent("hex-media-\(id.prefix(64)).jpg")
+    let file = FileManager.default.temporaryDirectory.appendingPathComponent("hex-media-\(id.replacingOccurrences(of: "/", with: "_").prefix(64)).jpg")
     try? data.write(to: file)
     return (image, file)
   }

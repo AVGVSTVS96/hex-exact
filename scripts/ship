@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the server: builds hex Exact on the Mac and puts it on its install link,
+# Runs on the server (BUILT=<the Mac's built .app> skips the build): builds hex Exact on the Mac and puts it on its install link,
 # https://<server>/hex-exact/, which Bassim taps in Safari on his Duo. Signing is the stable hex
 # voice app's: xtool here makes the profiles for the Mac's development certificate and signs ad
 # hoc, then scripts/resign signs on the Mac, whose login keychain holds the key. Never let xtool
@@ -21,17 +21,23 @@ title=$(git -C "$here" log --oneline -1 | cut -c1-80)
 
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer, so it's asleep" >&2; exit 1; }
 rsync -a --exclude .git --exclude '/app/target' --exclude '/app/.exact' --exclude '/shell/build' "$here/" "$mac:$folder/"
-echo "building $title on the Mac"
-app=$(ssh "$mac" "HEX_URL='$HEX_URL' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1)
+if [ -n "${BUILT:-}" ]; then
+  app=$BUILT
+else
+  echo "building $title on the Mac"
+  app=$(ssh "$mac" "HEX_URL='$HEX_URL' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1)
+fi
 
 echo "making its profiles with xtool and signing it with the Mac's certificate"
 rsync -a --delete "$mac:$app/" "$work/HexExact.app/"
-python3 - "$work/HexExact.app" "$number" <<'PY'
+python3 - "$work/HexExact.app" "$number" "$HEX_URL" "$HEX_TOKEN" <<'PY'
 import glob, plistlib, sys
-app, number = sys.argv[1:]
+app, number, origin, token = sys.argv[1:]
 for path in [f"{app}/Info.plist", *glob.glob(f"{app}/PlugIns/*.appex/Info.plist")]:
     info = plistlib.load(open(path, "rb"))
     info["CFBundleVersion"] = number
+    if path == f"{app}/Info.plist":
+        info.update(HexURL=origin, HexToken=token)
     plistlib.dump(info, open(path, "wb"), fmt=plistlib.FMT_BINARY)
 PY
 xtool sign "$work/HexExact.app" </dev/null

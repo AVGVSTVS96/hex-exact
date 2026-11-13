@@ -18,7 +18,7 @@ final class Call: NSObject {
   private(set) var started: Date?
   private(set) var failure: String?
 
-  private let hex = Hex()
+  private let hex = HexServer()
   private let factory: RTCPeerConnectionFactory
   private var peer: RTCPeerConnection?
   private var channel: RTCDataChannel?
@@ -175,7 +175,7 @@ struct Refusal: LocalizedError {
 }
 
 /// hex's voice server, at the address and token the build put in Info.plist.
-struct Hex: Sendable {
+struct HexServer: Sendable {
   struct Opened { let id: String; let sdp: String }
 
   let origin = (Bundle.main.object(forInfoDictionaryKey: "HexURL") as? String ?? "")

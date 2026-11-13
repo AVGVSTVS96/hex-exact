@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Runs on the server: builds hex Exact on the Mac and puts it on its install link,
+# https://<server>/hex-exact/, which Bassim taps in Safari on his Duo. Signing is the stable hex
+# voice app's: xtool here makes the profiles for the Mac's development certificate and signs ad
+# hoc, then scripts/resign signs on the Mac, whose login keychain holds the key. Never let xtool
+# revoke that certificate to make its own.
+#   scripts/ship
+set -euo pipefail
+here=$(cd "$(dirname "$0")/.." && pwd)
+mac=${HEX_EXACT_MAC:-mac}
+folder=Developer/hex-exact
+link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
+url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
+bundle=com.shahidy.hexexact
+work=$HOME/.local/share/hex-exact/work
+mkdir -p "$link" "$work"
+
+eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
+number=$(git -C "$here" rev-list --count HEAD)
+title=$(git -C "$here" log --oneline -1 | cut -c1-80)
+
+ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer, so it's asleep" >&2; exit 1; }
+rsync -a --exclude .git --exclude '/app/target' --exclude '/app/.exact' --exclude '/shell/build' "$here/" "$mac:$folder/"
+echo "building $title on the Mac"
+app=$(ssh "$mac" "HEX_URL='$HEX_URL' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1)
+
+echo "making its profiles with xtool and signing it with the Mac's certificate"
+rsync -a --delete "$mac:$app/" "$work/HexExact.app/"
+python3 - "$work/HexExact.app" "$number" <<'PY'
+import glob, plistlib, sys
+app, number = sys.argv[1:]
+for path in [f"{app}/Info.plist", *glob.glob(f"{app}/PlugIns/*.appex/Info.plist")]:
+    info = plistlib.load(open(path, "rb"))
+    info["CFBundleVersion"] = number
+    plistlib.dump(info, open(path, "wb"), fmt=plistlib.FMT_BINARY)
+PY
+xtool sign "$work/HexExact.app" </dev/null
+signed=$folder/shell/build/signed/HexExact.app
+ssh "$mac" "mkdir -p $folder/shell/build/signed"
+rsync -a --delete "$work/HexExact.app/" "$mac:$signed/"
+serial=$(python3 -c "
+import glob, os, plistlib, subprocess
+path = max(glob.glob(os.path.expanduser('~/.config/xtool/data/??????????')), key=os.path.getmtime)
+der = plistlib.load(open(path, 'rb'))['certificate']
+print(subprocess.run(['openssl', 'x509', '-inform', 'DER', '-noout', '-serial'], input=der, capture_output=True).stdout.decode().split('=')[1].strip())")
+ssh "$mac" sh "$folder/scripts/resign" "$serial" "$signed" </dev/null
+
+echo "putting it on the install link"
+ssh "$mac" "cd $folder/shell/build/signed && rm -rf Payload HexExact.ipa && mkdir Payload && cp -R HexExact.app Payload/ &&
+  ditto -c -k --keepParent Payload HexExact.ipa && rm -rf Payload" </dev/null
+scp -q "$mac:$folder/shell/build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
+mv "$link/hex-exact-$number.ipa.part" "$link/hex-exact-$number.ipa"
+find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
+python3 - "$link" "$url" "$number" "$bundle" "$title" <<'PY'
+import html, plistlib, sys, urllib.parse
+link, url, number, bundle, title = sys.argv[1:]
+plistlib.dump({"items": [{
+    "assets": [{"kind": "software-package", "url": f"{url}/hex-exact-{number}.ipa"}],
+    "metadata": {"bundle-identifier": bundle, "bundle-version": number, "kind": "software", "title": "hex Exact"},
+}]}, open(f"{link}/manifest.plist", "wb"))
+install = "itms-services://?action=download-manifest&url=" + urllib.parse.quote(f"{url}/manifest.plist", safe="")
+open(f"{link}/index.html", "w").write(f"""<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>hex Exact {number}</title>
+<style>
+body {{ font: 17px/1.4 -apple-system, system-ui; max-width: 30em; margin: 18vh auto 0; padding: 0 20px }}
+a {{ display: block; padding: 14px; border-radius: 14px; background: #6B4FD8; color: white; text-align: center; font-weight: 600; text-decoration: none }}
+p {{ opacity: .6; font-size: 15px; margin-top: 20px }}
+</style>
+<a href="{html.escape(install)}">Install hex Exact {number}</a>
+<p>The experimental Exact build. It installs beside hex, which stays as it is.</p>
+<p>{html.escape(title)}</p>
+""")
+PY
+echo "$title is on the install link: $url/"

@@ -1,0 +1,3 @@
+# Sourced on the Mac before any Exact or Xcode command: rustup's cargo ahead of Homebrew's, and Xcode 27.3.
+export PATH=/opt/homebrew/Cellar/rustup/1.29.0_2/bin:$PATH
+export DEVELOPER_DIR=/Applications/Xcode-27.3-beta.app/Contents/Developer

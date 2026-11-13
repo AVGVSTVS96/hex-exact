@@ -1,0 +1,50 @@
+{
+  "$schema": "../../exact/scripts/app.schema.json",
+  "name": "hex Exact",
+  "short_name": "hex Exact",
+  "id": "com.shahidy.hexexact",
+  "start_url": "/",
+  "display": "standalone",
+  "app": {
+    "id": "com.shahidy.hexexact",
+    "name": "hex Exact"
+  },
+  "host": {
+    "web": {},
+    "ios": {
+      "minimumOS": "18.0",
+      "deviceFamily": [
+        "iphone"
+      ]
+    }
+  },
+  "deploy": {
+    "store": {
+      "web": "0",
+      "ios": "A"
+    },
+    "activate": "immediate",
+    "check": {
+      "interval": 60
+    },
+    "signing": {
+      "key": "hexexact",
+      "keys": {
+        "hexexact": "t+q5QCYHB8D2dXE/47nSWljC3CQI+t+Sj2vcpwmubxo="
+      }
+    }
+  },
+  "open_url": {
+    "schemes": [
+      "hexexact"
+    ]
+  },
+  "userInterfaceStyle": "dark",
+  "icons": [
+    {
+      "src": "assets/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}

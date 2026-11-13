@@ -2,8 +2,9 @@ import type { Answer, Result, Sources } from './app.contract.d.ts';
 import { HEX_TOKEN, HEX_URL } from './hex.ts';
 
 // hex's voice server, on the tailnet. hex.ts is written at build from the stable app's settings
-// (scripts/hex-env), so the token never enters the repository.
-export const grants = `net.fetch ${HEX_URL}`;
+// (scripts/hex-env), so neither its address nor its token enters the repository; the grant is
+// every https origin because the address isn't known until then.
+export const grants = 'net.fetch https:';
 
 type CallBody = { id?: unknown; ended?: unknown; title?: unknown; preview?: unknown; turns?: unknown };
 const none: Result<'loadLatest'> = { id: '', title: '', live: false, turns: [] };

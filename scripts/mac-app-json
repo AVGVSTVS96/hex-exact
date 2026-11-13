@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+# Runs on the Mac: gives the build copy of app/app.json its update channel, the tailnet origin that
+# stays out of the public repository.
+import json, sys
+path = sys.argv[1]
+app = json.load(open(path))
+app["deploy"]["channels"] = {"prod": sys.argv[2]}
+json.dump(app, open(path, "w"), indent=2)

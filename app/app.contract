@@ -207,7 +207,8 @@ component App
   // Out to the app a thread lives in; the hidden "opened" field hears whether it opened.
   action openOut(link: string, app: string)
     opening = app
-    haptic("selection")
+    if haptics
+      haptic("selection")
     openURL(link, "opened")
   action heardOpen(v: string)
     missing = missing.filter(a => a != opening).concat(v == "failed" ? [opening] : [])

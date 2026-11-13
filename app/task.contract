@@ -1,7 +1,7 @@
 // A task's page (§9.2, 9.7, 9.8): what it needs from Bassim, what it's doing now, what it did, its
 // pinned post, its messages, every place it lives, its week and its history. The same route opens
 // a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
-use Viewport, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection from "./shapes.contract"
+use Viewport, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
 use Mark, PlaceTile, whenOf, appName, lengthOf from "./parts.contract"
 use Said from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
@@ -57,6 +57,10 @@ component TaskScreen
     talk: action
     message: action
     answering: string
+    attached: Media[]
+    attachedTo: string
+    attach: action
+    detach: action
     back: action
   state replying = ""
   state allPlaces = false
@@ -128,7 +132,7 @@ component TaskScreen
               header
                 text "Needs you"
               for a in pageAsks key=a.id
-                AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=draftOf(drafts, `ask:${a.id}`), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open)
+                AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=draftOf(drafts, `ask:${a.id}`), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
           if kind == "topic" and topicEntries.length > 0
             section
               for e in topicEntries key=e.id
@@ -239,7 +243,7 @@ component TaskScreen
                   text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer)
+          ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach)
       else if kind == "task" and chat.sends and viewport.width < 700
         link href=`${path("thread", id)}#compose` margin="6px 12px 10px" padding="11px 16px" border-radius=22 border="1px solid -exact-separator" testId="task-compose"
           text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1

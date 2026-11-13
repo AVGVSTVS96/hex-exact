@@ -2,7 +2,8 @@
 // question, what it's about and where it came from, then its answers as one kind of row, hex's pick
 // marked in mint; a few short answers sit side by side. Bassim can also answer in his own words, or
 // say it isn't needed. Once answered it folds to what he said, with Undo.
-use Ask, Words from "./shapes.contract"
+use Ask, Words, Media from "./shapes.contract"
+use Album, Thumb, AddMedia, Waiting from "./media.contract"
 use Mark, whenOf from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
@@ -26,10 +27,12 @@ component AskCard
     again: action
     reply: action
     open: action
+    width: number
   state chosen = [""].slice(0, 0)
   state folded = false
   derive answered = said.id == ask.id and said.verb != "note" and said.status != "failed"
   derive noted = said.id == ask.id and said.verb == "note" and said.status == "sent"
+  derive shots = ask.options.filter(o => o.shot >= 0)
   derive from = match ask.places.at(0) { case some(p) => p.place, case none => ask.topic }
   action choose(label: string)
     if ask.multiple
@@ -80,14 +83,24 @@ component AskCard
               for l in ask.links key=l.url
                 link href=l.url padding="5px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`ask-link-${l.label}`
                   text `${l.label} ↗` font="-exact-footnote" font-weight=600
+        if ask.pictures.length > 0 and not folded
+          Album(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=min(width, 340))
+        if shots.length > 0
+          scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none"
+            row gap=10 padding="2px 0"
+              for o in shots key=o.label
+                column gap=6 align-items="center" width=150 flex-shrink=0
+                  Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=150, square=false)
+                  button press=choose(o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-shot-${ask.id}-${o.label}`
+                    text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-footnote" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label") line-clamp=1
         if evenRow(ask)
           row gap=8
-            for o in ask.options key=o.label
+            for o in ask.options.filter(o => o.shot < 0) key=o.label
               button press=choose(o.label) appearance="none" flex=1 min-width=0 padding="11px 8px" border-radius=12 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-option-${ask.id}-${o.label}`
                 text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 text-align="center" color=(o.pick ? "hex.accent" : "-exact-label")
         else
           column border-top="0.5px solid -exact-separator"
-            for o in ask.options key=o.label
+            for o in ask.options.filter(o => o.shot < 0) key=o.label
               button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`ask-option-${ask.id}-${o.label}`
                 if ask.multiple
                   image (chosen.includes(o.label) ? "symbol:select-fill" : "symbol:circle") width=22 height=22 object-fit="contain" color=(chosen.includes(o.label) ? "AccentColor" : "-exact-tertiary-label")
@@ -118,9 +131,15 @@ component ReplyComposer
     dismissed: action
     note: action
     answer: action
+    attached: Media[]
+    attach: action
+    detach: action
   state text = ""
   state started = false
   derive words = started ? text : draft
+  derive empty = words.trim() == "" and attached.length == 0
+  action add(source: string)
+    attach(`ask:${ask.id}`, source)
   action edit(v: string)
     text = v
     started = true
@@ -134,7 +153,7 @@ component ReplyComposer
     keep(`ask:${ask.id}`, "")
     dismissed()
   action leave
-    if words.trim() == ""
+    if empty
       dismissed()
   view
     column gap=8 padding="10px 16px" testId="reply"
@@ -142,9 +161,12 @@ component ReplyComposer
         text `Replying to ${ask.question}` font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
         button press=dismissed aria-label="Close, keep the draft" testId="reply-close"
           image "symbol:close"
+      Waiting(media=attached, remove=detach)
       textarea id="reply-field" value=words input=edit blur=leave autofocus=true rows=3 field-sizing="content" max-height=130 placeholder="Your answer" aria-label="Your answer" testId="reply-field"
-      row gap=8 justify-content="flex-end"
-        button press=sendNote disabled=(words.trim() == "") buttonStyle="bordered" testId="reply-note"
+      row gap=8 align-items="center"
+        AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=36, disabled=(attached.length >= 4), add=add)
+        box flex=1
+        button press=sendNote disabled=empty buttonStyle="bordered" testId="reply-note"
           text "Send as note"
-        button press=sendAnswer disabled=(words.trim() == "") buttonStyle="filled" testId="reply-answer"
+        button press=sendAnswer disabled=empty buttonStyle="filled" testId="reply-answer"
           text "Answer"

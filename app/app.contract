@@ -70,6 +70,10 @@ component App
   // waiting to go with its next send.
   state attached = [Media(id="", kind="", aspect=0)].slice(0, 0)
   state attachedTo = ""
+  // Why the last photo or video added to a composer didn't arrive.
+  state addError = ""
+  // The live call and what was last tried in it (talk | share), so the call says if it didn't go.
+  state tried = ""
   // The ask whose original message is open ("From <place>"), read from hex while it is.
   state wordsAsk = ""
   // The live call's agents: those running at hex's last word, and the one that just finished, shown
@@ -130,11 +134,11 @@ component App
   mutation noted as shape Sent queue then settleNote
   mutation dismissed as shape Sent queue then settleDismiss
   mutation undone as shape Sent queue then settleUndo
-  mutation acted as shape Reply queue
-  mutation marked as shape Reply queue
+  mutation acted as shape Sent queue then settleAct
+  mutation marked as shape Sent queue then settleRead
   mutation talked as shape Reply
   mutation messaged as shape Reply queue then settleMessage
-  mutation stopped as shape Reply
+  mutation stopped as shape Sent
   mutation removed as shape Reply queue
   mutation saved as shape Reply queue refreshes settings
 
@@ -150,6 +154,12 @@ component App
   // elsewhere's words and clock.
   derive liveId = call.status != "idle" and call.id != "" and not call.demo ? call.id : (call.status == "idle" ? activity.call : "")
   resource liveRecord = loadCall(liveId, true) when liveId != "" as shape CallRecord else empty()
+  // What didn't go, said where it was tried: in the call, under a thread's composer.
+  derive talkTrouble = pending(talked) ? "" : match talked { case some(r) => r.ok ? "" : `Not sent · ${r.error}`, case none => "" }
+  derive shareTrouble = pending(shared) ? "" : match shared { case some(r) => r.ok ? "" : `Not shared · ${r.error}`, case none => "" }
+  derive trouble = call.status != "live" ? "" : tried == `${call.id}|talk` ? talkTrouble : tried == `${call.id}|share` ? shareTrouble : ""
+  derive stopFailed = pending(stopped) ? "" : match stopped { case some(r) => r.ok ? "" : r.id, case none => "" }
+  derive stopWords = pending(stopped) ? "" : match stopped { case some(r) => r.ok ? "" : `Not stopped · ${r.error}`, case none => "" }
   derive removeError = pending(removed) ? "" : match removed { case some(r) => r.error, case none => "" }
 
   task minute mount
@@ -207,6 +217,7 @@ component App
     send commanded = hangUp(id)
   // A photo or video into the live call; one that didn't arrive, again.
   action share(source: string)
+    tried = `${call.id}|share`
     send shared = shareMedia(source)
   action reshare(key: string)
     send retried = retryShare(key)
@@ -214,11 +225,13 @@ component App
   action attach(to: string, source: string)
     attached = attachedTo == to ? attached : attached.slice(0, 0)
     attachedTo = to
+    addError = ""
     send added = attachMedia(source, 4 - (attachedTo == to ? attached.length : 0))
   action gotMedia
     match added
       case some(r)
         attached = attached.concat(r.media).slice(0, 4)
+        addError = r.ok ? "" : r.error
       case none
         attached = attached
   action detach(id: string)
@@ -226,6 +239,7 @@ component App
   // Bring a task ("asks": everything that waits) into the live call, or start one about it.
   action talk(about: string)
     if call.status == "live"
+      tried = `${call.id}|talk`
       send talked = talkAbout(about)
     else
       send commanded = callCommand("start", voice, about, phone)
@@ -316,10 +330,27 @@ component App
     drafts = drafts.filter(l => field(l, 0) != key).concat(text == "" ? [] : [`${key}\t${text.replaceAll("\t", " ")}`])
   action showWords(id: string)
     wordsAsk = wordsAsk == id ? "" : id
+  // A stuck run's action and a fresh result's Read: only a failure is kept, under its row.
   action act(id: string)
+    said = said.filter(l => field(l, 0) != id or field(l, 3) != "failed")
     send acted = actStuck(id)
   action markRead(id: string)
+    said = said.filter(l => field(l, 0) != id or field(l, 3) != "failed")
     send marked = readFresh(id)
+  action settleAct
+    match acted
+      case some(r)
+        if not r.ok
+          said = said.concat([saidLine(Said(id=r.id, verb="act", label="", status="failed", detail=r.error, missed=0, question="", topic="", task=""))])
+      case none
+        said = said
+  action settleRead
+    match marked
+      case some(r)
+        if not r.ok
+          said = said.concat([saidLine(Said(id=r.id, verb="read", label="", status="failed", detail=r.error, missed=0, question="", topic="", task=""))])
+      case none
+        said = said
 
   // Threads
   action message(id: string, words: string)
@@ -387,18 +418,18 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, trouble=trouble)
         if e.name == "calls"
           CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(calls)), failed=failed(calls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"
           PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
           TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
-            TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, attach=attach, detach=detach, back=back)
+            TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, attach=attach, detach=detach, back=back)
         if e.name == "task"
-          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, attach=attach, detach=detach, back=back)
+          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, attach=attach, detach=detach, back=back)
         if e.name == "thread"
-          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
+          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${task.id}` ? addError : ""), stopError=(stopFailed == task.id ? stopWords : ""), attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
         if e.name == "steps"
           Steps(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), back=back)
         if e.name == "picks"

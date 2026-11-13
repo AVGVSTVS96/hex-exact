@@ -37,7 +37,6 @@ const sent = (id: string, r: { ok: boolean; error: string; reply: unknown }): Re
   const reply = obj(r.reply);
   return { id, ok: r.ok, error: r.error, topic: str(reply.topic), missed: num(reply.missed) };
 };
-const done = (r: { ok: boolean; error: string }): Result<'actStuck'> => ({ ok: r.ok, error: r.error });
 
 export const asks: Partial<Sources> = {
   // Everything that waits on Bassim: questions, stuck runs, fresh results, the last check.
@@ -81,6 +80,6 @@ export const asks: Partial<Sources> = {
   noteAsk: async ([id, text, media]) => sent(id, await write('POST', `/asks/${enc(id)}/note`, { text, ...(media.length ? { media } : {}) })),
   dismissAsk: async ([id]) => sent(id, await write('POST', `/asks/${enc(id)}/dismiss`)),
   undoAsk: async ([id]) => sent(id, await write('POST', `/asks/${enc(id)}/undo`)),
-  actStuck: async ([id]) => done(await write('POST', `/stuck/${enc(id)}/act`)),
-  readFresh: async ([id]) => done(await write('POST', `/fresh/${enc(id)}/read`)),
+  actStuck: async ([id]) => sent(id, await write('POST', `/stuck/${enc(id)}/act`)),
+  readFresh: async ([id]) => sent(id, await write('POST', `/fresh/${enc(id)}/read`)),
 };

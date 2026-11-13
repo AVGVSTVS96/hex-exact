@@ -53,7 +53,7 @@ fn putAway(said: Said[], id: string): bool = said.filter(s => s.id == id and s.v
 fn unreached(missed: number): string = missed == 1 ? "One place was out of reach and still asks it" : `${missed} places were out of reach and still ask it`
 
 // How a failed write reads under its item: "Not answered · Cannot reach hex…"
-fn failedWords(s: Said): string = `${s.verb == "dismiss" ? "Not put away" : s.verb == "undo" ? "Not undone" : s.verb == "again" ? "Not sent again" : s.verb == "note" ? "Not sent" : "Not answered"} · ${s.detail}`
+fn failedWords(s: Said): string = `${s.verb == "dismiss" ? "Not put away" : s.verb == "undo" ? "Not undone" : s.verb == "again" ? "Not sent again" : s.verb == "note" or s.verb == "act" ? "Not sent" : s.verb == "read" ? "Not marked read" : "Not answered"} · ${s.detail}`
 
 // A word on an ask, on its way: the ask's question and topic kept beside it, so the row can fold
 // to "label → topic" after hex lets the ask go.

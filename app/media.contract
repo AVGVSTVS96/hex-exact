@@ -62,12 +62,16 @@ component AddMedia
           image "symbol:sf/photo.on.rectangle"
           text "Photos"
 
-// What waits to go with a composer's next send, each with a × to take it out.
+// What waits to go with a composer's next send, each with a × to take it out, and why the last one
+// added didn't arrive.
 component Waiting
   props
     media: Media[]
+    error: string
     remove: action
   view
+    if error != ""
+      text error font="-exact-footnote" color="hex.danger" padding="4px 0" testId="waiting-error"
     if media.length > 0
       row gap=8 padding="4px 0" testId="waiting"
         for m in media key=m.id

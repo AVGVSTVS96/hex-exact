@@ -58,6 +58,8 @@ component Home
     // What Bassim did with each question here, newest last, and the agent that just finished.
     said: Said[]
     finished: string
+    // Why bringing a task into the call, or sharing into it, didn't go ("Not sent · …").
+    trouble: string
 
   // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
   derive elsewhere = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0
@@ -94,8 +96,8 @@ component Home
   derive agentWhere = agent.state == "running" ? `${agent.to}${running.length > 1 ? `  +${running.length - 1}` : ""}` : agent.state
 
   derive label = status == "connecting" ? "Connecting" : status == "reconnecting" ? "Reconnecting" : status == "ending" ? "Ending conversation" : elsewhere ? `${startedOf(liveRecord.call.source)}, ${whereOf(liveRecord.call.source).toLowerCase()}` : live ? (micOff and hushed ? "Microphone and hex muted" : micOff ? "Microphone muted" : hushed ? "hex muted" : "Conversation active") : "Ready to start a conversation"
-  derive footer = call.error != "" ? call.error : hushed ? (call.muted ? "hex muted" : "hex muted · say “unmute”") : elsewhere ? `${whereOf(liveRecord.call.source)} · ${startedOf(liveRecord.call.source)}` : call.interrupted and live ? "Paused while another app has the audio" : status == "idle" and call.ending != "" ? (call.ending == "no-connect" ? endingOf(call.ending) : `${endingOf(call.ending)} · ${lengthOf(call.seconds)}`) : ""
-  derive footerBad = call.error != "" or (status == "idle" and badEnding(call.ending))
+  derive footer = call.error != "" ? call.error : trouble != "" ? trouble : hushed ? (call.muted ? "hex muted" : "hex muted · say “unmute”") : elsewhere ? `${whereOf(liveRecord.call.source)} · ${startedOf(liveRecord.call.source)}` : call.interrupted and live ? "Paused while another app has the audio" : status == "idle" and call.ending != "" ? (call.ending == "no-connect" ? endingOf(call.ending) : `${endingOf(call.ending)} · ${lengthOf(call.seconds)}`) : ""
+  derive footerBad = call.error != "" or trouble != "" or (status == "idle" and badEnding(call.ending))
   action primary
     if elsewhere
       hangUp(activity.call)

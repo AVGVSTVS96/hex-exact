@@ -68,7 +68,7 @@ export const tasks: Partial<Sources> = {
   },
   stopTask: async ([id]) => {
     const r = await write('POST', `/tasks/${enc(id)}/stop`);
-    return { ok: r.ok, error: r.error };
+    return { id, ok: r.ok, error: r.error, topic: '', missed: 0 };
   },
   // During a call: bring a task, or everything that waits ("asks"), into it.
   talkAbout: async ([about]) => {

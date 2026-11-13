@@ -134,6 +134,7 @@ component ReplyComposer
     note: action
     answer: action
     attached: Media[]
+    addError: string
     attach: action
     detach: action
   state text = ""
@@ -163,7 +164,7 @@ component ReplyComposer
         text `Replying to ${ask.question}` font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
         button press=dismissed aria-label="Close, keep the draft" testId="reply-close"
           image "symbol:close"
-      Waiting(media=attached, remove=detach)
+      Waiting(media=attached, error=addError, remove=detach)
       textarea id="reply-field" value=words input=edit blur=leave autofocus=true rows=3 field-sizing="content" max-height=130 placeholder="Your answer" aria-label="Your answer" testId="reply-field"
       row gap=8 align-items="center"
         AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=36, disabled=(attached.length >= 4), add=add)

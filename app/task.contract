@@ -59,12 +59,13 @@ component TaskScreen
     answering: string
     attached: Media[]
     attachedTo: string
+    addError: string
     attach: action
     detach: action
     back: action
   view
     column navigationKey=`${entry.id}` navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 testId="task"
-      TaskBody(id=entry.params.id, pane=false, entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, attach=attach, detach=detach, back=back)
+      TaskBody(id=entry.params.id, pane=false, entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, attach=attach, detach=detach, back=back)
 
 // The page itself: a route's (TaskScreen), or a pane beside the Tasks list on a wide screen.
 component TaskBody
@@ -104,6 +105,7 @@ component TaskBody
     answering: string
     attached: Media[]
     attachedTo: string
+    addError: string
     attach: action
     detach: action
     back: action
@@ -296,7 +298,7 @@ component TaskBody
                   text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), attach=attach, detach=detach)
+          ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach)
       else if kind == "task" and chat.sends
         link href=`${path("thread", id)}#compose` margin="6px 12px 10px" padding="11px 16px" border-radius=22 border="1px solid -exact-separator" testId="task-compose"
           text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1

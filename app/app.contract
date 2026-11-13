@@ -111,9 +111,9 @@ component App
   resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
   resource check = loadCheck() when names.includes("check") as shape Check else empty()
   resource settings = loadSettings() when names.includes("settings") as shape Settings else empty()
-  // The message an ask came from: the one opened on a card, else the pick open on screen.
+  // The message an ask came from: the pick on top of the screen, else the one opened on a card.
   derive pickId = match stack(nav).filter(e => e.name == "pick").at(-1) { case some(e) => e.params.id, case none => "" }
-  derive wordsId = wordsAsk != "" ? wordsAsk : pickId
+  derive wordsId = top(nav).name == "pick" ? pickId : wordsAsk
   resource words = loadWords(wordsId) when wordsId != "" as shape Words else empty()
 
   // Writes. Each says how it went in its slot; a screen reads `pending(x)` and the reply.
@@ -221,7 +221,7 @@ component App
     attached = attachedTo == `ask:${id}` ? attached.slice(0, 0) : attached
   action answerMany(id: string, labels: string[])
     answering = `${id}|${labels.join(", ")}`
-    said = withSaid(said, saidFor(allAsks, id, "answer", labels.join(", ")))
+    said = withSaid(said, saidFor(allAsks, id, "answers", labels.join(", ")))
     haptic("selection")
     send answered = answerAsk(id, labels, noMedia)
   // hex's picks, all at once: each ask with its answer, in order.
@@ -241,12 +241,16 @@ component App
   action undo(id: string)
     said = said.filter(l => field(l, 0) != id)
     send undone = undoAsk(id)
-  // Answer again where a place was out of reach.
+  // Answer again where a place was out of reach: one label as it was, several (verb "answers") as
+  // they were joined.
   action again(id: string)
     match saids.filter(s => s.id == id).at(-1)
       case some(s)
-        said = withSaid(said, saidFor(allAsks, id, "answer", s.label))
-        send answered = answerAsk(id, s.label.split(", "), noMedia)
+        said = withSaid(said, saidFor(allAsks, id, s.verb, s.label))
+        if s.verb == "dismiss"
+          send dismissed = dismissAsk(id)
+        else
+          send answered = answerAsk(id, (s.verb == "answers" ? s.label.split(", ") : [s.label]), noMedia)
       case none
         said = said
   action settle

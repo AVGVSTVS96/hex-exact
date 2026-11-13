@@ -6,7 +6,7 @@
 
 use Ask, Sent from "./shapes.contract"
 
-// A question. verb: answer | dismiss | note. status: sending | sent | failed. detail: where it went
+// A question. verb: answer | answers (several labels, joined by ", ") | dismiss | note. status: sending | sent | failed. detail: where it went
 // (the topic) or why it didn't. missed: places out of reach that still ask it.
 shape Said
   id: string

@@ -26,7 +26,7 @@ component App
   derive why = place.name == "failed" ? place.params.why : ""
   derive lastId = match latest.turns.at(-1) { case some(t) => t.id, case none => "" }
   derive headline = status == "connecting" ? "Calling hex…" : status == "connected" ? (muted ? "Muted" : "hex is listening") : status == "ending" ? "Hanging up…" : "hex"
-  derive detail = why != "" ? why : status == "idle" ? (latest.title == "" ? "Tap Call to talk with hex." : `Last call: ${latest.title}`) : "Built in Exact, with the call in a Swift shell."
+  derive detail = why != "" ? why : status == "idle" ? (latest.title == "" ? "Tap Call to talk with hex. This line came over the air." : `Last call: ${latest.title}`) : "Built in Exact, with the call in a Swift shell."
 
   task poll mount
     every(2000, pull)

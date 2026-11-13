@@ -20,7 +20,7 @@ number=$(git -C "$here" rev-list --count HEAD)
 title=$(git -C "$here" log --oneline -1 | cut -c1-80)
 
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer, so it's asleep" >&2; exit 1; }
-rsync -a --exclude .git --exclude '/app/target' --exclude '/app/.exact' --exclude '/shell/build' "$here/" "$mac:$folder/"
+rsync -a --exclude .git --exclude '/app/target' --exclude '/app/.exact' "$here/" "$mac:$folder/"
 if [ -n "${BUILT:-}" ]; then
   app=$BUILT
 else
@@ -41,8 +41,8 @@ for path in [f"{app}/Info.plist", *glob.glob(f"{app}/PlugIns/*.appex/Info.plist"
     plistlib.dump(info, open(path, "wb"), fmt=plistlib.FMT_BINARY)
 PY
 xtool sign "$work/HexExact.app" </dev/null
-signed=$folder/shell/build/signed/HexExact.app
-ssh "$mac" "mkdir -p $folder/shell/build/signed"
+signed=Developer/hex-exact-build/signed/HexExact.app
+ssh "$mac" "mkdir -p Developer/hex-exact-build/signed"
 rsync -a --delete "$work/HexExact.app/" "$mac:$signed/"
 serial=$(python3 -c "
 import glob, os, plistlib, subprocess
@@ -52,9 +52,9 @@ print(subprocess.run(['openssl', 'x509', '-inform', 'DER', '-noout', '-serial'],
 ssh "$mac" sh "$folder/scripts/resign" "$serial" "$signed" </dev/null
 
 echo "putting it on the install link"
-ssh "$mac" "cd $folder/shell/build/signed && rm -rf Payload HexExact.ipa && mkdir Payload && cp -R HexExact.app Payload/ &&
+ssh "$mac" "cd Developer/hex-exact-build/signed && rm -rf Payload HexExact.ipa && mkdir Payload && cp -R HexExact.app Payload/ &&
   ditto -c -k --keepParent Payload HexExact.ipa && rm -rf Payload" </dev/null
-scp -q "$mac:$folder/shell/build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
+scp -q "$mac:Developer/hex-exact-build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
 mv "$link/hex-exact-$number.ipa.part" "$link/hex-exact-$number.ipa"
 find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
 python3 - "$link" "$url" "$number" "$bundle" "$title" <<'PY'

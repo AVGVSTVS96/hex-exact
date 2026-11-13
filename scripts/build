@@ -7,22 +7,26 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 . "$here/scripts/mac-env"
 exact=${EXACT:-$HOME/Developer/exact}
+# Xcode's output stays outside the repository, where Exact's deploy would read its package
+# checkouts as submodules.
+out=$HOME/Developer/hex-exact-build
+mkdir -p "$out"
 
 cd "$here/app"
 "$here/scripts/mac-app-json" app.json "$EXACT_CHANNEL"
 # A build belongs to the update stream whose publisher receipt EXACT_UPDATE_RECEIPT names; without
 # one it starts a new stream.
 [ -n "${EXACT_UPDATE_RECEIPT:-}" ] || export EXACT_UPDATE_GENESIS=1
-built=$(bun exact.mjs ios --device --embed --unsigned --json 2>"$here/shell/embed.log" | tail -1)
+built=$(bun exact.mjs ios --device --embed --unsigned --json 2>"$out/embed.log" | tail -1)
 embed=$(jq -r .path <<<"$built")
-[ -d "$embed" ] || { tail -20 "$here/shell/embed.log" >&2; exit 1; }
+[ -d "$embed" ] || { tail -20 "$out/embed.log" >&2; exit 1; }
 
 cd "$here/shell"
 export EXACT_PACKAGE=$exact/host/apple EXACT_LIB_DIR=$embed EXACT_LIB=app_apple \
   EXACT_APP_COMPOSITION=updating EXACT_APPLE_LINK=none EXACT_UPDATE_TRUST=production
 xcodegen generate --quiet
 xcodebuild -project HexExact.xcodeproj -scheme HexExact -configuration Release \
-  -destination generic/platform=iOS -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+  -destination generic/platform=iOS -derivedDataPath "$out" CODE_SIGNING_ALLOWED=NO \
   HEX_URL="$HEX_URL" HEX_TOKEN="$HEX_TOKEN" EXACT_LIB_DIR="$embed" EXACT_LIB=app_apple \
-  build >build.log 2>&1 || { rg -N 'error:' build.log | sort -u | head -30 >&2; exit 1; }
-echo "$here/shell/build/Build/Products/Release-iphoneos/HexExact.app"
+  build >"$out/build.log" 2>&1 || { rg -N 'error:' "$out/build.log" | sort -u | head -30 >&2; exit 1; }
+echo "$out/Build/Products/Release-iphoneos/HexExact.app"

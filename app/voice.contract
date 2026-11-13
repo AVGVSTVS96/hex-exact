@@ -46,10 +46,13 @@ component VoicePage
     back: action
   derive book = viewport.horizontalViewportSegments == 2
   derive paneWidth = book ? viewport.width / 2 - 40 : min(viewport.width - 64, 420)
-  derive chosen = settings.voice != "" ? settings.voice : voice
+  derive chosen = voice
   derive locked = inCall or (loading and settings.voice == "")
-  derive personality = settings.personality != "" ? settings.personality : "default"
-  derive pace = settings.pace != "" ? settings.pace : "normal"
+  // What Bassim just picked shows at once; hex's answer follows.
+  state pickedPace = ""
+  state pickedPersonality = ""
+  derive personality = pickedPersonality != "" ? pickedPersonality : settings.personality != "" ? settings.personality : "default"
+  derive pace = pickedPace != "" ? pickedPace : settings.pace != "" ? settings.pace : "normal"
   action choose(id: string)
     haptic("selection")
     set("voice", id)
@@ -61,9 +64,11 @@ component VoicePage
       choose(id)
   action pickPace(p: string)
     haptic("selection")
+    pickedPace = p
     set("pace", p)
   action pickPersonality(p: string)
     haptic("selection")
+    pickedPersonality = p
     set("personality", p)
   view
     column navigationKey=`${entry.id}` navigationScroll="voice" position="absolute" inset=0 testId="voice"

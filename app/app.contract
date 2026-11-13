@@ -335,7 +335,7 @@ component App
     skippedBuild = n
 
   // The voice is hex's, for every call: the phone follows it, and gives hex its own when hex has none.
-  task voiceFromHex when settings.voice != "" and settings.voice != voice key=settings.voice
+  task voiceFromHex when not pending(saved) and settings.voice != "" and settings.voice != voice key=settings.voice
     after(1, takeVoice)
   task voiceToHex when current(settings) and settings.voice == "" key=voice
     after(1, giveVoice)

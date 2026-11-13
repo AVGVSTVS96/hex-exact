@@ -36,7 +36,7 @@ component SettingsScreen
     back: action
   derive book = viewport.horizontalViewportSegments == 2
   derive paneWidth = book ? viewport.width / 2 - 40 : min(viewport.width - 32, 420)
-  derive voiceLine = `${voiceName(settings.voice != "" ? settings.voice : voice)}${match settings.personalities.filter(p => p.id == settings.personality and p.id != "default").at(0) { case some(p) => ` · ${p.label}`, case none => "" }}`
+  derive voiceLine = `${voiceName(voice)}${match settings.personalities.filter(p => p.id == settings.personality and p.id != "default").at(0) { case some(p) => ` · ${p.label}`, case none => "" }}`
   derive chosenColor = personaColor == "" ? "#FFFFFF" : personaColor
   action pickPersona(p: string)
     haptic("selection")

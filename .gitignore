@@ -1,0 +1,10 @@
+app/hex.ts
+app/target/
+app/.exact/
+app/node_modules/
+app/app.contract.d.ts
+shell/HexExact.xcodeproj/
+shell/build/
+shell/Shell/Info.plist
+shell/Activity/Info.plist
+.DS_Store

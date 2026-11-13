@@ -1,0 +1,93 @@
+name: HexExact
+options:
+  bundleIdPrefix: com.shahidy
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGNING_ALLOWED: "NO"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  Exact:
+    path: ${EXACT_PACKAGE}
+  WebRTC:
+    url: https://github.com/stasel/WebRTC
+    from: "137.0.0"
+targets:
+  HexExact:
+    type: application
+    platform: iOS
+    sources:
+      - Shell
+      - Shared
+      - Siri/AskHex.swift
+      - Siri/AskAttributes.swift
+      - path: Siri/Skills.skillsbundle
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: Exact
+        product: ExactKit
+      - package: Exact
+        product: ExactUpdates
+      - package: WebRTC
+        product: WebRTC
+      - target: Activity
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shahidy.hexexact
+        PRODUCT_NAME: HexExact
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        OTHER_LDFLAGS: ["-L$(EXACT_LIB_DIR)", "-l$(EXACT_LIB)"]
+    info:
+      path: Shell/Info.plist
+      properties:
+        CFBundleDisplayName: hex Exact
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        HexURL: $(HEX_URL)
+        HexToken: $(HEX_TOKEN)
+        NSMicrophoneUsageDescription: hex listens through your microphone while you talk with it.
+        NSSupportsLiveActivities: true
+        UIBackgroundModes: [audio]
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [hexexact]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    postCompileScripts:
+      - name: Exact plan and assets
+        basedOnDependencyAnalysis: false
+        script: |
+          # The embed directory's static trees (assets, shaders, the plan's files) sit at the bundle's top level, where the standalone Exact app has them.
+          cd "$EXACT_LIB_DIR"
+          for tree in *; do
+            case "$tree" in *.a|include|compat.json|capabilities.json|receipt.json) ;; *) cp -R "$tree" "$TARGET_BUILD_DIR/$WRAPPER_NAME/" ;; esac
+          done
+  Activity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Activity
+      - Shared/CallAttributes.swift
+      - Siri/AskActivity.swift
+      - Siri/AskAttributes.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shahidy.hexexact.activity
+        PRODUCT_NAME: Activity
+    info:
+      path: Activity/Info.plist
+      properties:
+        CFBundleDisplayName: hex Exact
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

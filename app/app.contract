@@ -1,0 +1,67 @@
+// hex Exact's screen. The Swift shell around it holds the call (WebRTC), Siri and the Live
+// Activity: this screen asks it for a call, mute or End with `openURL("hexexact://…")`, and the
+// shell says where the call is by moving this screen to `/call/<status>/<mic>` or `/failed/<why>`.
+// What hex hears and says comes from hex's voice server, read here every two seconds.
+routes nav
+  home "/"
+    call "/call/:status/:mic"
+    failed "/failed/:why"
+
+shape Turn
+  id: string
+  who: string
+  text: string
+
+shape Latest
+  id: string
+  title: string
+  live: bool
+  turns: Turn[]
+
+component App
+  resource latest = loadLatest() as shape Latest else empty()
+  derive place = top(nav)
+  derive status = place.name == "call" ? place.params.status : "idle"
+  derive muted = place.name == "call" and place.params.mic == "muted"
+  derive why = place.name == "failed" ? decodeURIComponent(place.params.why) : ""
+  derive lastId = match latest.turns.at(-1) { case some(t) => t.id, case none => "" }
+  derive headline = status == "connecting" ? "Calling hex…" : status == "connected" ? (muted ? "Muted" : "hex is listening") : status == "ending" ? "Hanging up…" : "hex"
+  derive detail = why != "" ? why : status == "idle" ? (latest.title == "" ? "Tap Call to talk with hex." : `Last call: ${latest.title}`) : "Built in Exact, with the call in a Swift shell."
+
+  task poll mount
+    every(2000, pull)
+
+  action pull
+    refresh latest
+  // The shell moves this screen as the call changes; each place replaces the last, so there is no Back.
+  action follow(url: string)
+    nav = replace(nav, url)
+  action call
+    openURL("hexexact://call")
+  action mute
+    openURL("hexexact://mute")
+  action end
+    openURL("hexexact://end")
+
+  view
+    main navigationKey=`${top(nav).id}` navigate=follow testId="app" width="100%" height="100%"
+      for e in stack(nav) key=e.id
+        column navigationKey=`${e.id}` navigationScroll="transcript" position="absolute" inset=0 padding="24px 20px" gap=16
+          column align-items="center" gap=6 padding-top=24
+            text headline role="heading" aria-level=1 font-size=34 font-weight=700 testId="headline"
+            text detail color="-exact-secondary-label" text-align="center" testId="detail"
+          list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0
+            for t in (latest.live ? latest.turns : []) key=t.id
+              row justify-content=(t.who == "you" ? "flex-end" : "flex-start") padding="3px 0"
+                text t.text padding="8px 12px" border-radius=18 max-width="80%" overflow-wrap="break-word"
+                  background-color=(t.who == "you" ? "AccentColor" : "-exact-fill") color=(t.who == "you" ? "AccentColorText" : "-exact-label")
+                  testId=`turn-${t.id}`
+          row gap=12 justify-content="center" padding-bottom=12
+            if status == "idle"
+              button press=call buttonStyle="filled" -exact-control-size="large" flex-grow=1 max-width="26.25rem" testId="call"
+                text "Call hex"
+            else
+              button press=mute disabled=(status != "connected") -exact-control-size="large" flex-grow=1 flex-basis="8rem" testId="mute"
+                text (muted ? "Unmute" : "Mute")
+              button press=end buttonStyle="filled" -exact-control-size="large" flex-grow=1 flex-basis="8rem" background-color="systemRed" testId="end"
+                text "End"

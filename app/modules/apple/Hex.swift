@@ -16,7 +16,7 @@ import UIKit
 ///           native.watch('captions'); native.call({op: 'captions'})  → its words and shared media
 ///           native.later({op: start | mute | end | demo | share | attach | retry, …})
 ///   views   hex-orb state=… silenced=… persona=… tint=… palette=… reaction=… still=…
-///           hex-media media=<id> kind=photo|video                     → an authed thumbnail; tap to look
+///           hex-media media=<id> kind=photo|video anchor=top|center  → an authed thumbnail; tap to look
 final class Hex: ExactModule {
   override class var views: [String: ExactNativeFactory] {
     [
@@ -419,7 +419,8 @@ final class DrawnOrb: UIView {
 // MARK: Media
 
 /// `hex-media`: a photo or video hex holds (`media` is its id from `POST /media`), or one still on
-/// this phone while it sends (a `file:` id). It fills its box, cropped; a video wears a play badge.
+/// this phone while it sends (a `file:` id). It fills its box, cropped about its centre, or showing
+/// its top with `anchor=top` (a screenshot taller than its box); a video wears a play badge.
 /// Tap it to look at it full screen, with Quick Look's swipe and pinch.
 final class MediaInstance: ExactNativeInstance {
   private let thumb = MediaThumb()
@@ -432,6 +433,7 @@ final class MediaInstance: ExactNativeInstance {
   override var view: ExactNativeView { thumb }
 
   override func setProps(_ props: [String: String]) throws {
+    thumb.top = props["anchor"] == "top"
     thumb.show(id: props["media"] ?? "", video: props["kind"] == "video")
   }
 
@@ -444,6 +446,7 @@ final class MediaThumb: UIView, QLPreviewControllerDataSource {
   private let badge = UIImageView(image: UIImage(systemName: "play.circle.fill"))
   private var id = ""
   private var file: URL?
+  var top = false { didSet { if top != oldValue { setNeedsLayout() } } }
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -468,6 +471,9 @@ final class MediaThumb: UIView, QLPreviewControllerDataSource {
   override func layoutSubviews() {
     super.layoutSubviews()
     image.frame = bounds
+    if top, let size = image.image?.size, size.width > 0, size.height / size.width > bounds.height / max(bounds.width, 1) {
+      image.frame.size.height = bounds.width * size.height / size.width
+    }
     badge.sizeToFit()
     badge.center = CGPoint(x: bounds.midX, y: bounds.midY)
   }
@@ -482,6 +488,7 @@ final class MediaThumb: UIView, QLPreviewControllerDataSource {
     guard !id.isEmpty else { return }
     if let cached = Self.cache.object(forKey: id as NSString) {
       image.image = cached
+      setNeedsLayout()
       return
     }
     Task.detached(priority: .userInitiated) { [weak self] in
@@ -491,6 +498,7 @@ final class MediaThumb: UIView, QLPreviewControllerDataSource {
         Self.cache.setObject(loaded.image, forKey: id as NSString)
         self.file = loaded.file
         UIView.transition(with: self.image, duration: 0.2, options: .transitionCrossDissolve) { self.image.image = loaded.image }
+        self.setNeedsLayout()
       }
     }
   }

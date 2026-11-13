@@ -3,33 +3,43 @@
 // `hex-media` view: it reads hex's copy with its token and opens full screen on a tap.
 use Media from "./shapes.contract"
 
-// A picture's height for its width, its shape kept between 3:4 and 4:3.
-fn heightFor(width: number, aspect: number): number = aspect <= 0 ? width : width / min(4 / 3, max(3 / 4, aspect))
+// A picture's shape (width over height): its own, no taller than 1:2; square until it's known.
+fn shapeOf(aspect: number): number = aspect <= 0 ? 1 : max(1 / 2, aspect)
+// The height a row of pictures stands at: `most`, lower when their shapes side by side are wider
+// than `width`.
+fn rowHeight(media: Media[], width: number, most: number): number = min(most, (width - 8 * max(0, media.length - 1)) / max(1 / 2, sum(media.map(m => shapeOf(m.aspect)))))
 
-// One picture at a width, with a hairline edge.
+// One picture in a box, with a hairline edge. A square crops about the centre; its own shape shows
+// the top of anything taller than 1:2.
 component Thumb
   props
     media: Media
     width: number
     square: bool
   view
-    box width=width height=(square ? width : heightFor(width, media.aspect)) border-radius=14 overflow="hidden" border="0.5px solid -exact-separator" flex-shrink=0
-      hex-media media=media.id kind=media.kind width="100%" height="100%" testId=`media-${media.id}`
+    box width=width height=(square ? width : width / shapeOf(media.aspect)) border-radius=14 overflow="hidden" border="0.5px solid -exact-separator" flex-shrink=0
+      hex-media media=media.id kind=media.kind anchor=(square ? "center" : "top") width="100%" height="100%" testId=`media-${media.id}`
 
-// A sent group: one picture at the full width, more as a two-up grid of squares.
+// Pictures side by side, each at its own shape, all one height: no taller than `height`, and no
+// wider together than `width`.
+component Pictures
+  props
+    media: Media[]
+    width: number
+    height: number
+  derive tall = rowHeight(media, width, height)
+  view
+    row gap=8 align-items="flex-start"
+      for m in media key=m.id
+        Thumb(media=m, width=(tall * shapeOf(m.aspect)), square=false)
+
+// A sent group of photos and videos, at their own shapes in one row.
 component Album
   props
     media: Media[]
     width: number
-  derive cell = (width - 4) / 2
   view
-    if media.length == 1
-      for m in media key=m.id
-        Thumb(media=m, width=width, square=false)
-    else
-      row flex-wrap="wrap" gap=4 width=width
-        for m in media key=m.id
-          Thumb(media=m, width=cell, square=true)
+    Pictures(media=media, width=width, height=440)
 
 // The "+" that adds a photo or video: a menu of Camera and Photos. `menu` names it on the screen.
 component AddMedia

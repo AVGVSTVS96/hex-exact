@@ -3,7 +3,7 @@
 // marked in mint; a few short answers sit side by side. Bassim can also answer in his own words, or
 // say it isn't needed. Once answered it folds to what he said, with Undo.
 use Ask, Words, Media from "./shapes.contract"
-use Album, Thumb, AddMedia, Waiting from "./media.contract"
+use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
 use Mark, whenOf from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
@@ -33,6 +33,8 @@ component AskCard
   derive answered = said.id == ask.id and said.verb != "note" and said.status != "failed"
   derive noted = said.id == ask.id and said.verb == "note" and said.status == "sent"
   derive shots = ask.options.filter(o => o.shot >= 0)
+  // The screenshots side by side at their own shapes, 300 tall at most; past 140 they scroll.
+  derive shotsTall = max(140, rowHeight(shots.map(o => Media(id="", kind="photo", aspect=o.aspect)), width, 300))
   derive from = match ask.places.at(0) { case some(p) => p.place, case none => ask.topic }
   action choose(label: string)
     if ask.multiple
@@ -84,13 +86,13 @@ component AskCard
                 link href=l.url padding="5px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`ask-link-${l.label}`
                   text `${l.label} ↗` font="-exact-footnote" font-weight=600
         if ask.pictures.length > 0 and not folded
-          Album(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=min(width, 340))
+          Pictures(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=width, height=300)
         if shots.length > 0
           scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none"
             row gap=10 padding="2px 0"
               for o in shots key=o.label
-                column gap=6 align-items="center" width=150 flex-shrink=0
-                  Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=150, square=false)
+                column gap=6 align-items="center" width=(shotsTall * shapeOf(o.aspect)) flex-shrink=0
+                  Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=(shotsTall * shapeOf(o.aspect)), square=false)
                   button press=choose(o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic="selection" aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-shot-${ask.id}-${o.label}`
                     text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-footnote" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label") line-clamp=1
         if evenRow(ask)

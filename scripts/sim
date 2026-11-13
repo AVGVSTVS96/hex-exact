@@ -86,6 +86,8 @@ for pose in $poses; do
       esac
       name=$(echo "${path#/}" | tr '/:' '__'); name=${name:-home}
       xcrun simctl io "$id" screenshot --display=$display "$out/$name-$pose-$appearance.png" >/dev/null 2>&1
+      # A path with report=pose leaves the shell's pose beside its shot.
+      case $path in *report=pose*) xcrun simctl spawn "$id" defaults read com.shahidy.hexexact HexPose >"$out/pose-$pose.json" 2>/dev/null || true ;; esac
     done
   done
 done

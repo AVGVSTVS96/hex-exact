@@ -1,4 +1,5 @@
 import type { Result, Sources } from '../app.contract.d.ts';
+import { INSTALL_URL } from '../hex.ts';
 import { bool, list, num, obj, str } from './parse.ts';
 
 // The live call is the Swift shell's. Its native module (modules/apple/Hex.swift) answers what it
@@ -30,5 +31,16 @@ export const call: Partial<Sources> = {
     if (!native?.available) return { ok: false, error: 'Calls run in the hex Exact app on the phone.' };
     const r = obj(await native.later({ op, voice, about }));
     return { ok: bool(r.ok), error: str(r.error) };
+  },
+};
+
+export const build: Partial<Sources> = {
+  // The newest build scripts/ship put on the install link, beside the one running (0 off the phone).
+  checkBuild: async (_args, _store, _storage, native) => {
+    const running = native?.available ? num(native.call({ op: 'build' }).number) : 0;
+    const response = await fetch(`${INSTALL_URL}/latest.json`, { exactTimeout: 20000, cache: 'no-store' });
+    if (!response.ok) throw new Error(`the install link answered ${response.status}`);
+    const latest = obj(await response.json());
+    return { latest: num(latest.number), running, install: str(latest.install) };
   },
 };

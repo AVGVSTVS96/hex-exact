@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Writes app/hex.ts and prints the build settings the shell needs, from the stable app's
+# Writes app/hex.ts (hex's address and token, and the install link's) and prints the build settings the shell needs, from the stable app's
 # release settings, so hex's address and token live only there.
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 env=${HEX_VOICE_ENV:-$HOME/.local/share/hex-voice/release/.env.local}
 set -a && . "$env" && set +a
-printf 'export const HEX_URL = %s;\nexport const HEX_TOKEN = %s;\n' \
-  "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_URL" '$v')" "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_TOKEN" '$v')" >"$here/app/hex.ts"
+install=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
+printf 'export const HEX_URL = %s;\nexport const HEX_TOKEN = %s;\nexport const INSTALL_URL = %s;\n' \
+  "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_URL" '$v')" "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_TOKEN" '$v')" "$(jq -Rn --arg v "$install" '$v')" >"$here/app/hex.ts"
 echo "HEX_URL=$EXPO_PUBLIC_HEX_URL HEX_TOKEN=$EXPO_PUBLIC_HEX_TOKEN"

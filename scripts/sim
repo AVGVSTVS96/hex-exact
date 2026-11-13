@@ -22,28 +22,35 @@ mkdir -p "$shots"
 eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer" >&2; exit 1; }
 rsync -a --exclude .git --exclude '/app/target' --exclude '/app/.exact' --exclude '/shell/build' "$here/" "$mac:$folder/"
+# Its own simulator, so other apps' checks keep theirs.
+sim=$(ssh "$mac" bash -s <<'MAC'
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+id=$(xcrun simctl list devices -j | /opt/homebrew/bin/jq -r '[.devices[][] | select(.name == "hexexact Duo")][0].udid // empty')
+if [ -z "$id" ]; then
+  runtime=$(xcrun simctl list runtimes -j | /opt/homebrew/bin/jq -r '[.runtimes[] | select(.name == "iOS 27.1")][0].identifier')
+  id=$(xcrun simctl create "hexexact Duo" "iPhone Duo" "$runtime")
+fi
+echo "$id"
+MAC
+)
 if [ -z "${BUILT:-}" ]; then
   echo "building for the simulator on the Mac"
-  ssh "$mac" "SIM=1 HEX_URL='$HEX_URL' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1
+  ssh "$mac" "SIM=1 EXACT_SIM=$sim HEX_URL='$HEX_URL' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1
 fi
 
-ssh "$mac" bash -s -- "$folder" "$POSES" "$APPEARANCES" "${paths[@]}" <<'MAC'
+ssh "$mac" bash -s -- "$folder" "$sim" "$POSES" "$APPEARANCES" "${paths[@]}" <<'MAC'
 set -euo pipefail
-folder=$1 poses=$2 appearances=$3
-shift 3
+folder=$1 id=$2 poses=$3 appearances=$4
+shift 4
 . ~/$folder/scripts/mac-env
-# The Duo simulator runs iOS 27.1, which Xcode-beta carries.
+# The Duo simulator runs iOS 27.1, which Xcode-beta carries. Its boot takes a turn (the Mac's
+# ~/.local/share/turn), so it may wait for room.
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+xcrun simctl boot "$id" 2>/dev/null || true
+xcrun simctl bootstatus "$id" -b >/dev/null
 app=$HOME/Developer/hex-exact-build/sim/Build/Products/Release-iphonesimulator/HexExact.app
 out=$HOME/Developer/hex-exact-build/shots
 rm -rf "$out" && mkdir -p "$out"
-id=$(xcrun simctl list devices -j | jq -r '[.devices[][] | select(.name == "hexexact Duo")][0].udid // empty')
-if [ -z "$id" ]; then
-  runtime=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.name == "iOS 27.1")][0].identifier')
-  id=$(xcrun simctl create "hexexact Duo" "iPhone Duo" "$runtime")
-fi
-xcrun simctl boot "$id" 2>/dev/null || true
-xcrun simctl bootstatus "$id" -b >/dev/null
 xcrun simctl status_bar "$id" override --time 9:41 --batteryLevel 100 --cellularBars 4 2>/dev/null || true
 hub=~/$folder/scripts/devicehub-sim
 [ "$hub" -nt ~/$folder/scripts/devicehub.c ] || {

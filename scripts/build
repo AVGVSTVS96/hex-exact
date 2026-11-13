@@ -15,7 +15,7 @@ mkdir -p "$out"
 if [ -n "${SIM:-}" ]; then
   device=() sdk=iphonesimulator destination='generic/platform=iOS Simulator' trust=development products=Release-iphonesimulator
 else
-  device=(--device) sdk=iphoneos destination=generic/platform=iOS trust=production products=Release-iphoneos
+  device=(--device --unsigned) sdk=iphoneos destination=generic/platform=iOS trust=production products=Release-iphoneos
 fi
 
 cd "$here/app"
@@ -23,7 +23,7 @@ cd "$here/app"
 # A build belongs to the update stream whose publisher receipt EXACT_UPDATE_RECEIPT names; without
 # one it starts a new stream.
 [ -n "${EXACT_UPDATE_RECEIPT:-}" ] || export EXACT_UPDATE_GENESIS=1
-built=$(bun exact.mjs ios "${device[@]}" --embed --unsigned --json 2>"$out/embed.log" | tail -1)
+built=$(bun exact.mjs ios "${device[@]}" --embed --json 2>"$out/embed.log" | tail -1)
 embed=$(jq -r .path <<<"$built")
 [ -d "$embed" ] || { tail -20 "$out/embed.log" >&2; exit 1; }
 

@@ -2,7 +2,7 @@
 // call, Siri and the Live Activity; this root holds everything the screens read and write, as
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
-use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply from "./shapes.contract"
+use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build from "./shapes.contract"
 use Home from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
@@ -68,6 +68,9 @@ component App
   resource calls = watchCalls() as shape Calls else empty()
   resource tasks = watchTasks() as shape Tasks else empty()
   resource asks = watchAsks() as shape Asks else empty()
+
+  // The newest build on the install link, for the update toast.
+  resource build = checkBuild() as shape Build else empty()
 
   // What the open screens show; asked only while they are open.
   derive names = stack(nav).map(e => e.name)

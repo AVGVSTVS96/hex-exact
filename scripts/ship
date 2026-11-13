@@ -57,6 +57,8 @@ ssh "$mac" "cd Developer/hex-exact-build/signed && rm -rf Payload HexExact.ipa &
 scp -q "$mac:Developer/hex-exact-build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
 mv "$link/hex-exact-$number.ipa.part" "$link/hex-exact-$number.ipa"
 find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
+# What the app's update toast reads: the newest build on the link.
+printf '{"number":%s,"install":"%s/"}\n' "$number" "$url" >"$link/latest.json"
 python3 - "$link" "$url" "$number" "$bundle" "$title" <<'PY'
 import html, plistlib, sys, urllib.parse
 link, url, number, bundle, title = sys.argv[1:]

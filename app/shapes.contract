@@ -379,6 +379,12 @@ shape Settings
   personalities: Choice[]
   paces: Choice[]
 
+// The update toast (§11): the newest build on the install link, and the one running here.
+shape Build
+  latest: number
+  running: number
+  install: string
+
 // A write's reply that carries nothing but whether it went.
 shape Reply
   ok: bool

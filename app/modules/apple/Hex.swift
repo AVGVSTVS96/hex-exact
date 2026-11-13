@@ -45,7 +45,8 @@ final class Hex: ExactModule {
     switch request["op"] as? String {
     case "call": return state
     case "captions": return captions
-    default: throw ExactNativeRefusal("hex answers call and captions")
+    case "build": return ["number": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0]
+    default: throw ExactNativeRefusal("hex answers call, captions and build")
     }
   }
 

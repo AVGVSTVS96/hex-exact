@@ -4,8 +4,8 @@ import UIKit
 
 /// The shell: a plain UIKit app that holds what Exact defers (the WebRTC call, Siri, the Live
 /// Activity) and shows one Exact session as its whole screen. The call reaches the screen through
-/// `Bridge` and the app's native module; `hexexact://go/<path>` opens a screen (Siri, tests), and `hexexact://demo[/<path>]` starts the demo call
-/// (scripts/sim's `call:` paths).
+/// `Bridge` and the app's native module; `hexexact://go/<path>` opens a screen (Siri, tests), and
+/// `hexexact://demo[/<path>]` starts the demo call (scripts/sim's `call:` paths).
 ///
 /// Exact's own delivery stays on (ExactUpdates), so a new plan reaches the screen over the air.
 @main
@@ -77,9 +77,6 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
   private func open(_ url: URL) {
     guard url.scheme == "hexexact" else { return }
     switch url.host() {
-    case "call": Call.shared.start()
-    case "mute": Call.shared.toggleMute()
-    case "end": Call.shared.end()
     case "demo":
       Call.shared.startDemo()
       if !url.path().isEmpty, url.path() != "/" { session?.navigate(url.path()) }

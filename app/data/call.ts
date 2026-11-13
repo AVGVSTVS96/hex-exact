@@ -43,7 +43,7 @@ export const call: Partial<Sources> = {
     const rect = (r: Json) => ({ x: num(r.x), y: num(r.y), width: num(r.width), height: num(r.height) });
     return { bar: str(p.bar), fold: rect(obj(p.fold)), occlusions: list(p.occlusions, rect) };
   },
-  // op: start | mute | end | demo. voice and about only start a call; about is a task id or "asks".
+  // op: start | mute | end. voice and about only start a call; about is a task id or "asks".
   // prefs: the phone's sounds, haptics and persona, which the shell keeps for the call's feedback
   // and its Live Activity.
   callCommand: async ([op, voice, about, prefs], _store, _storage, native) => {

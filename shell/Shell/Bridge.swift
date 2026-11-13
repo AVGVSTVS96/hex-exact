@@ -6,9 +6,9 @@ import Foundation
 ///
 ///   Hex module ──HexCallCommand {op, …, reply}──▶ Bridge ──▶ Call, MediaPicker
 ///   Hex module ──HexCallAsk──▶ Bridge ──HexCallState + HexCaptions──▶ Hex module (when it loads)
-///   Call ──HexCallState / HexCaptions / HexCallLevels──▶ Hex module ──▶ app.ts, the orb
+///   Call ──HexCallState / HexCaptions / HexCallLevels / HexCallTone──▶ Hex module ──▶ app.ts, the orb
 ///
-/// Commands: `start` {voice, about}, `mute`, `end`, `demo`, `share` {source} (a photo or video into
+/// Commands: `start` {voice, about}, `mute`, `end`, `share` {source} (a photo or video into
 /// the live call), `attach` {source, most} (for a composer: answers the uploaded media), `retry`
 /// {key} (a share that failed). Each may carry Bassim's phone settings, which are kept (Prefs).
 @MainActor
@@ -16,6 +16,7 @@ enum Bridge {
   static let state = Notification.Name("HexCallState")
   static let captions = Notification.Name("HexCaptions")
   static let levels = Notification.Name("HexCallLevels")
+  static let tone = Notification.Name("HexCallTone")
   static let command = Notification.Name("HexCallCommand")
   static let ask = Notification.Name("HexCallAsk")
 
@@ -46,16 +47,13 @@ enum Bridge {
     let call = Call.shared
     switch request["op"] as? String {
     case "start":
-      call.start(voice: request["voice"] as? String ?? "marin", about: request["about"] as? String ?? "")
+      call.start(voice: request["voice"] as? String, about: request["about"] as? String ?? "")
       reply(["ok": true, "error": ""])
     case "mute":
       call.toggleMute()
       reply(["ok": true, "error": ""])
     case "end":
       call.end()
-      reply(["ok": true, "error": ""])
-    case "demo":
-      call.startDemo()
       reply(["ok": true, "error": ""])
     case "retry":
       call.retryShare(request["key"] as? String ?? "")
@@ -120,5 +118,10 @@ enum Bridge {
 
   static func levelsChanged(_ levels: (input: Float, output: Float)) {
     NotificationCenter.default.post(name: Self.levels, object: nil, userInfo: ["input": levels.input, "output": levels.output])
+  }
+
+  /// How far Bassim's voice lifts and brightens, -1…1, 30 times a second while he talks.
+  static func toneChanged(pitch: Float, tone: Float) {
+    NotificationCenter.default.post(name: Self.tone, object: nil, userInfo: ["pitch": pitch, "tone": tone])
   }
 }

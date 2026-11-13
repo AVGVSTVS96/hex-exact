@@ -3,7 +3,7 @@ import UIKit
 
 /// The call's sounds and haptics, as the stable app plays them: a chime and a success tap when the
 /// call goes live, a lower chime and a soft tap when it ends. Each follows Bassim's Sounds and
-/// Haptics settings, which the screen writes here (Bridge.prefs).
+/// Haptics settings, which the screen sends with each command (Prefs).
 @MainActor
 enum Feedback {
   private static var players: [String: AVAudioPlayer] = [:]
@@ -17,10 +17,6 @@ enum Feedback {
       }
     }
     if Prefs.sounds { play(live ? "connect" : "end") }
-  }
-
-  static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-    if Prefs.haptics { UIImpactFeedbackGenerator(style: style).impactOccurred() }
   }
 
   private static func play(_ name: String) {

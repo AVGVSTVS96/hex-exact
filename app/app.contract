@@ -26,7 +26,7 @@ component App
   derive why = place.name == "failed" ? place.params.why : ""
   derive lastId = match latest.turns.at(-1) { case some(t) => t.id, case none => "" }
   derive headline = status == "connecting" ? "Calling hex…" : status == "connected" ? (muted ? "Muted" : "hex is listening") : status == "ending" ? "Hanging up…" : "hex"
-  derive detail = why != "" ? why : status == "idle" ? (latest.title == "" ? "Tap Call to talk with hex. This line came over the air." : `Last call: ${latest.title}`) : "Built in Exact, with the call in a Swift shell."
+  derive detail = why != "" ? why : status == "idle" ? (latest.title == "" ? "Tap Call to talk with hex." : `Last call: ${latest.title}`) : "Built in Exact, with the call in a Swift shell."
 
   task poll mount
     every(2000, pull)
@@ -50,6 +50,7 @@ component App
           column align-items="center" gap=6 padding-top=24
             text headline role="heading" aria-level=1 font-size=34 font-weight=700 testId="headline"
             text detail color="-exact-secondary-label" text-align="center" testId="detail"
+            text "This line came over the air, through Exact's updates." font="-exact-footnote" color="-exact-tertiary-label" text-align="center" testId="over-the-air"
           list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0
             for t in (latest.live ? latest.turns : []) key=t.id
               row justify-content=(t.who == "you" ? "flex-end" : "flex-start") padding="3px 0"

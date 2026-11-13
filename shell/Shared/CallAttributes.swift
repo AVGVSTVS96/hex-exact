@@ -3,12 +3,15 @@ import AppIntents
 import Foundation
 
 /// What the call's Live Activity shows. The app starts and updates it (Activity.swift); the
-/// extension draws it (CallActivity.swift).
+/// extension draws it (CallActivity.swift). `state`: connecting (reconnecting too), live, muted or
+/// ended; `orb` names Bassim's persona's image; an ended call says how it ended in `outcome`.
 struct CallAttributes: ActivityAttributes {
   struct ContentState: Codable, Hashable {
-    var line: String
-    var muted: Bool
+    var state: String
     var since: Date?
+    var orb: String
+    var outcome: String = ""
+    var bad: Bool = false
   }
 }
 
@@ -20,6 +23,18 @@ struct EndCall: LiveActivityIntent {
 
   func perform() async throws -> some IntentResult {
     NotificationCenter.default.post(name: Self.ended, object: nil)
+    return .result()
+  }
+}
+
+/// Mute or unmute on the Live Activity, in the app as End is.
+struct MuteCall: LiveActivityIntent {
+  static let title: LocalizedStringResource = "Mute or unmute the call with hex"
+  static let isDiscoverable = false
+  static let toggled = Notification.Name("MuteCall")
+
+  func perform() async throws -> some IntentResult {
+    NotificationCenter.default.post(name: Self.toggled, object: nil)
     return .result()
   }
 }

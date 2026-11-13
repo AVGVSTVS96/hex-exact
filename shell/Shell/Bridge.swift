@@ -4,9 +4,13 @@ import Foundation
 /// `app/modules/apple/Hex.swift`, which Exact loads from its own framework; the two meet on
 /// NotificationCenter, so neither links the other.
 ///
-///   Hex module ──HexCallCommand {op: start|mute|end, voice, about}──▶ Bridge ──▶ Call
+///   Hex module ──HexCallCommand {op, …, reply}──▶ Bridge ──▶ Call, MediaPicker
 ///   Hex module ──HexCallAsk──▶ Bridge ──HexCallState + HexCaptions──▶ Hex module (when it loads)
 ///   Call ──HexCallState / HexCaptions / HexCallLevels──▶ Hex module ──▶ app.ts, the orb
+///
+/// Commands: `start` {voice, about}, `mute`, `end`, `demo`, `share` {source} (a photo or video into
+/// the live call), `attach` {source, most} (for a composer: answers the uploaded media), `retry`
+/// {key} (a share that failed). Each may carry Bassim's phone settings, which are kept (Prefs).
 @MainActor
 enum Bridge {
   static let state = Notification.Name("HexCallState")
@@ -14,6 +18,8 @@ enum Bridge {
   static let levels = Notification.Name("HexCallLevels")
   static let command = Notification.Name("HexCallCommand")
   static let ask = Notification.Name("HexCallAsk")
+
+  typealias Reply = ([String: Any]) -> Void
 
   private static var pending = false
 
@@ -35,12 +41,45 @@ enum Bridge {
   }
 
   private static func run(_ request: [AnyHashable: Any]) {
+    let reply = request["reply"] as? Reply ?? { _ in }
+    Prefs.save(request)
     let call = Call.shared
     switch request["op"] as? String {
-    case "start": call.start(voice: request["voice"] as? String ?? "marin", about: request["about"] as? String ?? "")
-    case "mute": call.toggleMute()
-    case "end": call.end()
-    default: break
+    case "start":
+      call.start(voice: request["voice"] as? String ?? "marin", about: request["about"] as? String ?? "")
+      reply(["ok": true, "error": ""])
+    case "mute":
+      call.toggleMute()
+      reply(["ok": true, "error": ""])
+    case "end":
+      call.end()
+      reply(["ok": true, "error": ""])
+    case "demo":
+      call.startDemo()
+      reply(["ok": true, "error": ""])
+    case "retry":
+      call.retryShare(request["key"] as? String ?? "")
+      reply(["ok": true, "error": ""])
+    case "share":
+      Task {
+        let picked = await MediaPicker.pick(request["source"] as? String ?? "photos", sends: true)
+        call.share(picked)
+        reply(["ok": true, "error": ""])
+      }
+    case "attach":
+      Task {
+        let most = (request["most"] as? NSNumber)?.intValue ?? MediaPicker.most
+        let picked = await MediaPicker.pick(request["source"] as? String ?? "photos", most: max(1, most), sends: false)
+        do {
+          var media: [[String: Any]] = []
+          for item in picked { media.append(try await HexServer().upload(item).json) }
+          reply(["ok": true, "error": "", "media": media])
+        } catch {
+          reply(["ok": false, "error": "Not added · " + ((error as? LocalizedError)?.errorDescription ?? "hex didn't take it"), "media": [[String: Any]]()])
+        }
+      }
+    default:
+      reply(["ok": false, "error": "The shell doesn't know that command."])
     }
   }
 
@@ -49,15 +88,16 @@ enum Bridge {
     CallLiveActivity.follow(call)
     NotificationCenter.default.post(name: state, object: nil, userInfo: [
       "status": call.status.rawValue,
-      "id": call.sessionId ?? "",
+      "id": call.id ?? "",
       "muted": call.muted,
-      "hexMuted": call.hexMuted,
-      "interrupted": false,
+      "hexMuted": false,
+      "interrupted": call.interrupted,
       "started": (call.started?.timeIntervalSince1970 ?? 0) * 1000,
       "error": call.failure ?? "",
       "ending": call.ending,
       "seconds": call.seconds,
       "shell": true,
+      "demo": call.demo,
     ])
   }
 

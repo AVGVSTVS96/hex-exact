@@ -6,7 +6,8 @@
   "start_url": "/",
   "display": "standalone",
   "modules": [
-    "hex-orb"
+    "hex-orb",
+    "hex-media"
   ],
   "app": {
     "id": "com.shahidy.hexexact",

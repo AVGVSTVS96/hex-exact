@@ -2,7 +2,7 @@
 // call, Siri and the Live Activity; this root holds everything the screens read and write, as
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
-use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page from "./shapes.contract"
+use Viewport, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
 use Home from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
@@ -55,6 +55,10 @@ component App
   state answering = ""
   state messaging = ""
   state removing = ""
+  // Photos and videos added to one composer (attachedTo: `ask:<id>` or `thread:<id>`), uploaded,
+  // waiting to go with its next send.
+  state attached = [Media(id="", kind="", aspect=0)].slice(0, 0)
+  state attachedTo = ""
   // The ask whose original message is open ("From <place>"), read from hex while it is.
   state wordsAsk = ""
   // Milliseconds since launch, a minute at a time: "Today", "3 min ago" and the like move on.
@@ -94,6 +98,9 @@ component App
 
   // Writes. Each says how it went in its slot; a screen reads `pending(x)` and the reply.
   mutation commanded as shape Reply
+  mutation shared as shape Reply
+  mutation retried as shape Reply
+  mutation added as shape Attached then gotMedia
   mutation answered as shape Sent queue
   mutation answeredAll as shape Reply queue
   mutation noted as shape Sent queue
@@ -113,6 +120,12 @@ component App
   derive now = clock.epochAtZero + tick
   // Nothing attached: what a send carries until the camera and Photos attach media ids from POST /media.
   derive noMedia = [""].slice(0, 0)
+  // What the shell keeps of the phone's choices: the call's sounds and haptics, its Live Activity's orb.
+  derive phone = PhonePrefs(sounds=sounds, haptics=haptics, persona=persona, personaColor=personaColor, palette=opalPalette)
+  // The live call's record, here or elsewhere (a phone call): hex muting itself, and a call held
+  // elsewhere's words and clock.
+  derive liveId = call.status != "idle" and call.id != "" and not call.demo ? call.id : (call.status == "idle" ? activity.call : "")
+  resource liveRecord = loadCall(liveId, true) when liveId != "" as shape CallRecord else empty()
   // How the orb is tinted: Opal by its palette, Mana by its own colour, the rest by the colour picked.
   derive orbTint = persona == "opal" ? paletteColor(opalPalette) : persona == "mana" ? "" : (personaColor == "" ? "#FFFFFF" : personaColor)
   derive removeError = pending(removed) ? "" : match removed { case some(r) => r.error, case none => "" }
@@ -142,17 +155,38 @@ component App
 
   // The call
   action startCall(about: string)
-    send commanded = callCommand("start", voice, about)
+    send commanded = callCommand("start", voice, about, phone)
   action toggleMute
-    send commanded = callCommand("mute", "", "")
+    send commanded = callCommand("mute", "", "", phone)
   action endCall
-    send commanded = callCommand("end", "", "")
+    send commanded = callCommand("end", "", "", phone)
+  // A call held elsewhere (a phone call), ended from here.
+  action hangUpElsewhere(id: string)
+    send commanded = hangUp(id)
+  // A photo or video into the live call; one that didn't arrive, again.
+  action share(source: string)
+    send shared = shareMedia(source)
+  action reshare(key: string)
+    send retried = retryShare(key)
+  // Photos and videos for a composer, kept until it sends (at most four).
+  action attach(to: string, source: string)
+    attached = attachedTo == to ? attached : attached.slice(0, 0)
+    attachedTo = to
+    send added = attachMedia(source, 4 - (attachedTo == to ? attached.length : 0))
+  action gotMedia
+    match added
+      case some(r)
+        attached = attached.concat(r.media).slice(0, 4)
+      case none
+        attached = attached
+  action detach(id: string)
+    attached = attached.filter(m => m.id != id)
   // Bring a task ("asks": everything that waits) into the live call, or start one about it.
   action talk(about: string)
     if call.status == "live"
       send talked = talkAbout(about)
     else
-      send commanded = callCommand("start", voice, about)
+      send commanded = callCommand("start", voice, about, phone)
 
   // Asks
   action answer(id: string, label: string)

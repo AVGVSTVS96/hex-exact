@@ -14,11 +14,16 @@ struct CallHex: AppIntent {
 }
 
 struct Shortcuts: AppShortcutsProvider {
-  static var appShortcuts: [AppShortcut] {
+  @AppShortcutsBuilder static var appShortcuts: [AppShortcut] {
     AppShortcut(
       intent: CallHex(),
       phrases: ["Call hex in \(.applicationName)", "Start a \(.applicationName) call"],
       shortTitle: "Call hex",
       systemImageName: "phone.fill")
+    AppShortcut(
+      intent: AskHex(),
+      phrases: ["Ask hex in \(.applicationName)", "Ask \(.applicationName)"],
+      shortTitle: "Ask hex",
+      systemImageName: "bubble.left.and.text.bubble.right")
   }
 }

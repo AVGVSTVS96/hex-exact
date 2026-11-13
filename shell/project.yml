@@ -2,7 +2,7 @@ name: HexExact
 options:
   bundleIdPrefix: com.shahidy
   deploymentTarget:
-    iOS: "18.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 settings:
   base:
@@ -18,6 +18,9 @@ packages:
   WebRTC:
     url: https://github.com/stasel/WebRTC
     from: "137.0.0"
+  RiveRuntime:
+    url: https://github.com/rive-app/rive-ios
+    from: "6.30.0"
 targets:
   HexExact:
     type: application
@@ -37,6 +40,8 @@ targets:
         product: ExactUpdates
       - package: WebRTC
         product: WebRTC
+      - package: RiveRuntime
+        product: RiveRuntime
       - target: ExactModules
         link: false
         embed: true
@@ -56,6 +61,7 @@ targets:
         HexURL: $(HEX_URL)
         HexToken: $(HEX_TOKEN)
         NSMicrophoneUsageDescription: hex listens through your microphone while you talk with it.
+        NSCameraUsageDescription: Take a photo or video to show hex.
         NSSupportsLiveActivities: true
         UIBackgroundModes: [audio]
         UILaunchScreen: {}
@@ -84,6 +90,10 @@ targets:
     sources:
       - build/modules
       - ../app/modules/apple
+    dependencies:
+      - package: RiveRuntime
+        product: RiveRuntime
+        embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.shahidy.hexexact.modules

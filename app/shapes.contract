@@ -30,9 +30,10 @@ shape Time
 
 // The live call, held by the Swift shell (app/modules/apple/Hex.swift)
 
-// status: idle | connecting | live | ending. ending: how the last call ended (you, hex, dropped,
-// expired, no-connect), with its length in seconds. shell is false where no Swift shell holds calls
-// (a plain Exact build, the web, the agent).
+// status: idle | connecting | live | reconnecting | ending. ending: how the last call ended (you,
+// hex, dropped, expired, no-connect), with its length in seconds. interrupted: another app (a phone
+// call, Siri) has the audio. shell is false where no Swift shell holds calls (a plain Exact build,
+// the web, the agent); demo is the scripted call (hexexact://demo).
 shape CallState
   status: string
   id: string
@@ -44,13 +45,17 @@ shape CallState
   ending: string
   seconds: number
   shell: bool
+  demo: bool
 
-// who: you | hex
+// who: you | hex. A turn with media is photos and videos Bassim sent into the call; note is
+// "sending", why they weren't sent, or "" once hex has them.
 shape Caption
   id: string
   who: string
   text: string
   at: number
+  media: Media[]
+  note: string
 
 shape Captions
   call: string
@@ -393,3 +398,18 @@ shape Page
 shape Reply
   ok: bool
   error: string
+
+// What the camera or Photos added to a composer, uploaded: error says why not.
+shape Attached
+  ok: bool
+  error: string
+  media: Media[]
+
+// Bassim's choices on this phone that the shell needs too: the call's sounds and haptics, and the
+// persona its Live Activity shows.
+shape PhonePrefs
+  sounds: bool
+  haptics: bool
+  persona: string
+  personaColor: string
+  palette: string

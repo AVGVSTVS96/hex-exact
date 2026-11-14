@@ -9,7 +9,11 @@ use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord,
 use Glass, Surface, endingOf, badEnding, lengthOf from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
-use Said, failedWords from "./said.contract"
+use Said, failedWords, unreached from "./said.contract"
+
+// How an answer from the call went out, as the stable app says it: " and cleared its Telegram
+// buttons", or which places were out of reach.
+fn reachedBy(ask: Ask, settled: number, missed: number): string = `${settled > 0 ? ` and cleared its ${missed > 0 ? "" : ["telegram", "discord"].filter(app => ask.places.filter(p => p.app == app).length > 0).map(app => app == "telegram" ? "Telegram " : "Discord ").join("and ")}buttons` : ""}${missed > 0 ? `. ${unreached(missed)}` : ""}`
 
 // One line of the live transcript: a caption, photos and videos Bassim sent (media, and note:
 // "sending", why not, or ""), or the call's ask at index `ask` (-1 for anything else).
@@ -214,7 +218,7 @@ component CallAskCard
       if sent != ""
         row gap=8 align-items="center"
           image "symbol:select-fill" width=18 height=18 object-fit="contain" color="hex.accent" aria-hidden=true
-          text `Sent “${sent}” to ${ask.topic}` font="-exact-subheadline" flex=1
+          text `Sent “${sent}” to ${ask.topic}${reachedBy(ask, card.settled, card.missed)}` font="-exact-subheadline" flex=1
       else
         row gap=8 align-items="center"
           button press=openTask(ask.task) appearance="none" testId=`call-ask-topic-${ask.id}`

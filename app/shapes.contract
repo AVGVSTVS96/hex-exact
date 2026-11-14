@@ -403,6 +403,10 @@ shape CallAsk
   ask: Ask
   answer: string
   answered: bool
+  // How the answer went out: how many of the ask's buttons in its places were cleared, and how
+  // many places were out of reach.
+  settled: number
+  missed: number
 
 shape Activity
   version: number

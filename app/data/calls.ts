@@ -33,6 +33,6 @@ export const calls: Partial<Sources> = {
       version: num(b.version),
       call: str(b.call),
       tasks: list(b.tasks, (t) => ({ id: str(t.id), state: str(t.state), text: str(t.text), to: str(t.to), line: str(t.line) })),
-      asks: list(b.asks, (c) => ({ at: at(c.at), ask: ask(obj(c.ask)), answer: str(c.answer), answered: c.answer !== undefined })),
+      asks: list(b.asks, (c) => ({ at: at(c.at), ask: ask(obj(c.ask)), answer: str(c.answer), answered: c.answer !== undefined, settled: num(obj(c.sent).settled), missed: num(obj(c.sent).missed) })),
     })),
 };

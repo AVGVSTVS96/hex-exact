@@ -89,7 +89,7 @@ component Home
 
   // The wrap-up of the call that just ended here (the call its words are from), once hex has
   // written one.
-  derive last = match calls.calls.filter(c => c.id == captions.call).at(0) { case some(c) => c, case none => CallRow(id="", started=0, ended=0, ending="", source="", voice="", title="", reason="", why="", summary="", waiting=[], seconds=0, tasks=0, preview="", live=false) }
+  derive last = match calls.calls.filter(c => c.id == captions.call).at(0) { case some(c) => c, case none => CallRow(id="", started=0, ended=0, ending="", source="", voice="", title="", why="", summary="", waiting=[], seconds=0, tasks=0, preview="", live=false) }
   derive wrapped = status == "idle" and call.ending != "" and last.id != "" and not last.live and (last.title != "" or last.summary != "" or last.waiting.length > 0)
 
   // What hex is doing for the call: the first running task, or for a moment the one that just

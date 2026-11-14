@@ -27,7 +27,7 @@ final class Hex: ExactModule {
   }
 
   static let idle: [String: Any] = [
-    "status": "idle", "id": "", "muted": false, "hexMuted": false, "interrupted": false,
+    "status": "idle", "id": "", "muted": false, "interrupted": false,
     "started": 0, "error": "", "ending": "", "seconds": 0, "shell": false, "demo": false,
   ]
 

@@ -259,7 +259,7 @@ component TaskBody
               for s in sortBy(task.steps, s => s.at, "desc").slice(0, 3) key=s.id
                 row gap=10 align-items="baseline"
                   text kindWord(s.kind) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" width="5.5rem" flex-shrink=0
-                  text (s.brief != "" and s.kind != "say" and s.kind != "think" ? s.text : s.text) font="-exact-subheadline" line-clamp=2 flex=1 color=(s.state == "failed" ? "hex.danger" : "-exact-label")
+                  text s.text font="-exact-subheadline" line-clamp=2 flex=1 color=(s.state == "failed" ? "hex.danger" : "-exact-label")
               link href=path("steps", id) testId="task-steps"
                 text (task.agents.length > 0 ? `All steps · ${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : "All steps") flex=1 line-clamp=1
           if kind == "task"

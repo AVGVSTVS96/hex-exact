@@ -88,7 +88,6 @@ enum Bridge {
       "status": call.status.rawValue,
       "id": call.id ?? "",
       "muted": call.muted,
-      "hexMuted": false,
       "interrupted": call.interrupted,
       "started": (call.started?.timeIntervalSince1970 ?? 0) * 1000,
       "error": call.failure ?? "",

@@ -57,7 +57,6 @@ shape CallState
   status: string
   id: string
   muted: bool
-  hexMuted: bool
   interrupted: bool
   started: number
   error: string
@@ -135,7 +134,6 @@ shape Stuck
   action: string
   mark: string
   at: number
-  request: string
   sent: bool
 
 shape Fresh
@@ -269,7 +267,6 @@ shape Step
   detail: string
   result: string
   agent: string
-  brief: string
 
 shape PlanItem
   text: string
@@ -350,7 +347,6 @@ shape CallRow
   source: string
   voice: string
   title: string
-  reason: string
   why: string
   summary: string
   waiting: string[]

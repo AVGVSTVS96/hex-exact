@@ -8,7 +8,7 @@ import { at, bool, list, num, obj, str, type Json } from './parse.ts';
 const track = (t: Json) => ({ at: at(t.at), state: str(t.state) });
 const step = (s: Json, i: number) => ({
   id: str(s.id) || `${i}`, at: at(s.at), ended: at(s.end), kind: str(s.kind), text: str(s.text), state: str(s.state),
-  detail: str(s.detail), result: str(s.result), agent: str(s.agent), brief: str(s.brief),
+  detail: str(s.detail), result: str(s.result), agent: str(s.agent),
 });
 // via: the app the agent runs in (t3 opens it in T3 Code). Its steps come only on a task's page.
 const agent = (a: Json) => ({

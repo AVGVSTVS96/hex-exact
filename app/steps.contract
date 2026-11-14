@@ -17,7 +17,7 @@ shape Turn
 fn says(steps: Step[]): number = steps.filter(s => s.kind == "say").length
 fn turnIndex(asc: Step[], i: number): number = says(asc.slice(0, i))
 fn turnsOf(steps: Step[], running: bool, now: number, offset: number): Turn[] = range(says(sortBy(steps, s => s.at)) + 1).map(n => turnOf(sortBy(steps, s => s.at), n, says(sortBy(steps, s => s.at)), running, now, offset)).filter(t => t.steps.length > 0).slice(0, 40)
-fn blankStep(): Step = Step(id="", at=0, ended=0, kind="", text="", state="", detail="", result="", agent="", brief="")
+fn blankStep(): Step = Step(id="", at=0, ended=0, kind="", text="", state="", detail="", result="", agent="")
 fn stepAt(asc: Step[], i: number): Step = match asc.at(i) { case some(s) => s, case none => blankStep() }
 fn turnSteps(asc: Step[], n: number): Step[] = range(asc.length).filter(i => turnIndex(asc, i) == n).map(i => stepAt(asc, i))
 fn turnOf(asc: Step[], n: number, last: number, running: bool, now: number, offset: number): Turn = Turn(n=n, title=(n == last ? (running ? "Now" : "Since its last message") : match turnSteps(asc, n).at(-1) { case some(s) => `Said ${whenOf(s.at, now, offset)}`, case none => "" }), steps=sortBy(turnSteps(asc, n), s => s.at, "desc"), start=0, end=0)

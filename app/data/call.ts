@@ -8,7 +8,7 @@ import { bool, list, num, obj, str, type Json } from './parse.ts';
 // bake) they answer idle.
 
 const idle: Result<'callState'> = {
-  status: 'idle', id: '', muted: false, hexMuted: false, interrupted: false, started: 0, error: '', ending: '', seconds: 0, shell: false, demo: false,
+  status: 'idle', id: '', muted: false, interrupted: false, started: 0, error: '', ending: '', seconds: 0, shell: false, demo: false,
 };
 
 const NO_SHELL = 'Calls run in the hex Exact app on the phone.';
@@ -21,7 +21,7 @@ export const call: Partial<Sources> = {
     native.watch('call');
     const s = native.call({ op: 'call' });
     return {
-      status: str(s.status) || 'idle', id: str(s.id), muted: bool(s.muted), hexMuted: bool(s.hexMuted), interrupted: bool(s.interrupted),
+      status: str(s.status) || 'idle', id: str(s.id), muted: bool(s.muted), interrupted: bool(s.interrupted),
       started: num(s.started), error: str(s.error), ending: str(s.ending), seconds: num(s.seconds), shell: bool(s.shell), demo: bool(s.demo),
     };
   },

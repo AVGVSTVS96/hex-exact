@@ -88,7 +88,7 @@ component HexHome
           else
             box width=60 height=60
           text "hex" font="-exact-headline" margin-top=8
-          button press=goLive disabled=(liveId == "") appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=7 max-width="100%" min-height=22 margin-top=2 aria-live="polite" aria-label=(liveId == "" ? "Nothing running" : `hex is working on ${liveTopic}: ${liveLine}`) testId="live-line"
+          button press=goLive disabled=(liveId == "") appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=7 max-width="100%" min-width=44 min-height=22 margin-top=2 aria-live="polite" aria-label=(liveId == "" ? "Nothing running" : `hex is working on ${liveTopic}: ${liveLine}`) testId="live-line"
             if liveId != ""
               row gap=3 flex-shrink=0 aria-hidden=true
                 for i in [0, 1, 2] key=i

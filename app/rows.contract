@@ -208,5 +208,7 @@ component DecidedLines
     column flex=1 min-width=0 gap=2
       text ask.topic font="-exact-headline" line-clamp=1
       text ask.question font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+      if ask.took != ""
+        text `✦ ${ask.took}` font="-exact-subheadline" font-weight=600 color="hex.accent" line-clamp=1
       if word.id != ""
         text failedWords(word) font="-exact-footnote" color="hex.danger"

@@ -161,6 +161,8 @@ component DecidedCard
         button press=undo(ask.id) appearance="none" padding="4px 11px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-card-undo-${ask.id}`
           text "Undo" font="-exact-footnote" font-weight=600
       text ask.question font="-exact-title3" font-weight=600
+      if ask.took != ""
+        text `✦ ${ask.took}` font="-exact-headline" color="hex.accent"
       if ask.why != ""
         text ask.why font="-exact-body" color="-exact-label" user-select="text"
       if failed != ""

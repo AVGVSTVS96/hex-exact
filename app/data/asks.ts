@@ -31,6 +31,7 @@ export const ask = (a: Json): Ask => ({
   places: list(a.places, place),
   was: strings(a.was),
   decided: at(a.decided),
+  took: str(a.took),
 });
 
 // id: the ask it's about, so the screen knows which question the reply settles.

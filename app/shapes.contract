@@ -108,7 +108,8 @@ shape Place
 
 // kind: ask | do | pick … as hex names it. was: this ask's earlier ids (a draft carries over).
 // decided: when hex took it off Bassim's list to decide itself (0 while it's his), and why says
-// why that's hex's call; on an open ask, why says why hex picks what it does.
+// why that's hex's call; on an open ask, why says why hex picks what it does. took: the pick hex
+// answered with ("" when hex decided it another way).
 shape Ask
   id: string
   kind: string
@@ -127,6 +128,7 @@ shape Ask
   places: Place[]
   was: string[]
   decided: number
+  took: string
 
 // mark: paused | failed. sent: hex has already been asked to act.
 shape Stuck

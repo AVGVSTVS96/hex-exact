@@ -383,7 +383,7 @@ Endings: you / hex / dropped / expired / no-connect / no-answer / busy.
 
 | Method | Path | Response / body |
 |---|---|---|
-| GET | `/asks?after=` | `{version, asks:[Ask], stuck:[{id, app, title, why, action, mark: paused\|failed, at, request?, sent?}], fresh:[{id, app, topic, title, line, at, read}], check:{at, why, fixed, flagged}\|null}`. Ask = `{id, kind, task, app, topic, at, question, context?, why?, options:[{label, value?, pick?, shot?, shape?, detail?}], multiple?, pictures?:[{id, shape?}], links?:[{label, url}], places:[{app, place, task?, call?, link?}], tag?, was?:[ids]}`; `decided:[Ask & {decided, why}]`, what the check handed back to hex in the last week (hex server since AVGVSTVS96/hex#369) |
+| GET | `/asks?after=` | `{version, asks:[Ask], stuck:[{id, app, title, why, action, mark: paused\|failed, at, request?, sent?}], fresh:[{id, app, topic, title, line, at, read}], check:{at, why, fixed, flagged}\|null}`. Ask = `{id, kind, task, app, topic, at, question, context?, why?, options:[{label, value?, pick?, shot?, shape?, detail?}], multiple?, pictures?:[{id, shape?}], links?:[{label, url}], places:[{app, place, task?, call?, link?}], tag?, was?:[ids]}`; `decided:[Ask & {decided, why, took?}]`, what hex decided in the last week: what the check handed back to it, and the picks it took (hex server since AVGVSTVS96/hex#369, picks with `VOICE_TAKES_PICKS=1`) |
 | GET | `/asks/check` | `{at, why, read:{what: n}, fixed:[{title, text, did?}], flagged:[…]}`; 404 if no check yet |
 | GET | `/asks/:id/words` | `{place, at?, text}` (the original message); 404 |
 | GET | `/asks/:id/shots/:n` | image |

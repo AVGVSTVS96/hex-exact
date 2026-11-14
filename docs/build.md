@@ -69,10 +69,11 @@ Album(media, width) · Thumb(media, width, square)   pictures (the hex-media vie
 
 **Questions** look the same everywhere: `AskCard` (ask.contract) sits flat on the page, in a
 `section background-color="transparent"`, and every answer on the task page, the pick page and the
-call is an `AnswerRow`. **hex decided** is `asks.decided`: what hex's check took off Needs you
-in the last week as hex's own call, with its reason. Home and Tasks both read it; a question hex
-only has a pick for still needs Bassim and stays in Needs you ("hex picked for N · Take them").
-`undo` on a decided one puts it back on Needs you, and hex won't take it again.
+call is an `AnswerRow`. **hex decided** is `asks.decided`, the last week of what hex decided
+itself: questions it answered with its own pick (`took`; money ones stay in Needs you) and ones
+its check handed back to it, each with its reason. hex's server makes that call, so Home, Tasks
+and their counts agree without a rule of their own. `undo` on a decided one puts it back on Needs
+you, and hex won't take it again.
 
 A composer passes its key (`thread:<id>`, `ask:<id>`): root `attach(key, source)` picks and
 uploads, `attached` (Media[]) holds them while `attachedTo == key`, `detach(id)` takes one out.

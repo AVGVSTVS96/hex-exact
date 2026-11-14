@@ -53,6 +53,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     window.makeKeyAndVisible()
     self.window = window
     options.urlContexts.first.map { open($0.url) }
+    // A launch argument (`-HexOpen <link>`) opens a link too, without the prompt iOS shows before
+    // `simctl openurl` hands one over (scripts/sim).
+    UserDefaults.standard.string(forKey: "HexOpen").flatMap(URL.init(string:)).map { open($0) }
   }
 
   func sceneDidBecomeActive(_ scene: UIScene) {

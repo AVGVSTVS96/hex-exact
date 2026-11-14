@@ -77,14 +77,16 @@ for pose in $poses; do
   hubdo orientation "$orientation"; sleep 1; hubdo orientation "$orientation"
   for appearance in $appearances; do
     xcrun simctl ui "$id" appearance "$appearance"
-    xcrun simctl launch --terminate-running-process "$id" com.shahidy.hexexact >/dev/null
-    sleep 4
     for path in "$@"; do
+      # Each screen is a fresh launch handed its link, as `simctl openurl` stops at iOS's
+      # "Open in" prompt.
       case $path in
         # The demo call, then the screen: its live state shot a few lines in.
-        call:*) xcrun simctl openurl "$id" "hexexact://demo${path#call:}"; sleep ${DEMO_WAIT:-12} ;;
-        *) xcrun simctl openurl "$id" "hexexact://go$path"; sleep 3 ;;
+        call:*) link="hexexact://demo${path#call:}" wait=${DEMO_WAIT:-12} ;;
+        *) link="hexexact://go$path" wait=3 ;;
       esac
+      xcrun simctl launch --terminate-running-process "$id" com.shahidy.hexexact -HexOpen "$link" >/dev/null
+      sleep $((wait + 4))
       name=$(echo "${path#/}" | tr '/:' '__'); name=${name:-home}
       xcrun simctl io "$id" screenshot --display=$display "$out/$name-$pose-$appearance.png" >/dev/null 2>&1
       # A path with report=pose leaves the shell's pose beside its shot.

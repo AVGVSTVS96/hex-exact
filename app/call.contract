@@ -70,7 +70,7 @@ component Home
     setReading: action
 
   // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
-  derive elsewhere = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0
+  derive elsewhere = isElsewhere(call, activity, liveRecord)
   derive status = elsewhere ? (leaving ? "ending" : "live") : call.status
   derive live = status == "live"
   derive here = live and not elsewhere
@@ -87,8 +87,7 @@ component Home
   // The call's words and its asks, in the order they came. The last call's stay until the next. The
   // shell stamps its words in epoch ms and hex its asks in ms into the call, as it does a call's
   // record.
-  derive spoken = elsewhere ? liveRecord.turns.map((t, i) => Line(id=`r${i}`, at=t.at, who=(t.who == "you" ? "you" : "hex"), text=t.text, ask=-1, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1, media=t.media, note=t.note))
-  derive lines = sortBy(spoken.concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=(elsewhere ? c.at : call.started + c.at), who="hex", text="", ask=i, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : []), l => l.at)
+  derive lines = linesOf(call, captions, activity, liveRecord, live)
   derive talking = lines.length > 0
   derive elapsed = elsewhere ? liveRecord.call.started : call.started
 
@@ -124,21 +123,19 @@ component Home
   // orb above the fold and the words below.
   derive W = viewport.width
   derive H = viewport.height
-  derive barSide = pose.bar == "left" and viewport.safeAreaLeft > 0 ? "left" : pose.bar == "right" and viewport.safeAreaRight > 0 ? "right" : ""
+  derive barSide = barOf(viewport, pose)
   derive columned = barSide != ""
-  derive columnW = barSide == "left" ? viewport.safeAreaLeft : barSide == "right" ? viewport.safeAreaRight : 0
+  derive columnW = columnWidth(viewport, pose)
   derive columnX = barSide == "left" ? 0 : W - columnW
-  derive covers = pose.occlusions.filter(o => o.x < columnX + columnW and o.x + o.width > columnX)
-  derive columnTop = max(max(top, 16), largest(covers.filter(o => o.y + o.height / 2 < H / 2).map(o => o.y + o.height + 8)))
-  derive columnFoot = max(max(viewport.safeAreaBottom, 12), largest(covers.filter(o => o.y + o.height / 2 >= H / 2).map(o => H - o.y + 8)))
-  // The column's middle is the system's: its status items' (the camera's ring), else the column's.
-  derive columnMid = match covers.filter(o => o.width < columnW).at(0) { case some(o) => o.x + o.width / 2, case none => columnX + columnW / 2 }
+  derive columnTop = columnTopOf(viewport, pose)
+  derive columnFoot = columnFootOf(viewport, pose)
+  derive columnMid = columnMidOf(viewport, pose)
   derive tight = H < 520
   derive muteSize = columned and tight ? 48 : 60
   derive callSize = columned and tight ? 56 : columned ? 64 : 72
   derive banded = (book or laptop) and not columned
   // The band's widest stretch clear of the camera.
-  derive bandSpan = widestClear(16, W - 16, pose.occlusions.filter(o => o.y + o.height / 2 < top))
+  derive bandSpan = bandOf(viewport, pose)
   derive left = barSide == "left" ? columnW : 0
   derive right = barSide == "right" ? columnW : 0
   derive contentW = W - left - right
@@ -236,24 +233,7 @@ component Home
           text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
         if single and footerBad
           text footer font="-exact-footnote" color="-exact-system-red" text-align="center" padding="0 20px 6px" testId="words-trouble"
-        list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 20px" mask-image="linear-gradient(to bottom, transparent 0, #000 24px, #000 94%, transparent 100%)"
-          for l in lines key=l.id
-            column
-              if l.ask >= 0
-                for c in activity.asks.slice(l.ask, l.ask + 1) key=c.ask.id
-                  CallAskCard(card=c, said=said.filter(s => s.id == c.ask.id and s.verb == "answer"), haptics=haptics, answer=answer, answerMany=answerMany, openTask=openTask)
-              else if l.media.length > 0
-                column align-items="flex-end" gap=4 padding="4px 0" testId=`line-${l.id}`
-                  box opacity=(l.note == "sending" ? 0.6 : 1)
-                    Album(media=l.media, width=min(contentW * 0.6, 260))
-                  if l.note == "sending"
-                    text "Sending" font="-exact-caption1" color="-exact-secondary-label"
-                  else if l.note != ""
-                    button press=reshare(l.id.slice(1)) disabled=(not live) appearance="none" testId=`reshare-${l.id}`
-                      text `Not sent · ${l.note}${live ? " · Tap to try again" : ""}` font="-exact-caption1" color="-exact-system-red" text-align="end"
-              else
-                row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
-                  text l.text user-select="text" max-width=(l.who == "you" ? "82%" : "100%") font=(l.who == "you" ? "-exact-body" : "-exact-title3") font-weight=(l.who == "you" ? 400 : 500) color=(l.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(l.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(l.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word" testId=`line-${l.id}`
+        CallWords(lines=lines, asks=activity.asks, said=said, width=contentW, live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
 
       // The agent line: what hex is doing for this call; tap for the Working tab.
       if agentShown
@@ -287,8 +267,124 @@ component Home
           else
             box width=60 height=60
 
+// A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
+fn isElsewhere(call: CallState, activity: Activity, liveRecord: CallRecord): bool = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0
+// The call's words and its asks, in the order they came. The last call's stay until the next. The
+// shell stamps its words in epoch ms and hex its asks in ms into the call, as it does a call's
+// record.
+fn linesOf(call: CallState, captions: Captions, activity: Activity, liveRecord: CallRecord, live: bool): Line[] = sortBy((isElsewhere(call, activity, liveRecord) ? liveRecord.turns.map((t, i) => Line(id=`r${i}`, at=t.at, who=(t.who == "you" ? "you" : "hex"), text=t.text, ask=-1, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1, media=t.media, note=t.note))).concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=(isElsewhere(call, activity, liveRecord) ? c.at : call.started + c.at), who="hex", text="", ask=i, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : []), l => l.at)
+
+// What was said, as it was said: hex's words large, Bassim's in a bubble, photos and videos he sent,
+// and the questions hex put on screen.
+component CallWords
+  inject
+    haptics: bool
+  props
+    lines: Line[]
+    asks: CallAsk[]
+    said: Said[]
+    width: number
+    live: bool
+    answer: action
+    answerMany: action
+    openTask: action
+    reshare: action
+  view
+    list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 20px" mask-image="linear-gradient(to bottom, transparent 0, #000 24px, #000 94%, transparent 100%)"
+      for l in lines key=l.id
+        column
+          if l.ask >= 0
+            for c in asks.slice(l.ask, l.ask + 1) key=c.ask.id
+              CallAskCard(card=c, said=said.filter(s => s.id == c.ask.id and s.verb == "answer"), haptics=haptics, answer=answer, answerMany=answerMany, openTask=openTask)
+          else if l.media.length > 0
+            column align-items="flex-end" gap=4 padding="4px 0" testId=`line-${l.id}`
+              box opacity=(l.note == "sending" ? 0.6 : 1)
+                Album(media=l.media, width=min(width * 0.6, 260))
+              if l.note == "sending"
+                text "Sending" font="-exact-caption1" color="-exact-secondary-label"
+              else if l.note != ""
+                button press=reshare(l.id.slice(1)) disabled=(not live) appearance="none" testId=`reshare-${l.id}`
+                  text `Not sent · ${l.note}${live ? " · Tap to try again" : ""}` font="-exact-caption1" color="-exact-system-red" text-align="end"
+          else
+            row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
+              text l.text user-select="text" max-width=(l.who == "you" ? "82%" : "100%") font=(l.who == "you" ? "-exact-body" : "-exact-title3") font-weight=(l.who == "you" ? 400 : 500) color=(l.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(l.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(l.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word" testId=`line-${l.id}`
+
+// The call while Tasks, Calls or Settings cover Home on the Duo: hex's orb small, the call's clock
+// and its buttons, down the side column or across the band beside the camera. A tap on the orb goes
+// back to the call. On a book fold with Tasks open, Words puts the call's words on the left screen,
+// beside the page.
+component CallDock
+  inject
+    haptics: bool
+  props
+    viewport: Viewport
+    pose: Pose
+    call: CallState
+    activity: Activity
+    liveRecord: CallRecord
+    persona: string
+    personaColor: string
+    palette: string
+    leaving: bool
+    tasksOpen: bool
+    beside: bool
+    mute: action
+    end: action
+    hangUp: action
+    home: action
+    toggleBeside: action
+  derive elsewhere = isElsewhere(call, activity, liveRecord)
+  derive status = elsewhere ? (leaving ? "ending" : "live") : call.status
+  derive columned = barOf(viewport, pose) != ""
+  derive mid = columnMidOf(viewport, pose)
+  derive tight = viewport.height < 520
+  derive band = bandOf(viewport, pose)
+  derive started = elsewhere ? liveRecord.call.started : call.started
+  derive micOff = call.muted or call.interrupted
+  derive book = viewport.horizontalViewportSegments == 2
+  action stop
+    if elsewhere
+      hangUp(activity.call)
+    else
+      end()
+  view
+    if columned
+      column position="absolute" top=columnTopOf(viewport, pose) bottom=columnFootOf(viewport, pose) left=(mid - 28) width=56 align-items="center" justify-content="space-between" z-index=20 testId="call-dock"
+        column align-items="center" gap=8
+          button press=home appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
+            hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=34 height=34
+          if status == "live"
+            time datetime=started format="timer" font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
+          if book and tasksOpen
+            button press=toggleBeside appearance="none" width=44 height=44 border-radius=22 backgroundMaterial="glass" background-color=(beside ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(beside ? "Show Tasks beside the page" : "Show the transcript beside Tasks") aria-pressed=beside -exact-press-haptic=(haptics ? "selection" : "none") testId="dock-beside"
+              image "symbol:sf/text.bubble" width=18 height=18 object-fit="contain" color=(beside ? "AccentColor" : "-exact-label")
+        column align-items="center" gap=(tight ? 10 : 14)
+          if not elsewhere
+            MuteButton(size=48, mute=mute, micOff=micOff, hushed=false, disabled=(status != "live" or not call.shell))
+          CallButton(size=(tight ? 48 : 56), status=status, busy=(status != "live"), retry=false, primary=stop)
+    else
+      row position="absolute" top=max(viewport.safeAreaTop / 2 + 7 - 22, 4) right=(viewport.width - band.x - band.width) gap=10 align-items="center" z-index=20 testId="call-dock"
+        button press=home appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
+          hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=34 height=34
+        if status == "live"
+          time datetime=started format="timer" font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-secondary-label" min-width=44
+        if not elsewhere
+          MuteButton(size=44, mute=mute, micOff=micOff, hushed=false, disabled=(status != "live" or not call.shell))
+        CallButton(size=44, status=status, busy=(status != "live"), retry=false, primary=stop)
+
 // The widest stretch of [from, to] clear of every box in `taken`, 12 points off each.
 fn widestClear(from: number, to: number, taken: Rect[]): Span = match sortBy(range(taken.length + 1).map(i => Span(x=(i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from }), width=((i == taken.length ? to : match sortBy(taken, t => t.x).at(i) { case some(t) => t.x - 12, case none => to }) - (i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from })))), s => s.width, "desc").at(0) { case some(s) => s, case none => Span(x=from, width=to - from) }
+// The Duo's side column: the side the system bars take ("" when none), how wide, where its tools
+// start below a camera, where its buttons end above one, and its middle, the system's own: its status
+// items' (the camera's ring), else the column's.
+fn barOf(v: Viewport, p: Pose): string = p.bar == "left" and v.safeAreaLeft > 0 ? "left" : p.bar == "right" and v.safeAreaRight > 0 ? "right" : ""
+fn columnWidth(v: Viewport, p: Pose): number = barOf(v, p) == "left" ? v.safeAreaLeft : barOf(v, p) == "right" ? v.safeAreaRight : 0
+fn coversOf(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.x < (barOf(v, p) == "left" ? 0 : v.width - columnWidth(v, p)) + columnWidth(v, p) and o.x + o.width > (barOf(v, p) == "left" ? 0 : v.width - columnWidth(v, p)))
+fn columnTopOf(v: Viewport, p: Pose): number = max(max(v.safeAreaTop, 16), largest(coversOf(v, p).filter(o => o.y + o.height / 2 < v.height / 2).map(o => o.y + o.height + 8)))
+fn columnFootOf(v: Viewport, p: Pose): number = max(max(v.safeAreaBottom, 12), largest(coversOf(v, p).filter(o => o.y + o.height / 2 >= v.height / 2).map(o => v.height - o.y + 8)))
+fn columnMidOf(v: Viewport, p: Pose): number = match coversOf(v, p).filter(o => o.width < columnWidth(v, p)).at(0) { case some(o) => o.x + o.width / 2, case none => (barOf(v, p) == "left" ? 0 : v.width - columnWidth(v, p)) + columnWidth(v, p) / 2 }
+// The top band of a fold with no side column, clear of its camera.
+fn bandOf(v: Viewport, p: Pose): Span = widestClear(16, v.width - 16, p.occlusions.filter(o => o.y + o.height / 2 < v.safeAreaTop))
 fn largest(xs: number[]): number = match sortBy(xs, x => x, "desc").at(0) { case some(x) => x, case none => 0 }
 
 shape Span

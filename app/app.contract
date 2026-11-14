@@ -3,7 +3,7 @@
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
 use CallRow, Viewport, Pose, Delivery, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
-use Home from "./call.contract"
+use Home, CallDock, CallWords, linesOf, isElsewhere from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
 use TasksList from "./tasks.contract"
@@ -84,6 +84,8 @@ component App
   state agentDone = ""
   // On a phone and the cover screen: the call's words pulled up to read, the orb docked.
   state reading = false
+  // On a book fold with Tasks open during a call: the call's words on the left screen, beside the page.
+  state besideWords = false
   // Milliseconds since launch, a minute at a time: "Today", "3 min ago" and the like move on.
   state tick = 0
 
@@ -196,6 +198,9 @@ component App
   derive firstWords = match captions.turns.at(0) { case some(t) => t.at, case none => 0 }
   derive heard = match captions.turns.filter(t => t.who == "you" and t.text != "").at(0) { case some(t) => t.text.trim().slice(0, 160), case none => "" }
   derive callsShown = endedHere ? Calls(calls, calls=[CallRow(id=captions.call, started=firstWords, ended=firstWords + call.seconds * 1000, ending=call.ending, source="app", voice=voice, title="", reason="", why="", summary="", waiting=[], seconds=call.seconds, tasks=0, preview=heard, live=false)].concat(calls.calls)) : calls
+  // A call on, here or held elsewhere, and a Duo pose with a side column or a band for it.
+  derive callOn = call.status != "idle" or isElsewhere(call, activity, liveRecord)
+  derive duo = (pose.bar != "" and (viewport.safeAreaLeft > 0 or viewport.safeAreaRight > 0)) or viewport.horizontalViewportSegments == 2 or viewport.verticalViewportSegments == 2
   derive removeError = pending(removed) ? "" : match removed { case some(r) => r.error, case none => "" }
 
   task minute mount
@@ -230,6 +235,8 @@ component App
     reading = true
   action restWords
     reading = false
+  action toggleBeside
+    besideWords = not besideWords
   action setReading(on: bool)
     reading = on
     if haptics
@@ -520,6 +527,13 @@ component App
         if e.name == "words"
           YourWords(entry=e, words=settings.words, set=setSetting, back=back)
       input id="opened" display="none" change=heardOpen
+      // Over Tasks, Calls and Settings on the Duo during a call: the call, docked in the side column
+      // or the band; on a book fold, its words beside Tasks' page.
+      if callOn and place.name != "home" and duo
+        if besideWords and viewport.horizontalViewportSegments == 2 and names.includes("tasks")
+          column position="absolute" top=0 bottom=0 left=0 width="env(viewport-segment-width 0 0)" padding-top=(viewport.safeAreaTop + 12) padding-bottom=(max(viewport.safeAreaBottom, 12) + 12) background-color="-exact-background" z-index=19 testId="words-beside"
+            CallWords(lines=linesOf(call, captions, activity, liveRecord, true), asks=activity.asks, said=saids, width=min(viewport.width / 2, 455), live=true, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
+        CallDock(viewport=viewport, pose=pose, call=call, activity=activity, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), leaving=pending(commanded), tasksOpen=names.includes("tasks"), beside=besideWords, mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, home=home, toggleBeside=toggleBeside)
       // Over every screen: a new build is on the install link. Keyed by whether the app is in front,
       // so coming back from an install that didn't happen offers it again.
       for v in [page.visibilityState] key=v

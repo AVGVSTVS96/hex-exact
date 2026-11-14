@@ -1,20 +1,49 @@
-// A question from hex (§9.3), as a task's page shows it: flat on the page, no box around it. The
-// question, what it's about and where it came from, then its answers as one kind of row, hex's pick
-// marked in mint; a few short answers sit side by side. Bassim can also answer in his own words, or
-// say it isn't needed. Once answered it folds to what he said, with Undo.
+// A question from hex (§9.3), flat on the page: no card and no box inside it. Which question it is
+// and when, the question, what it's about in reading text, and a small "Why" that opens the message
+// it came from; then every answer as one kind of row, hex's pick marked in mint, and his own words
+// as the last row. Once answered it folds to what he said, with Undo.
 use Ask, Words, Media from "./shapes.contract"
 use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
 use Mark, whenOf from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
-// A few short answers fit side by side.
-fn evenRow(a: Ask): bool = a.options.length > 0 and a.options.length <= 3 and not a.multiple and a.options.filter(o => o.label.length > 14 or o.detail != "").length == 0
+fn questionWord(n: number, of: number): string = of > 1 ? `Question ${n} of ${of}` : "Question"
+
+// One answer to a question, the same row everywhere a question shows: a ring (filled when chosen,
+// mint for hex's pick), its words and what they mean, and "✦ hex’s pick" at its end.
+component AnswerRow
+  inject
+    haptics: bool
+  props
+    label: string
+    detail: string
+    pick: bool
+    chosen: bool
+    // radio: one answer; check: one of several; "" for a row that only shows.
+    role: string
+    disabled: bool
+    id: string
+    press: action
+  view
+    button press=press disabled=disabled appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") role=(role == "check" ? "checkbox" : role == "radio" ? "radio" : "button") aria-checked=chosen aria-label=(pick ? `${label}, hex’s pick` : label) testId=id
+      box width=22 height=22 border-radius=11 flex-shrink=0 box-sizing="border-box" border=(chosen ? "none" : pick ? "1.5px solid hex.accent" : "1.5px solid -exact-tertiary-label") background-color=(chosen ? "AccentColor" : "transparent") display="flex" align-items="center" justify-content="center" aria-hidden=true
+        if chosen
+          image "symbol:checkmark" width=11 height=11 object-fit="contain" color="ink.on-accent"
+      column flex=1 min-width=0 gap=2
+        text label font="-exact-body" color="-exact-label"
+        if detail != ""
+          text detail font="-exact-subheadline" color="-exact-secondary-label"
+      if pick
+        text "✦ hex’s pick" font="-exact-footnote" font-weight=500 color="hex.accent" white-space="nowrap"
 
 component AskCard
   inject
     haptics: bool
   props
     ask: Ask
+    // Which of the page's questions this is, and how many it has.
+    n: number
+    of: number
     now: number
     offset: number
     said: Said
@@ -41,14 +70,12 @@ component AskCard
   action choose(label: string)
     if ask.multiple
       chosen = chosen.includes(label) ? chosen.filter(c => c != label) : chosen.concat([label])
-      if haptics
-        haptic("selection")
     else
       answer(ask.id, label)
   action fold
     folded = not folded
   view
-    column gap=12 padding="14px 0 10px" testId=`ask-card-${ask.id}`
+    column gap=8 padding="10px 0 14px" testId=`ask-card-${ask.id}`
       if answered
         row gap=12 align-items="flex-start"
           Mark(state="done", size=22)
@@ -64,30 +91,33 @@ component AskCard
             text "Undo" font="-exact-subheadline" font-weight=600
       else
         row gap=8 align-items="center"
-          text whenOf(ask.at, now, offset) font="-exact-footnote" color="-exact-secondary-label" font-variant-numeric="tabular-nums" flex=1
+          box width=8 height=8 border-radius=4 background-color="hex.ask" flex-shrink=0 aria-hidden=true
+          text `${questionWord(n, of)}${ask.at > 0 ? ` · ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-footnote" color="-exact-secondary-label" font-variant-numeric="tabular-nums" line-clamp=1
           if ask.tag != ""
-            text ask.tag font="-exact-caption1" font-weight=600 color="hex.ask" padding="2px 8px" border-radius=999 background-color="hex.ask.wash"
-          button press=dismiss(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-dismiss-${ask.id}`
-            text "Not needed" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+            text `· ${ask.tag}` font="-exact-footnote" font-weight=600 color="hex.ask" white-space="nowrap"
+          box flex=1
+          button press=dismiss(ask.id) appearance="none" padding="4px 11px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-dismiss-${ask.id}`
+            text "Not needed" font="-exact-footnote" font-weight=600
         button press=fold appearance="none" text-align="left" aria-expanded=(not folded) testId=`ask-fold-${ask.id}`
           text ask.question font="-exact-title3" font-weight=600 line-clamp=(folded ? 2 : 0)
-        if ask.context != "" and not folded
-          text ask.context font="-exact-body" color="-exact-secondary-label" user-select="text"
         if not folded
-          button press=showWords(ask.id) appearance="none" display="flex" flex-direction="row" gap=4 align-items="center" aria-expanded=wordsOpen testId=`ask-from-${ask.id}`
-            text `From ${from}${ask.at > 0 ? ` · ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-footnote" font-weight=600 color="hex.accent"
-            image (wordsOpen ? "symbol:sf/chevron.up" : "symbol:sf/chevron.down") width=10 height=10 object-fit="contain" color="hex.accent"
+          if ask.context != ""
+            text ask.context font="-exact-body" color="-exact-label" user-select="text"
+          button press=showWords(ask.id) appearance="none" display="flex" flex-direction="row" gap=6 align-items="center" padding="2px 0" aria-expanded=wordsOpen aria-label=`Why: the message from ${from}` testId=`ask-from-${ask.id}`
+            text "Why" font="-exact-subheadline" font-weight=600 color="-exact-label"
+            text `· from ${from}${ask.at > 0 ? `, ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1 flex-shrink=1
+            image "symbol:forward-chevron" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" rotate=(wordsOpen ? "90deg" : "0deg") transition="rotate 200ms ease"
           if wordsOpen
-            column padding="10px 12px" border-radius=12 background-color="-exact-tertiary-fill" gap=4
+            column gap=4 padding="2px 0 4px 12px" border-left="2px solid -exact-separator"
               if words.text == ""
                 progress aria-label="Loading the message"
               else
-                text words.text markup="markdown" font="-exact-subheadline" user-select="text"
+                text words.text markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
           if ask.links.length > 0
-            row gap=8 flex-wrap="wrap"
+            row gap=14 flex-wrap="wrap"
               for l in ask.links key=l.url
-                link href=l.url padding="5px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`ask-link-${l.label}`
-                  text `${l.label} ↗` font="-exact-footnote" font-weight=600
+                link href=l.url testId=`ask-link-${l.label}`
+                  text `${l.label} ↗` font="-exact-subheadline" font-weight=600
         if ask.pictures.length > 0 and not folded
           Pictures(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=width, height=300)
         if shots.length > 0
@@ -96,35 +126,45 @@ component AskCard
               for o in shots key=o.label
                 column gap=6 align-items="center" width=(shotsTall * shapeOf(o.aspect)) flex-shrink=0
                   Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=(shotsTall * shapeOf(o.aspect)), square=false)
-                  button press=choose(o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-shot-${ask.id}-${o.label}`
-                    text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-footnote" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label") line-clamp=1
-        if evenRow(ask)
-          row gap=8
-            for o in ask.options.filter(o => o.shot < 0) key=o.label
-              button press=choose(o.label) appearance="none" flex=1 min-width=0 padding="11px 8px" border-radius=12 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`ask-option-${ask.id}-${o.label}`
-                text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 text-align="center" color=(o.pick ? "hex.accent" : "-exact-label")
-        else
-          column border-top="0.5px solid -exact-separator"
-            for o in ask.options.filter(o => o.shot < 0) key=o.label
-              button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`ask-option-${ask.id}-${o.label}`
-                if ask.multiple
-                  image (chosen.includes(o.label) ? "symbol:select-fill" : "symbol:circle") width=22 height=22 object-fit="contain" color=(chosen.includes(o.label) ? "AccentColor" : "-exact-tertiary-label")
-                column flex=1 min-width=0 gap=2
-                  text o.label font="-exact-body" font-weight=(o.pick ? 600 : 400) color=(o.pick ? "hex.accent" : "-exact-label")
-                  if o.detail != ""
-                    text o.detail font="-exact-subheadline" color="-exact-secondary-label"
-                if o.pick
-                  text "✦ hex’s pick" font="-exact-caption1" font-weight=600 color="hex.accent" white-space="nowrap"
+                  text o.label font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
+        column border-top="0.5px solid -exact-separator" margin-top=4
+          for o in ask.options key=o.label
+            AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=chosen.includes(o.label), role=(ask.multiple ? "check" : "radio"), disabled=false, id=`ask-option-${ask.id}-${o.label}`, press=choose(o.label))
+          button press=reply(ask.id) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-own-${ask.id}`
+            box width=22 height=22 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-hidden=true
+              image "symbol:pencil" width=17 height=17 object-fit="contain" color="-exact-secondary-label"
+            text (draft != "" ? draft : "In your own words") font="-exact-body" color=(draft != "" ? "-exact-label" : "-exact-secondary-label") line-clamp=1 flex=1
         if ask.multiple
-          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=(chosen.length == 0) testId=`ask-answer-${ask.id}`
+          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=(chosen.length == 0) margin-top=4 testId=`ask-answer-${ask.id}`
             text (chosen.length == 0 ? "Pick one or more" : `Answer with ${chosen.length}`)
-        button press=reply(ask.id) appearance="none" display="flex" flex-direction="row" gap=10 align-items="center" padding="4px 0" text-align="left" testId=`ask-own-${ask.id}`
-          image "symbol:sf/pencil" width=16 height=16 object-fit="contain" color="-exact-secondary-label"
-          text (draft != "" ? draft : "Answer in your own words") font="-exact-subheadline" color=(draft != "" ? "-exact-label" : "-exact-secondary-label") line-clamp=1 flex=1
         if noted
           text `Sent to ${said.detail != "" ? said.detail : ask.topic} as a note. The question is still open.` font="-exact-footnote" color="-exact-secondary-label"
         if said.id == ask.id and said.status == "failed"
           text failedWords(said) font="-exact-footnote" color="hex.danger" testId=`ask-failed-${ask.id}`
+
+// A question hex took off Bassim's list to decide itself, on its thread's page: when, the question,
+// why it's hex's call, and Undo, which puts it back on his list.
+component DecidedCard
+  inject
+    haptics: bool
+  props
+    ask: Ask
+    now: number
+    offset: number
+    failed: string
+    undo: action
+  view
+    column gap=8 padding="10px 0 14px" testId=`decided-card-${ask.id}`
+      row gap=8 align-items="center"
+        box width=8 height=8 border-radius=4 background-color="hex.accent" flex-shrink=0 aria-hidden=true
+        text `hex decided${ask.decided > 0 ? ` · ${whenOf(ask.decided, now, offset)}` : ""}` font="-exact-footnote" color="hex.accent" font-variant-numeric="tabular-nums" flex=1 line-clamp=1
+        button press=undo(ask.id) appearance="none" padding="4px 11px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-card-undo-${ask.id}`
+          text "Undo" font="-exact-footnote" font-weight=600
+      text ask.question font="-exact-title3" font-weight=600
+      if ask.why != ""
+        text ask.why font="-exact-body" color="-exact-label" user-select="text"
+      if failed != ""
+        text failed font="-exact-footnote" color="hex.danger"
 
 // Bassim's own words to a question, at the page's foot: send them as a note (the question stays
 // open) or as the answer. Closing it keeps the draft.

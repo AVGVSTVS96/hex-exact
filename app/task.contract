@@ -3,10 +3,10 @@
 // a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
 use Viewport, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
 use Mark, PlaceTile, whenOf, appName, lengthOf from "./parts.contract"
-use Said from "./said.contract"
+use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
 use EntryRow from "./rows.contract"
-use AskCard, ReplyComposer from "./ask.contract"
+use AskCard, DecidedCard, ReplyComposer from "./ask.contract"
 
 // A working stretch of a thread's week, as fractions of the lane (log-like: the last hour is a
 // fifth of it, the week before three days ago another).
@@ -128,6 +128,7 @@ component TaskBody
   derive title = kind == "topic" ? topicName : kind == "done" ? finished.title : (row.place != "" ? row.place : row.name)
   derive parent = isPart(row) ? row.name : ""
   derive pageAsks = kind == "topic" ? asks.asks.filter(a => a.topic == topicName) : asksOf(row, asks.asks)
+  derive pageDecided = kind == "topic" ? asks.decided.filter(a => a.topic == topicName) : kind == "task" ? asksOf(row, asks.decided) : asks.decided.slice(0, 0)
   derive waiting = pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).length
   derive siblings = sortBy(tasks.tasks.filter(t => t.name == row.name and t.id != row.id), t => t.at, "desc")
   derive places = [row].concat(siblings)
@@ -200,20 +201,22 @@ component TaskBody
             section
               text "hex didn't answer, so this can't open yet." color="-exact-secondary-label"
           if pageAsks.length > 0
-            section
-              header
-                text "Needs you"
-              for a in pageAsks key=a.id
+            section background-color="transparent"
+              for a, i in pageAsks key=a.id
                 // An open question swipes to Not needed, as a row in the list does.
                 if said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0
-                  AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
+                  AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
                 else
                   scroll swipeContent=`${a.id}-card` swipeTrailing=`${a.id}-card-away` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`ask-swipe-${a.id}`
                     box id=`${a.id}-card` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box"
-                      AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
+                      AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
                     button id=`${a.id}-card-away` press=dismiss(a.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`card-away-${a.id}`
                       image "symbol:sf/hand.raised.slash"
                       text "Not needed"
+          if pageDecided.length > 0
+            section background-color="transparent"
+              for a in pageDecided key=a.id
+                DecidedCard(ask=a, now=now, offset=offset, failed=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, undo=undo)
           if kind == "topic" and topicEntries.length > 0
             section
               for e in topicEntries key=e.id

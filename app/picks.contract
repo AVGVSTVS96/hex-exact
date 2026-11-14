@@ -40,7 +40,7 @@ component Picks
               link href=path("pick", a.id) testId=`pick-${a.id}`
                 column flex=1 min-width=0 gap=3
                   text `${a.topic}${a.tag != "" ? ` · ${a.tag}` : ""}` font="-exact-footnote" color="-exact-secondary-label"
-                  text a.question font="-exact-body" line-clamp=3
+                  text a.question font="-exact-body" color="-exact-label" line-clamp=3
                   if choiceOf(picked, a) == ""
                     text "Decide later" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
                   else if choiceOf(picked, a) == pickOf(a)

@@ -7,11 +7,12 @@
 // the words the right; like a laptop, the orb sits above the fold and the words below; folded shut,
 // or on a phone, one column, the orb rising to make room for the words.
 use Viewport, Pose, Rect, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
-use Glass, Surface, endingOf, badEnding, lengthOf from "./parts.contract"
+use Glass, endingOf, badEnding, lengthOf from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
 use HexHome from "./home.contract"
+use AnswerRow from "./ask.contract"
 
 // How an answer from the call went out, as the stable app says it: " and cleared its Telegram
 // buttons", or which places were out of reach.
@@ -555,25 +556,27 @@ component CallAskCard
     else
       answer(ask.id, label)
   view
-    column class=Surface gap=10 margin="8px 0" testId=`call-ask-${ask.id}`
+    column gap=6 margin="8px 0" padding-top=10 border-top="0.5px solid -exact-separator" testId=`call-ask-${ask.id}`
       if sent != ""
         row gap=8 align-items="center"
           image "symbol:select-fill" width=18 height=18 object-fit="contain" color="hex.accent" aria-hidden=true
           text `Sent “${sent}” to ${ask.topic}${reachedBy(ask, card.settled, card.missed)}` font="-exact-subheadline" flex=1
       else
         row gap=8 align-items="center"
+          box width=8 height=8 border-radius=4 background-color="hex.ask" flex-shrink=0 aria-hidden=true
           button press=openTask(ask.task) appearance="none" testId=`call-ask-topic-${ask.id}`
             text `${ask.topic} ›` font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
           if ask.tag != ""
-            text ask.tag font="-exact-caption1" padding="2px 8px" border-radius=999 background-color="-exact-tertiary-fill" color="-exact-secondary-label"
+            text `· ${ask.tag}` font="-exact-footnote" font-weight=600 color="hex.ask" white-space="nowrap"
         text ask.question font="-exact-headline" user-select="text"
-        row gap=8 flex-wrap="wrap"
+        column border-top="0.5px solid -exact-separator" margin-top=2
           for o in ask.options key=o.label
-            button press=choose(o.label) disabled=sending appearance="none" padding="8px 14px" border-radius=999 background-color=(chosen.includes(o.label) or (sending and mine.label == o.label) ? "AccentColor" : o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") opacity=(sending and mine.label != o.label ? 0.45 : 1) -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) aria-checked=(ask.multiple ? chosen.includes(o.label) : false) role=(ask.multiple ? "checkbox" : "button") testId=`call-ask-option-${o.label}`
-              text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=(o.pick ? 600 : 400) color=(chosen.includes(o.label) or (sending and mine.label == o.label) ? "ink.on-accent" : o.pick ? "hex.accent" : "-exact-label")
-          for l in ask.links key=l.url
-            link href=l.url padding="8px 14px" border-radius=999 background-color="-exact-tertiary-fill"
-              text `${l.label} ↗` font="-exact-subheadline"
+            AnswerRow(label=o.label, detail="", pick=o.pick, chosen=(chosen.includes(o.label) or (sending and mine.label == o.label)), role=(ask.multiple ? "check" : "radio"), disabled=sending, id=`call-ask-option-${o.label}`, press=choose(o.label))
+        if ask.links.length > 0
+          row gap=14 flex-wrap="wrap" padding-top=4
+            for l in ask.links key=l.url
+              link href=l.url
+                text `${l.label} ↗` font="-exact-subheadline" font-weight=600
         if ask.multiple and chosen.length > 0
           button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=sending testId=`call-ask-answer-${ask.id}`
             text `Answer with ${chosen.length}`

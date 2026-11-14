@@ -1,10 +1,11 @@
-// One of hex's picks (§9.6): the question, why hex picks what it does, every answer with what it
-// means, and where the question came from. Choosing one sets it on hex's picks; nothing is sent
-// until Bassim answers them all there.
+// One of hex's picks (§9.6), flat as every question: the question, what it's about, why hex picks
+// what it does, every answer as the same row with what it means, and where the question came from.
+// Choosing one sets it on hex's picks; nothing is sent until Bassim answers them all there.
 use Viewport, Asks, Words, Media from "./shapes.contract"
 use whenOf from "./parts.contract"
 use Pictures from "./media.contract"
 use pickOf, choiceOf from "./picks.contract"
+use AnswerRow from "./ask.contract"
 
 component Pick
   props
@@ -33,42 +34,24 @@ component Pick
           section
             text "This question is answered" color="-exact-secondary-label" testId="pick-answered"
         for a in found key=a.id
-          section
-            text a.question font="-exact-title3" font-weight=600 padding="4px 0"
-            if a.why != ""
-              column gap=4 padding=12 border-radius=14 background-color="hex.accent.wash"
-                text `Why hex picks ${pickOf(a)}` font="-exact-footnote" font-weight=600 color="hex.accent"
-                text a.why font="-exact-subheadline"
-          section
-            header
-              text "Your answer"
-            // Its answers' screenshots, else hex's pictures, at their own shapes.
-            if a.options.filter(o => o.shot >= 0).length > 0 or a.pictures.length > 0
-              Pictures(media=(a.options.filter(o => o.shot >= 0).length > 0 ? a.options.filter(o => o.shot >= 0).map(o => Media(id=`/asks/${encodeURIComponent(a.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect)) : a.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect))), width=(min(viewport.width, 700) - 72), height=300)
-            for o in a.options key=o.label
-              button press=choose(o.label) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" text-align="left" role="radio" aria-checked=(choiceOf(picked, a) == o.label) testId=`pick-option-${o.label}`
-                column flex=1 min-width=0 gap=2
-                  text o.label font="-exact-body" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
-                  if o.detail != ""
-                    text o.detail font="-exact-subheadline" color="-exact-secondary-label"
-                if o.pick
-                  text "✦ hex’s pick" font="-exact-caption1" font-weight=600 color="hex.accent" white-space="nowrap"
-                if choiceOf(picked, a) == o.label
-                  image "symbol:checkmark" width=16 height=16 object-fit="contain" color="AccentColor"
-            button press=choose("") appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" text-align="left" role="radio" aria-checked=(choiceOf(picked, a) == "") testId="pick-later"
-              column flex=1 min-width=0 gap=2
-                text "Decide later" font="-exact-body" color="-exact-secondary-label"
-                text "Stays in Needs you, unanswered." font="-exact-subheadline" color="-exact-secondary-label"
-              if choiceOf(picked, a) == ""
-                image "symbol:checkmark" width=16 height=16 object-fit="contain" color="AccentColor"
-            footer
-              text "Sent when you tap Answer on hex’s picks"
-          if a.context != ""
-            section
-              header
-                text "What it's about"
-              text a.context font="-exact-subheadline" user-select="text"
-          section
+          section background-color="transparent"
+            column gap=8 padding="6px 0 4px"
+              text a.question font="-exact-title3" font-weight=600
+              if a.context != ""
+                text a.context font="-exact-body" color="-exact-label" user-select="text"
+              if a.why != ""
+                column gap=2
+                  text `✦ Why hex picks ${pickOf(a)}` font="-exact-subheadline" font-weight=600 color="hex.accent"
+                  text a.why font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+              // Its answers' screenshots, else hex's pictures, at their own shapes.
+              if a.options.filter(o => o.shot >= 0).length > 0 or a.pictures.length > 0
+                Pictures(media=(a.options.filter(o => o.shot >= 0).length > 0 ? a.options.filter(o => o.shot >= 0).map(o => Media(id=`/asks/${encodeURIComponent(a.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect)) : a.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect))), width=(min(viewport.width, 700) - 72), height=300)
+              column border-top="0.5px solid -exact-separator" margin-top=4 role="radiogroup" aria-label="Your answer"
+                for o in a.options key=o.label
+                  AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=(choiceOf(picked, a) == o.label), role="radio", disabled=false, id=`pick-option-${o.label}`, press=choose(o.label))
+                AnswerRow(label="Decide later", detail="Stays in Needs you, unanswered.", pick=false, chosen=(choiceOf(picked, a) == ""), role="radio", disabled=false, id="pick-later", press=choose(""))
+              text "Sent when you tap Answer on hex’s picks" font="-exact-footnote" color="-exact-secondary-label"
+          section background-color="transparent"
             header
               text "From the thread"
             text (wordsAsk == a.id and words.place != "" ? `${words.place} · ${whenOf(words.at, now, offset)}` : `${a.topic} · ${whenOf(a.at, now, offset)}`) font="-exact-footnote" color="-exact-secondary-label"

@@ -197,7 +197,7 @@ component App
   derive endedHere = call.status == "idle" and call.ending != "" and call.ending != "no-connect" and captions.call != "" and captions.call != "demo" and calls.calls.filter(c => c.id == captions.call).length == 0
   derive firstWords = match captions.turns.at(0) { case some(t) => t.at, case none => 0 }
   derive heard = match captions.turns.filter(t => t.who == "you" and t.text != "").at(0) { case some(t) => t.text.trim().slice(0, 160), case none => "" }
-  derive callsShown = endedHere ? Calls(calls, calls=[CallRow(id=captions.call, started=firstWords, ended=firstWords + call.seconds * 1000, ending=call.ending, source="app", voice=voice, title="", reason="", why="", summary="", waiting=[], seconds=call.seconds, tasks=0, preview=heard, live=false)].concat(calls.calls)) : calls
+  derive callsShown = endedHere ? Calls(calls, calls=[CallRow(id=captions.call, started=firstWords, ended=firstWords + call.seconds * 1000, ending=call.ending, source="app", voice=voice, title="", why="", summary="", waiting=[], seconds=call.seconds, tasks=0, preview=heard, live=false)].concat(calls.calls)) : calls
   // A call on, here or held elsewhere, and a Duo pose with a side column or a band for it.
   derive callOn = call.status != "idle" or isElsewhere(call, activity, liveRecord)
   derive duo = (pose.bar != "" and (viewport.safeAreaLeft > 0 or viewport.safeAreaRight > 0)) or viewport.horizontalViewportSegments == 2 or viewport.verticalViewportSegments == 2

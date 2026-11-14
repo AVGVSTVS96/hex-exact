@@ -41,7 +41,8 @@ if [ -z "${BUILT:-}" ]; then
   ssh "$mac" "SIM=1 EXACT_SIM=$sim HEX_URL='$HEX_URL' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1
 fi
 
-ssh "$mac" bash -s -- "$folder" "$sim" "$POSES" "$APPEARANCES" "${paths[@]}" <<'MAC'
+# ssh joins its arguments into one command line, so each is quoted for the Mac's shell.
+ssh "$mac" bash -s -- "$(printf "%q " "$folder" "$sim" "$POSES" "$APPEARANCES" "${paths[@]}")" <<'MAC'
 set -euo pipefail
 folder=$1 id=$2 poses=$3 appearances=$4
 shift 4

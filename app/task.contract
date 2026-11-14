@@ -21,6 +21,8 @@ fn spansOf(track: Track[], now: number): Span[] = range(track.length).filter(i =
 fn failsOf(track: Track[], now: number): number[] = track.filter(t => t.state == "failed").map(t => laneX(hoursAgo(t.at, now)))
 fn blankSaid(): Said = Said(id="", verb="", label="", status="", detail="", missed=0, question="", topic="", task="")
 fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
+// A question's draft, or the one left on an earlier id of it (hex asks again under a new id).
+fn askDraft(drafts: string[], a: Ask): string = match [a.id].concat(a.was).map(id => draftOf(drafts, `ask:${id}`)).filter(d => d.trim() != "").at(0) { case some(d) => d, case none => "" }
 fn kindWord(kind: string): string = kind == "think" ? "Thought" : kind == "say" ? "Said" : kind == "run" ? "Ran" : kind == "read" ? "Read" : kind == "edit" ? "Edited" : kind == "search" ? "Searched" : kind == "web" ? "Looked up" : kind == "agent" ? "Agent" : kind == "plan" ? "Planned" : "Used a tool"
 // "(Asked Siri) words" from Bassim is an event: its label and its words.
 fn eventOf(text: string): string = text.startsWith("(") and text.indexOf(") ") > 1 ? text.slice(1, text.indexOf(") ")) : ""
@@ -202,7 +204,16 @@ component TaskBody
               header
                 text "Needs you"
               for a in pageAsks key=a.id
-                AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=draftOf(drafts, `ask:${a.id}`), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
+                // An open question swipes to Not needed, as a row in the list does.
+                if said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0
+                  AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
+                else
+                  scroll swipeContent=`${a.id}-card` swipeTrailing=`${a.id}-card-away` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`ask-swipe-${a.id}`
+                    box id=`${a.id}-card` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box"
+                      AskCard(ask=a, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
+                    button id=`${a.id}-card-away` press=dismiss(a.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`card-away-${a.id}`
+                      image "symbol:sf/hand.raised.slash"
+                      text "Not needed"
           if kind == "topic" and topicEntries.length > 0
             section
               for e in topicEntries key=e.id
@@ -313,7 +324,7 @@ component TaskBody
                   text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=draftOf(drafts, `ask:${a.id}`), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach)
+          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach)
       else if kind == "task" and chat.sends
         link href=`${path("thread", id)}#compose` margin="6px 12px 10px" padding="11px 16px" border-radius=22 border="1px solid -exact-separator" testId="task-compose"
           text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1

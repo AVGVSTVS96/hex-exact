@@ -18,9 +18,10 @@ use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
 use UpdateToast from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
+use firstNeed from "./home.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
-// Every screen and sheet. Home is the call; the rest open over it. hexexact://go/<path> opens any
+// Every screen and sheet. Home is hex, and the call; the rest open over it. hexexact://go/<path> opens any
 // of them from outside (Siri, scripts/sim).
 routes nav
   home "/"
@@ -137,7 +138,10 @@ component App
   // Tasks beside a page: the Duo opened like a book, or a window wide enough for both.
   derive split = viewport.horizontalViewportSegments == 2 or viewport.width >= 900
   derive firstPage = match stageTopics(entriesOf(tasks, asks, now), shownTab).at(0) { case some(t) => homeOf(pageOf(t), tasks.tasks), case none => "" }
-  derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : ""
+  // Home beside a page: the Duo opened like a book with no call on, the first thing that needs
+  // Bassim until he picks one.
+  derive homeBeside = viewport.horizontalViewportSegments == 2 and top(nav).name == "home" and call.status == "idle" and activity.call == "" ? (beside != "" ? beside : firstNeed(tasks, asks, saids, now)) : ""
+  derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : homeBeside
   derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => besideId }
   derive chatOpen = names.includes("thread") or names.includes("task") or besideId != ""
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
@@ -500,7 +504,9 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, pose=pose, reading=reading, setReading=setReading, trouble=trouble)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, pose=pose, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
+            if besideId != ""
+              TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "calls"
           CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=callsShown, loading=(not current(liveCalls)), failed=failed(liveCalls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"

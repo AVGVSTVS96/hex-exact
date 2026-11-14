@@ -1,15 +1,17 @@
-// Home: the call with hex (§1–4, 7). The orb in the middle, what each side says as it's said, the
-// questions hex puts on screen during the call, what hex is doing for it, and the controls. The
-// toolbar opens Calls, Tasks and Settings over it.
+// Home: hex itself while no call is on (home.contract), and the call with hex (§1–4, 7). In a call,
+// the orb in the middle, what each side says as it's said, the questions hex puts on screen during
+// the call, what hex is doing for it, and the controls. The toolbar opens Calls, Tasks and Settings
+// over it.
 //
 // On the Duo it follows the fold: folded like a book, the orb and controls take the left screen and
 // the words the right; like a laptop, the orb sits above the fold and the words below; folded shut,
 // or on a phone, one column, the orb rising to make room for the words.
-use Viewport, Pose, Rect, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media from "./shapes.contract"
+use Viewport, Pose, Rect, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
 use Glass, Surface, endingOf, badEnding, lengthOf from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
+use HexHome from "./home.contract"
 
 // How an answer from the call went out, as the stable app says it: " and cleared its Telegram
 // buttons", or which places were out of reach.
@@ -68,6 +70,16 @@ component Home
     pose: Pose
     reading: bool
     setReading: action
+    // hex as the home whenever no call is on: what needs Bassim and what hex is doing; on a book fold
+    // the page a row opens shows beside (the slot), `beside` its id.
+    offset: number
+    tasks: Tasks
+    asks: Asks
+    listsLoading: bool
+    listsFailed: bool
+    beside: string
+    select: action
+  slot
 
   // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
   derive elsewhere = isElsewhere(call, activity, liveRecord)
@@ -83,6 +95,8 @@ component Home
   derive single = not book and not laptop
   derive top = viewport.safeAreaTop
   derive bottom = max(viewport.safeAreaBottom, 12)
+  // No call on: hex is the home. A phone shows the last call's words over it while they're read.
+  derive homeMode = status == "idle" and not elsewhere and not (single and reading)
 
   // The call's words and its asks, in the order they came. The last call's stay until the next. The
   // shell stamps its words in epoch ms and hex its asks in ms into the call, as it does a call's
@@ -152,9 +166,11 @@ component Home
   state pullY = 0
   state pulling = false
   derive pull = single ? min(max((reading ? 1 : 0) + pullY / travel, 0), 1) : 1
-  derive orbX = restX + (dockX - restX) * pull
-  derive orbY = restY + (dockY - restY) * pull
-  derive orbSize = single ? restSize + (52 - restSize) * pull : book ? min(viewport.width / 2 - right - 64, viewport.height - top - 200) : min(viewport.height / 2 - top - 48, contentW - 120)
+  // At home it rests small at the top, where the home's face goes, and glides to the middle as a
+  // call starts.
+  derive orbX = homeMode ? restX : restX + (dockX - restX) * pull
+  derive orbY = homeMode ? below + 44 : restY + (dockY - restY) * pull
+  derive orbSize = single ? (homeMode ? 60 : restSize + (52 - restSize) * pull) : book ? min(viewport.width / 2 - right - 64, viewport.height - top - 200) : min(viewport.height / 2 - top - 48, contentW - 120)
   derive glide = pulling ? "0ms linear" : "420ms cubic-bezier(0.2, 0.8, 0.2, 1)"
   derive agentShown = live and agent.id != ""
   // Above the docked orb and the buttons: the agent line, then the words.
@@ -163,15 +179,34 @@ component Home
   derive wordsLeft = book ? "env(viewport-segment-left 1 0)" : `${left}px`
   derive wordsTop = book ? `${below}px` : laptop ? "env(viewport-segment-top 0 1)" : `${below}px`
   derive readable = talking or live
+  // On a fold at rest, the last call's words stay beside (book) or below (laptop) the home until
+  // Bassim opens a page or puts them away: `away` is the call whose words he put away.
+  state away = ""
+  derive wordsShown = talking and away != captions.call
+  derive homeBottom = columned ? bottom : bottom + 12 + callSize + 16
+  derive homeRight = book ? "calc(100% - env(viewport-segment-right 0 0))" : `${right}px`
+  action choose(page: string)
+    away = captions.call
+    select(page)
+  action toggleWords
+    away = wordsShown ? captions.call : ""
+  action showTranscript
+    if single
+      setReading(true)
+    else
+      toggleWords()
 
   action drag(dx: number, dy: number)
-    pulling = true
-    pullY = pullY + dy
+    if not homeMode
+      pulling = true
+      pullY = pullY + dy
   action release(vx: number, vy: number)
     let moved = pullY / travel
+    let was = pulling
     pulling = false
     pullY = 0
-    setReading(vy > 500 ? true : vy < -500 ? false : reading ? moved > -0.35 : moved >= 0.35)
+    if was
+      setReading(vy > 500 ? true : vy < -500 ? false : reading ? moved > -0.35 : moved >= 0.35)
   // A swipe in from the left edge opens Calls, as the stable app's drawer does.
   state edgeX = 0
   action edgeDrag(dx: number, dy: number)
@@ -188,7 +223,7 @@ component Home
   view
     column navigationKey=`${entry.id}` navigationBar="none" position="absolute" inset=0 background-color="-exact-background" testId="home"
       // At rest on a phone, a drag anywhere on the screen pulls the words down.
-      if single and not reading and readable
+      if single and not reading and readable and not homeMode
         box position="absolute" top=below bottom=0 left=left right=right touch-action="none" pan=drag panrelease=release testId="pull"
 
       box position="absolute" top=below bottom=0 left=left width=20 touch-action="none" pan=edgeDrag panrelease=edgeRelease z-index=1 aria-hidden=true testId="calls-edge"
@@ -207,17 +242,17 @@ component Home
       if single
         box position="absolute" left=(orbX - orbSize / 2) top=(orbY - orbSize / 2) width=orbSize height=orbSize touch-action="none" pan=drag panrelease=release press=orbTap aria-label=(reading ? `${label}. Put the words away` : label) -exact-layout-transition=glide testId="orb-spot"
           hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label -exact-layout-transition=glide testId="orb"
-        column position="absolute" top=(restY + restSize / 2 + 12) left=left right=right align-items="center" gap=10 opacity=(1 - pull) pointer-events=(pull > 0.5 ? "none" : "auto") testId="stage"
+        column position="absolute" top=(restY + restSize / 2 + 12) left=left right=right align-items="center" gap=10 opacity=(homeMode ? 0 : 1 - pull) pointer-events=(homeMode or pull > 0.5 ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="stage"
           CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
           if wrapped
             box padding="8px 32px" width="100%" box-sizing="border-box" display="flex" justify-content="center"
               WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
-        if readable
+        if readable and not (homeMode and columned)
           box position="absolute" left=(dockX - 26) top=(dockY - 26) opacity=(1 - pull) pointer-events=(pull > 0 ? "none" : "auto") testId="transcript-dock"
             button press=setReading(true) appearance="auto" buttonStyle="glass" width=52 height=52 aria-label="Show transcript" testId="show-transcript"
               image "symbol:sf/text.bubble"
       else
-        column position="absolute" top=below bottom=(laptop ? "calc(100% - env(viewport-segment-bottom 0 0))" : `${columned ? columnFoot : bottom + 12 + callSize + 16}px`) left=0 right=(book ? "calc(100% - env(viewport-segment-right 0 0))" : `${right}px`) align-items="center" justify-content="center" gap=10 testId="stage"
+        column position="absolute" top=below bottom=(laptop ? "calc(100% - env(viewport-segment-bottom 0 0))" : `${columned ? columnFoot : bottom + 12 + callSize + 16}px`) left=0 right=(book ? "calc(100% - env(viewport-segment-right 0 0))" : `${right}px`) align-items="center" justify-content="center" gap=10 opacity=(homeMode ? 0 : 1) pointer-events=(homeMode ? "none" : "auto") transition="opacity 300ms" testId="stage"
           hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label testId="orb"
           CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
           if wrapped and not talking
@@ -226,12 +261,35 @@ component Home
 
       // The words: under the toolbar as they're read, on the right screen of a book fold, below a
       // laptop fold.
-      column position="absolute" top=wordsTop bottom=wordsBottom left=wordsLeft right=right opacity=(single ? pull : readable ? 1 : 0) pointer-events=(single and pull < 1 ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="words"
+      column position="absolute" top=wordsTop bottom=wordsBottom left=wordsLeft right=right opacity=(single ? pull : homeMode ? (wordsShown ? 1 : 0) : readable ? 1 : 0) pointer-events=(single ? (pull < 1 ? "none" : "auto") : homeMode and not wordsShown ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="words"
         if live and not talking
           text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
         if single and footerBad
           text footer font="-exact-footnote" color="-exact-system-red" text-align="center" padding="0 20px 6px" testId="words-trouble"
         CallWords(lines=lines, asks=activity.asks, said=said, width=contentW, live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
+
+      // hex as the home: on a phone and the cover screen under the orb resting at its top; on a book
+      // fold on the left screen, the page a row opens on the right; on a laptop fold hex and Needs
+      // you above the fold, the rest below it.
+      if laptop
+        column position="absolute" top=below bottom="calc(100% - env(viewport-segment-bottom 0 0))" left=left right=right opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home"
+          HexHome(part="top", face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=false, beside="", select=choose, openTask=openTask, openTasks=openTasks)
+            CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
+            if wrapped
+              box padding="8px 0" display="flex" justify-content="center"
+                WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
+        column position="absolute" top="env(viewport-segment-top 0 1)" bottom=homeBottom left=left right=right opacity=(homeMode and not wordsShown ? 1 : 0) pointer-events=(homeMode and not wordsShown ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home-below"
+          HexHome(part="bottom", face=false, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=false, beside="", select=choose, openTask=openTask, openTasks=openTasks)
+      else
+        column position="absolute" top=below bottom=homeBottom left=left right=homeRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home"
+          HexHome(part="all", face=(not single), persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=book, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks)
+            CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
+            if wrapped
+              box padding="8px 0" display="flex" justify-content="center"
+                WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
+        if book and homeMode and not wordsShown
+          column position="absolute" top=top bottom=0 left="env(viewport-segment-left 1 0)" right=right z-index=1 testId="home-beside"
+            children
 
       // The agent line: what hex is doing for this call; tap for the Working tab.
       if agentShown
@@ -252,10 +310,14 @@ component Home
             AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=muteSize, disabled=false, add=share)
           if status != "idle"
             MuteButton(size=muteSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
+          if homeMode and talking
+            WordsButton(size=muteSize, shown=(not single and wordsShown), single=single, show=showTranscript)
           CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
       else
         row position="absolute" bottom=(bottom + 12) left=(book ? "env(viewport-segment-left 0 0)" : "0px") width=(book ? "env(viewport-segment-width 0 0)" : "100%") justify-content="center" align-items="center" gap=28 testId="controls"
-          if status == "idle"
+          if status == "idle" and homeMode and talking and not single
+            WordsButton(size=60, shown=wordsShown, single=false, show=showTranscript)
+          else if status == "idle"
             box width=60 height=60
           else
             MuteButton(size=60, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
@@ -428,6 +490,19 @@ component CallLines
       text (status == "reconnecting" ? "Reconnecting…" : "Calling hex…") font="-exact-subheadline" color="-exact-secondary-label" testId="connecting"
     if footer != ""
       text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
+
+// The last call's words: on a phone brought up over the home, on a fold shown or put away beside it.
+component WordsButton
+  inject
+    haptics: bool
+  props
+    size: number
+    shown: bool
+    single: bool
+    show: action
+  view
+    button press=show appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial="glass" background-color=(shown ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(single ? "Show transcript" : shown ? "Put the transcript away" : "Show the transcript") aria-pressed=(single ? false : shown) -exact-press-haptic=(haptics ? "selection" : "none") testId="home-words"
+      image "symbol:sf/text.bubble" width=(size * 0.36) height=(size * 0.36) object-fit="contain" color=(shown ? "AccentColor" : "-exact-label")
 
 component MuteButton
   inject

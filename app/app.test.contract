@@ -9,6 +9,13 @@ test "Home rests with the call ready to start"
   expect tree missing "footer"
   expect state call.status == "idle"
 
+test "with no call on, Home is hex's: its face, what it's doing, what needs Bassim, what it's working on"
+  expect tree has "hex"
+  expect tree has "live-line"
+  expect tree has "home-head-asks"
+  expect tree has "home-head-working"
+  expect tree missing "home-beside"
+
 test "without the shell a call doesn't start, and Home stays as it was"
   tap "call"
   clock data

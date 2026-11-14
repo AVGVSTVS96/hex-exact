@@ -1,0 +1,169 @@
+// hex as the home (the Muse review's first change): hex's face and one live line of what it's doing,
+// then the few things that need Bassim, then what it's working on, then what it decided for him.
+// Home shows it whenever no call is on; Tasks has the rest. Laptop-folded, its top half is hex and
+// Needs you and its bottom half the rest.
+use Tasks, Asks, TaskRow from "./shapes.contract"
+use Mark, whenOf, tintOf, washOf from "./parts.contract"
+use Said from "./said.contract"
+use Item, entriesOf, picksOf, homeOf, problemOf from "./inbox.contract"
+
+// What Bassim put away here leaves at once, as in Tasks.
+fn awayOf(said: Said[]): string[] = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
+// What needs Bassim, as Tasks lists it, without the questions hex decides itself.
+fn needsOf(tasks: Tasks, asks: Asks, said: Said[], now: number): Item[] = entriesOf(tasks, asks, now).filter(e => e.stage == "needs" and not awayOf(said).includes(e.id) and not picksOf(asks.asks, said).map(a => a.id).includes(e.id))
+// The page a row opens: its thread's main page, "" for what has none (a stuck run).
+fn pageFor(e: Item, tasks: Tasks): string = e.page == "" ? "" : homeOf(e.page, tasks.tasks)
+// The page beside Home on a book fold until Bassim picks one: the first thing that needs him.
+fn firstNeed(tasks: Tasks, asks: Asks, said: Said[], now: number): string = match needsOf(tasks, asks, said, now).filter(e => e.page != "").at(0) { case some(e) => homeOf(e.page, tasks.tasks), case none => "" }
+// What hex is doing right now: the thread that moved last of those running.
+fn liveOf(tasks: Tasks): option<TaskRow> = sortBy(tasks.tasks.filter(t => t.state == "working" and t.running), t => t.at, "desc").at(0)
+fn lineOf(t: TaskRow): string = t.line != "" ? t.line : match t.agents.filter(a => a.state == "working" and a.line != "").at(0) { case some(a) => a.line, case none => "" }
+// A row's mark, as Tasks draws its topic's.
+fn markOf(e: Item): string = e.stage == "needs" ? (e.kind == "task" or e.kind == "fresh" ? "needs" : e.mark) : problemOf(e.title) != "" ? "failed" : e.mark
+
+keyframes liveDot
+  50% opacity=0.25
+
+component HexHome
+  inject
+    haptics: bool
+  props
+    // all | top (hex and Needs you) | bottom (Working on and what hex decided)
+    part: string
+    // Whether to draw hex's face here; on a phone and the cover screen Home's own orb rests in its place.
+    face: bool
+    persona: string
+    personaColor: string
+    palette: string
+    reaction: string
+    still: bool
+    now: number
+    offset: number
+    tasks: Tasks
+    asks: Asks
+    said: Said[]
+    loading: bool
+    failed: bool
+    // On a book fold, rows open beside; the page that's there, "" when the call's words are.
+    split: bool
+    beside: string
+    select: action
+    openTask: action
+    openTasks: action
+  // What the call just left (how it ended, its wrap-up), under the live line.
+  slot
+  derive known = tasks.version > 0 or asks.version > 0
+  derive needs = needsOf(tasks, asks, said, now)
+  derive live = liveOf(tasks)
+  derive liveId = match live { case some(t) => t.id, case none => "" }
+  derive liveLine = match live { case some(t) => lineOf(t), case none => "" }
+  derive liveTopic = match live { case some(t) => t.name, case none => "" }
+  // What's working, newest first; the one on the live line isn't listed twice.
+  derive working = sortBy(entriesOf(tasks, asks, now).filter(e => e.stage == "working"), e => e.at, "desc")
+  derive listed = working.filter(e => e.id != liveId)
+  derive decided = picksOf(asks.asks, said).length
+  derive shownNeeds = needs.slice(0, 3)
+  derive shownWork = listed.slice(0, 2)
+  derive top = part != "bottom"
+  derive bottom = part != "top"
+  action go(e: Item)
+    if pageFor(e, tasks) == ""
+      openTasks(e.stage)
+    else if split
+      select(pageFor(e, tasks))
+    else
+      openTask(pageFor(e, tasks))
+  action goLive
+    if split
+      select(homeOf(liveId, tasks.tasks))
+    else
+      openTask(homeOf(liveId, tasks.tasks))
+  view
+    column flex=1 min-height=0 testId=`home-${part}`
+      if top
+        column align-items="center" padding="14px 16px 0" flex-shrink=0 testId="hex"
+          if face
+            hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=60 height=60 role="img" aria-label="hex"
+          else
+            box width=60 height=60
+          text "hex" font="-exact-headline" margin-top=8
+          button press=goLive disabled=(liveId == "") appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=7 max-width="100%" min-height=22 margin-top=2 aria-live="polite" aria-label=(liveId == "" ? "Nothing running" : `hex is working on ${liveTopic}: ${liveLine}`) testId="live-line"
+            if liveId != ""
+              row gap=3 flex-shrink=0 aria-hidden=true
+                for i in [0, 1, 2] key=i
+                  box width=4 height=4 border-radius=2 background-color="hex.progress" animation=(still ? "none" : `liveDot 1.2s ease-in-out ${i * 0.2}s infinite`)
+            text (not known ? " " : liveId == "" ? "Nothing running" : liveLine) font="-exact-subheadline" color=(liveId == "" ? "-exact-tertiary-label" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+      scroll flex=1 min-height=0 padding="0 6px 16px" mask-image="linear-gradient(to bottom, #000 0, #000 96%, transparent 100%)" testId=`home-list-${part}`
+        if top
+          children
+          if failed and not known
+            text "Can't reach hex. Trying again…" font="-exact-subheadline" color="-exact-secondary-label" text-align="center" padding="24px 10px" testId="home-offline"
+          Head(state="asks", label="Needs you", n=needs.length, known=known)
+          for e in shownNeeds key=e.id
+            HomeRow(entry=e, mark=markOf(e), now=now, offset=offset, selected=(split and beside != "" and beside == pageFor(e, tasks)), go=go(e))
+          if known and needs.length == 0
+            text "Nothing waits on you" font="-exact-subheadline" color="-exact-secondary-label" padding="6px 10px 6px 44px"
+          if needs.length > shownNeeds.length
+            More(n=needs.length - shownNeeds.length, go=openTasks("needs"), id="needs")
+        if bottom
+          Head(state="working", label="Working on", n=working.length, known=known)
+          for e in shownWork key=e.id
+            HomeRow(entry=e, mark=markOf(e), now=now, offset=offset, selected=(split and beside != "" and beside == pageFor(e, tasks)), go=go(e))
+          if known and working.length == 0
+            text "Nothing is working" font="-exact-subheadline" color="-exact-secondary-label" padding="6px 10px 6px 44px"
+          if listed.length > shownWork.length
+            More(n=listed.length - shownWork.length, go=openTasks("working"), id="working")
+          if decided > 0
+            button press=openTasks("needs") appearance="none" display="flex" flex-direction="row" align-items="center" gap=12 width="100%" box-sizing="border-box" padding="12px 10px 6px" margin-top=14 border-top="0.5px solid -exact-separator" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided}` testId="home-decided"
+              Mark(state="pick", size=22)
+              text `hex decided ${decided}` font="-exact-headline" flex=1 text-align="left"
+              image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+
+// A section's head: its colour's dot on its wash, its name, how many.
+component Head
+  props
+    state: string
+    label: string
+    n: number
+    known: bool
+  view
+    row gap=12 align-items="center" padding="20px 10px 4px" role="heading" aria-level=2 aria-label=`${label}, ${n}` testId=`home-head-${state}`
+      box width=22 height=22 border-radius=11 background-color=washOf(state) display="flex" align-items="center" justify-content="center" flex-shrink=0
+        box width=8 height=8 border-radius=4 background-color=tintOf(state)
+      text label font="-exact-headline" color=tintOf(state) flex=1
+      text (known ? `${n}` : "–") font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+// One thing: its mark, its topic, its line, when.
+component HomeRow
+  inject
+    haptics: bool
+  props
+    entry: Item
+    mark: string
+    now: number
+    offset: number
+    selected: bool
+    go: action
+  derive problem = problemOf(entry.title)
+  view
+    button press=go appearance="none" display="flex" flex-direction="row" align-items="flex-start" gap=12 width="100%" box-sizing="border-box" padding="9px 10px" border-radius=12 text-align="left" background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${entry.topic}: ${problem != "" ? problem : entry.title}` testId=`home-row-${entry.id}`
+      box padding-top=1
+        Mark(state=mark, size=22)
+      column flex=1 min-width=0 gap=2
+        text entry.topic font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+        text (problem != "" ? problem : entry.title) font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      text whenOf(entry.at, now, offset) font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" padding-top=3
+
+// "Show N more", into Tasks.
+component More
+  inject
+    haptics: bool
+  props
+    n: number
+    id: string
+    go: action
+  view
+    button press=go appearance="none" display="flex" flex-direction="row" align-items="center" gap=12 width="100%" box-sizing="border-box" padding="6px 10px" -exact-press-haptic=(haptics ? "selection" : "none") testId=`home-more-${id}`
+      box width=22 display="flex" justify-content="center" aria-hidden=true
+        image "symbol:ellipsis" width=14 height=14 object-fit="contain" color="-exact-tertiary-label"
+      text `Show ${n} more` font="-exact-subheadline" color="-exact-secondary-label"

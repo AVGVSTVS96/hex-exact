@@ -5,29 +5,6 @@ use Viewport, Settings from "./shapes.contract"
 use Option from "./parts.contract"
 use Pager from "./settings.contract"
 
-sound "assets/voices/alloy.wav"
-sound "assets/voices/ash.wav"
-sound "assets/voices/ballad.wav"
-sound "assets/voices/beacon.wav"
-sound "assets/voices/bossa.wav"
-sound "assets/voices/cedar.wav"
-sound "assets/voices/cinder.wav"
-sound "assets/voices/coral.wav"
-sound "assets/voices/delta.wav"
-sound "assets/voices/echo.wav"
-sound "assets/voices/gleam.wav"
-sound "assets/voices/marin.wav"
-sound "assets/voices/meridian.wav"
-sound "assets/voices/quartz.wav"
-sound "assets/voices/ripple.wav"
-sound "assets/voices/sage.wav"
-sound "assets/voices/shimmer.wav"
-sound "assets/voices/stone.wav"
-sound "assets/voices/tempo.wav"
-sound "assets/voices/verse.wav"
-sound "assets/voices/vesper.wav"
-sound "assets/voices/willow.wav"
-
 // The Live API's voices, Marin first, each with its accent where it has one.
 fn voices(): Option[] = [Option(id="marin", label="Marin", detail=""), Option(id="alloy", label="Alloy", detail=""), Option(id="ash", label="Ash", detail=""), Option(id="ballad", label="Ballad", detail=""), Option(id="beacon", label="Beacon", detail="Filipino English"), Option(id="bossa", label="Bossa", detail="Brazilian Portuguese"), Option(id="cedar", label="Cedar", detail=""), Option(id="cinder", label="Cinder", detail="Southern U.S. English"), Option(id="coral", label="Coral", detail=""), Option(id="delta", label="Delta", detail="Southern U.S. English"), Option(id="echo", label="Echo", detail=""), Option(id="gleam", label="Gleam", detail="North American English"), Option(id="meridian", label="Meridian", detail="North American English"), Option(id="quartz", label="Quartz", detail="Australian English"), Option(id="ripple", label="Ripple", detail="Australian English"), Option(id="sage", label="Sage", detail=""), Option(id="shimmer", label="Shimmer", detail=""), Option(id="stone", label="Stone", detail="Irish English"), Option(id="tempo", label="Tempo", detail="Brazilian Portuguese"), Option(id="verse", label="Verse", detail=""), Option(id="vesper", label="Vesper", detail="British English"), Option(id="willow", label="Willow", detail="Irish English")].map(v => Option(v, detail=(v.detail == "" ? "Swipe to hear each voice" : v.detail)))
 
@@ -43,6 +20,8 @@ component VoicePage
     loading: bool
     failed: bool
     unsaved: bool
+    // Plays a voice's sample (the shell's, so the silent switch doesn't hush it).
+    preview: action
     set: action
     open: action
     back: action
@@ -59,10 +38,10 @@ component VoicePage
     if haptics
       haptic("selection")
     set("voice", id)
-    playSound(`assets/voices/${id}.wav`, group="preview")
+    preview(id)
   action hear(id: string)
     if id == chosen
-      playSound(`assets/voices/${id}.wav`, group="preview")
+      preview(id)
     else
       choose(id)
   action pickPace(p: string)

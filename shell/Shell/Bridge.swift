@@ -55,6 +55,9 @@ enum Bridge {
     case "end":
       call.end()
       reply(["ok": true, "error": ""])
+    case "preview":
+      Feedback.preview(request["voice"] as? String ?? "")
+      reply(["ok": true, "error": ""])
     case "retry":
       call.retryShare(request["key"] as? String ?? "")
       reply(["ok": true, "error": ""])

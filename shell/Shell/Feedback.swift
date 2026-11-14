@@ -19,11 +19,43 @@ enum Feedback {
     if Prefs.sounds { play(live ? "connect" : "end") }
   }
 
+  private static var preview: AVAudioPlayer?
+  private static let previewEnded = PreviewEnded()
+
+  /// A voice's sample on the Voice page, as the stable app plays it: heard with the silent switch
+  /// on, other audio ducked while it plays and let go after. Only between calls (the page locks the
+  /// voice during one), so the call's audio session is never touched.
+  static func preview(_ voice: String) {
+    guard Call.shared.status == .idle,
+      let url = Bundle.main.url(forResource: "voice-\(voice)", withExtension: "m4a"),
+      let player = try? AVAudioPlayer(contentsOf: url)
+    else { return }
+    preview?.stop()
+    let session = AVAudioSession.sharedInstance()
+    try? session.setCategory(.playback, options: [.duckOthers])
+    try? session.setActive(true)
+    player.delegate = previewEnded
+    preview = player
+    player.play()
+  }
+
+  fileprivate static func letGo(_ player: AVAudioPlayer) {
+    guard player === preview, Call.shared.status == .idle else { return }
+    preview = nil
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
+
   private static func play(_ name: String) {
     let player = players[name] ?? Bundle.main.url(forResource: name, withExtension: "wav").flatMap { try? AVAudioPlayer(contentsOf: $0) }
     players[name] = player
     player?.currentTime = 0
     player?.play()
+  }
+}
+
+private final class PreviewEnded: NSObject, AVAudioPlayerDelegate {
+  func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully _: Bool) {
+    MainActor.assumeIsolated { Feedback.letGo(player) }
   }
 }
 

@@ -22,7 +22,7 @@ enum CallLiveActivity {
     case .idle:
       guard let activity = current else { return }
       current = nil
-      let ended = CallAttributes.ContentState(state: "ended", since: since, orb: Prefs.orb, outcome: outcome(call), bad: ["dropped", "no-connect", "expired"].contains(call.ending) || call.failure != nil)
+      let ended = CallAttributes.ContentState(state: "ended", since: since, orb: Prefs.orb, outcome: outcome(call), bad: ["dropped", "no-connect"].contains(call.ending))
       since = nil
       Task { await activity.end(ActivityContent(state: ended, staleDate: nil), dismissalPolicy: .after(Date().addingTimeInterval(120))) }
     case .connecting, .live, .reconnecting:
@@ -38,12 +38,15 @@ enum CallLiveActivity {
     }
   }
 
+  /// The stable app's ending lines, with how long it ran ("You hung up · 3:12").
   private static func outcome(_ call: Call) -> String {
     let line = [
-      "you": "You hung up", "hex": "hex hung up", "dropped": "The call dropped", "expired": "The call ran out of time",
-      "no-connect": "Couldn't connect",
+      "you": "You hung up", "hex": "hex hung up", "dropped": "Call dropped", "expired": "Time ran out",
+      "no-connect": "Couldn’t connect",
     ][call.ending] ?? "Call ended"
     guard since != nil, call.ending != "no-connect" else { return line }
-    return "\(line) · \(call.seconds / 60):\(String(format: "%02d", call.seconds % 60))"
+    let s = call.seconds
+    let rest = String(format: "%02d", s % 60)
+    return "\(line) · " + (s < 3600 ? "\(s / 60):\(rest)" : "\(s / 3600):\(String(format: "%02d", s / 60 % 60)):\(rest)")
   }
 }

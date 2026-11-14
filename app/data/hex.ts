@@ -55,7 +55,27 @@ export function watch<T>(path: string, map: (body: Record<string, unknown>) => T
     exactLongPoll: { cursor: 'after', from: 'version' },
     exactStream: (event) => {
       if (event.type === 'error') throw new Error(event.message || UNREACHABLE);
-      return map(JSON.parse(String(event.data)) as Record<string, unknown>);
+      const answer = map(JSON.parse(String(event.data)) as Record<string, unknown>);
+      latest.set(path, answer);
+      return answer;
     },
   });
+}
+
+/**
+ * What hex last said on each watched path, so `keep` can put it in app storage: a long poll's
+ * mapper can't touch storage itself, so a second read keyed on the poll's version writes it.
+ */
+const latest = new Map<string, unknown>();
+type Storage = Parameters<import('../app.contract.d.ts').Answer>[3];
+const file = (path: string) => `app:/data/kept${path.replaceAll('/', '-')}.json`;
+
+export async function keep(storage: Storage, path: string): Promise<void> {
+  if (latest.has(path)) await storage.fs.atomicWriteFile(file(path), new TextEncoder().encode(JSON.stringify(latest.get(path))));
+}
+
+/** The last answer kept for a path, for a launch that can't reach hex; nothing kept fails the read. */
+export async function kept<T>(storage: Storage, path: string): Promise<T> {
+  const bytes = await storage.fs.readFile(file(path));
+  return JSON.parse(new TextDecoder().decode(bytes)) as T;
 }

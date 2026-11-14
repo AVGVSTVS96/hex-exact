@@ -95,10 +95,24 @@ component App
 
   // hex, kept current: each holds a request open until hex changes (Exact's long poll).
   resource activity = watchActivity() as shape Activity else empty()
-  resource counts = watchCounts() as shape Counts else empty()
-  resource calls = watchCalls() as shape Calls else empty()
-  resource tasks = watchTasks() as shape Tasks else empty()
-  resource asks = watchAsks() as shape Asks else empty()
+  resource liveCounts = watchCounts() as shape Counts else empty()
+  resource liveCalls = watchCalls() as shape Calls else empty()
+  resource liveTasks = watchTasks() as shape Tasks else empty()
+  resource liveAsks = watchAsks() as shape Asks else empty()
+  // The same lists kept on the phone: read once at launch, shown until hex answers, and written
+  // each time hex changes them.
+  resource keptCounts = keptCounts() as shape Counts else empty()
+  resource keptCalls = keptCalls() as shape Calls else empty()
+  resource keptTasks = keptTasks() as shape Tasks else empty()
+  resource keptAsks = keptAsks() as shape Asks else empty()
+  derive counts = current(liveCounts) ? liveCounts : keptCounts
+  derive calls = liveCalls.version > 0 ? liveCalls : keptCalls
+  derive tasks = liveTasks.version > 0 ? liveTasks : keptTasks
+  derive asks = liveAsks.version > 0 ? liveAsks : keptAsks
+  resource keepingCounts = keep("/tasks/summary", `${liveCounts.needs} ${liveCounts.working} ${liveCounts.yours}`) when current(liveCounts) as shape Reply else empty()
+  resource keepingCalls = keep("/calls", `${liveCalls.version}`) when liveCalls.version > 0 as shape Reply else empty()
+  resource keepingTasks = keep("/tasks", `${liveTasks.version}`) when liveTasks.version > 0 as shape Reply else empty()
+  resource keepingAsks = keep("/asks", `${liveAsks.version}`) when liveAsks.version > 0 as shape Reply else empty()
 
   // The newest build on the install link, for the update toast, asked again each time the app
   // comes to the front.
@@ -456,11 +470,11 @@ component App
         if e.name == "home"
           Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, trouble=trouble)
         if e.name == "calls"
-          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(calls)), failed=failed(calls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
+          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(liveCalls)), failed=failed(liveCalls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"
           PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
-          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(tasks) or not current(asks)), failed=(failed(tasks) or failed(asks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
+          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(liveTasks) or not current(liveAsks)), failed=(failed(liveTasks) or failed(liveAsks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
             TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "task"
           TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)

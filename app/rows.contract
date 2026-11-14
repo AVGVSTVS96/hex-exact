@@ -173,3 +173,40 @@ component Folded
               text "Send again" font="-exact-footnote" font-weight=600
       button press=undo(said.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
         text "Undo" font="-exact-subheadline" font-weight=600
+
+// What hex took off Bassim's list to decide itself: its topic, the question, and Undo, which puts it
+// back on his list. A tap opens the thread hex decides it in.
+component DecidedRow
+  inject
+    haptics: bool
+  props
+    ask: Ask
+    said: Said[]
+    href: string
+    split: bool
+    selected: bool
+    select: action
+    undo: action
+  derive word = match said.filter(s => s.id == ask.id and s.status == "failed").at(-1) { case some(s) => s, case none => Said(id="", verb="", label="", status="", detail="", missed=0, question="", topic="", task="") }
+  view
+    row gap=10 align-items="center" testId=`decided-${ask.id}`
+      if split
+        button press=select appearance="none" display="flex" flex-direction="row" gap=12 align-items="flex-start" flex=1 min-width=0 text-align="left" padding="8px 10px" margin="0 0 0 -10px" border-radius=12 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided, ${ask.topic}: ${ask.question}` testId=`decided-open-${ask.id}`
+          DecidedLines(ask=ask, word=word)
+      else
+        link href=href display="flex" flex-direction="row" gap=12 align-items="flex-start" flex=1 min-width=0 padding="8px 0" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided, ${ask.topic}: ${ask.question}` testId=`decided-open-${ask.id}`
+          DecidedLines(ask=ask, word=word)
+      button press=undo(ask.id) appearance="none" padding="5px 12px" border-radius=999 background-color="-exact-tertiary-fill" flex-shrink=0 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-undo-${ask.id}`
+        text "Undo" font="-exact-subheadline" font-weight=600
+
+component DecidedLines
+  props
+    ask: Ask
+    word: Said
+  view
+    Mark(state="decided", size=22)
+    column flex=1 min-width=0 gap=2
+      text ask.topic font="-exact-headline" line-clamp=1
+      text ask.question font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+      if word.id != ""
+        text failedWords(word) font="-exact-footnote" color="hex.danger"

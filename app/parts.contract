@@ -16,8 +16,8 @@ style Pill
 
 // The colour a state is drawn in, everywhere: mint for what's Bassim's, amber for a question, blue
 // for work going on, red for a failure, grey for the settled (app.tamber).
-fn tintOf(state: string): string = state == "needs" or state == "pick" ? "hex.accent" : state == "asks" ? "hex.ask" : state == "working" or state == "running" ? "hex.progress" : state == "failed" ? "hex.danger" : "-exact-secondary-label"
-fn washOf(state: string): string = state == "needs" or state == "pick" ? "hex.accent.wash" : state == "asks" ? "hex.ask.wash" : state == "working" or state == "running" ? "hex.progress.wash" : state == "failed" ? "hex.danger.wash" : "-exact-tertiary-fill"
+fn tintOf(state: string): string = state == "needs" or state == "pick" or state == "decided" ? "hex.accent" : state == "asks" ? "hex.ask" : state == "working" or state == "running" ? "hex.progress" : state == "failed" ? "hex.danger" : "-exact-secondary-label"
+fn washOf(state: string): string = state == "needs" or state == "pick" or state == "decided" ? "hex.accent.wash" : state == "asks" ? "hex.ask.wash" : state == "working" or state == "running" ? "hex.progress.wash" : state == "failed" ? "hex.danger.wash" : "-exact-tertiary-fill"
 
 fn symbolOf(state: string): string = state == "asks" ? "symbol:sf/questionmark" : state == "pick" ? "symbol:sf/sparkle" : state == "done" ? "symbol:sf/checkmark" : state == "failed" ? "symbol:sf/exclamationmark" : state == "paused" ? "symbol:sf/pause.fill" : ""
 
@@ -40,8 +40,9 @@ keyframes markSpin
   to rotate="360deg"
 
 // A state's mark, the stable app's (§9.10), in a square of `size`: needs a mint dot on its wash; a
-// question amber with ?; hex's pick mint with ✦; working a turning blue arc; done a checked square;
-// read a dot; failed red with !; paused, stopped, pending (dashed) and idle (a ring) in grey.
+// question amber with ?; hex's pick mint with ✦, and what hex decided a mint ✦ on its wash; working
+// a turning blue arc; done a checked square; read a dot; failed red with !; paused, stopped,
+// pending (dashed) and idle (a ring) in grey.
 component Mark
   props
     state: string
@@ -58,6 +59,9 @@ component Mark
       else if state == "needs"
         box width=disc height=disc border-radius=(disc / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
           box width=dot height=dot border-radius=(dot / 2) background-color="hex.accent"
+      else if state == "decided"
+        box width=disc height=disc border-radius=(disc / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
+          image "symbol:sf/sparkle" width=glyph height=glyph object-fit="contain" color="hex.accent"
       else if state == "asks" or state == "pick"
         box width=disc height=disc border-radius=(disc / 2) background-color=tintOf(state) display="flex" align-items="center" justify-content="center"
           image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-background"
@@ -75,6 +79,39 @@ component Mark
         box width=(disc - 4) height=(disc - 4) border-radius=(disc / 2) border="1.5px dashed -exact-tertiary-label"
       else
         box width=dot height=dot border-radius=(dot / 2) border="1.5px solid -exact-tertiary-label"
+
+// A section of a list by state: its colour's dot on its wash, its name in that colour, how many
+// ("–" until hex has answered).
+component StageHead
+  props
+    state: string
+    label: string
+    n: number
+    known: bool
+    pad: string
+    id: string
+  view
+    row gap=12 align-items="center" padding=pad role="heading" aria-level=2 aria-label=`${label}, ${n}` testId=id
+      box width=22 height=22 border-radius=11 background-color=washOf(state) display="flex" align-items="center" justify-content="center" flex-shrink=0
+        box width=8 height=8 border-radius=4 background-color=tintOf(state)
+      text label font="-exact-headline" color=tintOf(state) flex=1
+      text (known ? `${n}` : "–") font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+// "Show N more" under the first few of a list: the rows' own mark column holds the ellipsis.
+component ShowMore
+  inject
+    haptics: bool
+  props
+    n: number
+    shown: bool
+    pad: string
+    id: string
+    press: action
+  view
+    button press=press appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" justify-content="flex-start" width="100%" box-sizing="border-box" text-align="left" padding=pad aria-expanded=shown -exact-press-haptic=(haptics ? "selection" : "none") testId=id
+      box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+        image "symbol:ellipsis" width=14 height=14 object-fit="contain" color="-exact-tertiary-label"
+      text (shown ? "Show fewer" : `Show ${n} more`) font="-exact-subheadline" color="-exact-secondary-label" flex=1
 
 // A count in its state's ink on its wash ("–" while loading).
 component Chip

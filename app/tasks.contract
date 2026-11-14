@@ -2,10 +2,10 @@
 // you, Working, Done, Quiet. Each topic is one row; search finds any question, thread or result by
 // every word. On a phone it's a sheet over the call, so the call stays in reach.
 use Viewport, Tasks, Asks, Counts from "./shapes.contract"
-use Mark, Chip, whenOf from "./parts.contract"
+use Mark, Chip, StageHead, ShowMore, whenOf from "./parts.contract"
 use Said from "./said.contract"
 use Item, Topic, entriesOf, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
-use ProjectRow, TopicHead, EntryRow from "./rows.contract"
+use ProjectRow, TopicHead, EntryRow, DecidedRow from "./rows.contract"
 
 shape TabItem
   id: string
@@ -48,6 +48,9 @@ component TasksList
     back: action
   slot
   state query = ""
+  // Needs you shows its first few and what hex decided its first two, until Bassim asks for more.
+  state allNeeds = false
+  state allDecided = false
   derive tabs = [TabItem(id="all", label="All"), TabItem(id="needs", label="Needs you"), TabItem(id="working", label="Working"), TabItem(id="done", label="Done"), TabItem(id="quiet", label="Quiet")]
   derive entries = entriesOf(tasks, asks, now)
   // An ask put away here leaves the counts at once, and its row folds where it was.
@@ -61,8 +64,15 @@ component TasksList
   derive asking = asks.asks.filter(a => not away.includes(a.id)).length
   derive known = tasks.version > 0 or asks.version > 0
   derive needsTab = tab == "needs" and not searching
+  derive shownTopics = needsTab and not allNeeds ? topics.slice(0, 3) : topics
+  derive decided = asks.decided
+  derive shownDecided = allDecided ? decided : decided.slice(0, 2)
   derive book = viewport.horizontalViewportSegments == 2
   derive listWidth = book ? "env(viewport-segment-width 0 0)" : "25rem"
+  action moreNeeds
+    allNeeds = not allNeeds
+  action moreDecided
+    allDecided = not allDecided
   action search(v: string)
     query = v
   action openPage(page: string)
@@ -93,12 +103,9 @@ component TasksList
                       text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(t.id == "needs" ? "hex.accent" : tab == t.id ? "-exact-background" : "-exact-secondary-label") opacity=(tab == t.id and t.id != "needs" ? 0.7 : 1)
             if failed and known
               text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 16px" testId="tasks-behind"
-            if needsTab and picks.length > 1
-              link href=path("picks") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-picks"
-                Mark(state="pick", size=22)
-                text `hex picked for ${picks.length} questions` flex=1 font="-exact-body"
-                text "Take them" font="-exact-subheadline" color="hex.accent"
-            for t, i in topics key=(tab == "done" or searching ? `${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : t.name)
+            if needsTab
+              StageHead(state="asks", label="Needs you", n=match countOf.at(1) { case some(n) => n, case none => 0 }, known=known, pad="6px 16px 2px", id="stage-head-asks")
+            for t, i in shownTopics key=(tab == "done" or searching ? `${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : t.name)
               if not searching and tab == "all" and (i == 0 or match topics.at(i - 1) { case some(p) => match p.entries.at(0) { case some(e) => e.stage, case none => "" } != match t.entries.at(0) { case some(e) => e.stage, case none => "" }, case none => true })
                 text stageWord(match t.entries.at(0) { case some(e) => e.stage, case none => "" }) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.4 padding=(i == 0 ? "4px 16px 2px" : "18px 16px 2px")
               if searching
@@ -107,6 +114,19 @@ component TasksList
                   EntryRow(entry=e, asks=asks.asks, said=said, why=whyOf(e, words), now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openPage)
               else
                 ProjectRow(topic=t, now=now, offset=offset, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=split, selected=(split and beside == homeOf(pageOf(t), tasks.tasks)), select=select(homeOf(pageOf(t), tasks.tasks)))
+            if needsTab and topics.length > 3
+              ShowMore(n=(topics.length - 3), shown=allNeeds, pad="4px 16px", id="more-needs", press=moreNeeds)
+            if needsTab and picks.length > 1
+              link href=path("picks") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-picks"
+                Mark(state="pick", size=22)
+                text `hex picked for ${picks.length} questions` flex=1 font="-exact-body"
+                text "Take them" font="-exact-subheadline" color="hex.accent"
+            if needsTab and decided.length > 0
+              StageHead(state="decided", label="hex decided", n=decided.length, known=known, pad="20px 16px 2px", id="stage-head-decided")
+              for a in shownDecided key=a.id
+                DecidedRow(ask=a, said=said, href=path("task", homeOf(a.task, tasks.tasks)), split=split, selected=(split and beside == homeOf(a.task, tasks.tasks)), select=select(homeOf(a.task, tasks.tasks)), undo=undo)
+              if decided.length > 2
+                ShowMore(n=(decided.length - 2), shown=allDecided, pad="4px 16px", id="more-decided", press=moreDecided)
             if needsTab and asks.check.at > 0
               link href=path("check") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-check"
                 Mark(state="done", size=22)

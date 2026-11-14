@@ -78,7 +78,13 @@ In the call, `share(source)` sends into the live call; the shell shows them amon
 Contract ── callCommand(op) ──▶ app.ts ── native.later ──▶ Hex.swift ─HexCallCommand─▶ Bridge ─▶ Call
 Call ─▶ Bridge ─HexCallState / HexCaptions─▶ Hex.swift ── changed("call") ──▶ app.ts ──▶ call, captions
 Call ─▶ Bridge ─HexCallLevels (8/s)─▶ hex-orb (native view; levels never cross into Contract)
+Screen ─HexPose─▶ Hex.swift ── changed("pose") ──▶ app.ts ──▶ pose (bar side, fold, cutouts)
 ```
+
+Exact's viewport gives the Duo's segments and safe areas; the shell's `Screen` (the window's root)
+adds what the stable app's Pose module read: which side the system bars take (the 84-pt column on
+the cover screen and the book fold), the fold, and what the cameras cover. Home and `CallDock` place
+the toolbar and the call's buttons from it (call.contract `barOf`, `columnTopOf`, `bandOf`).
 
 `app/modules/apple/Hex.swift` is the app's Exact native module. An embed build doesn't build
 modules, so the shell builds it as the `ExactModules` framework from the same file plus Exact's
@@ -138,5 +144,3 @@ before a build; builds share it with other work. Commit to main, signed, small.
 - A phone's Tasks is a sheet that stops at half height during a call, but the call under it
   stays dimmed and untouchable: Exact's sheets have no undimmed detent (the stable app's
   `largestUndimmedDetent` at medium).
-- The Esc key closing Tasks isn't wired: Contract's `key` events reach a focused node, not the
-  app, while no field is focused.

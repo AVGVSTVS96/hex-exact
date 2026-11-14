@@ -205,10 +205,8 @@ component Home
       // The orb: in the middle at rest, docked as the words are read (phone, cover screen); on the
       // left screen of a book fold; above a laptop fold.
       if single
-        box position="absolute" left=(orbX - orbSize / 2) top=(orbY - orbSize / 2) width=orbSize height=orbSize press=orbTap aria-label=(reading ? `${label}. Put the words away` : label) -exact-layout-transition=glide testId="orb-spot"
+        box position="absolute" left=(orbX - orbSize / 2) top=(orbY - orbSize / 2) width=orbSize height=orbSize touch-action="none" pan=drag panrelease=release press=orbTap aria-label=(reading ? `${label}. Put the words away` : label) -exact-layout-transition=glide testId="orb-spot"
           hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label -exact-layout-transition=glide testId="orb"
-        if reading
-          box position="absolute" left=(orbX - 30) top=(orbY - 30) width=60 height=60 touch-action="none" pan=drag panrelease=release press=orbTap aria-hidden=true
         column position="absolute" top=(restY + restSize / 2 + 12) left=left right=right align-items="center" gap=10 opacity=(1 - pull) pointer-events=(pull > 0.5 ? "none" : "auto") testId="stage"
           CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
           if wrapped

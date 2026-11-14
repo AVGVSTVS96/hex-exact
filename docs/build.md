@@ -138,8 +138,6 @@ before a build; builds share it with other work. Commit to main, signed, small.
 - The orb is the stable app's six Rive personas, drawn by RiveRuntime in the module
   (`hex-orb persona= tint= palette= reaction=`); a plain `exact ios` build has no Rive and draws
   hex's own sphere instead.
-- The orb's squash and stretch with the pitch of Bassim's voice (the stable app's C audio tap on
-  the mic) isn't here: WebRTC owns the mic in the shell, so the orb follows its input level only.
 - The camera, Photos, the call's Live Activity, its sounds and Siri are the shell's: Exact has no
   camera capture, and the call outlives the screen. Exact's own Live Activities can't follow a
   call the shell holds while the screen sleeps.

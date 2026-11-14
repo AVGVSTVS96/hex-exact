@@ -24,7 +24,7 @@ the stable app, screen by screen: it is what done means.
 |---|---|---|
 | `app/app.contract` | routes, every resource, mutation and action, the screen switch | shared: add, don't reshape |
 | `app/shapes.contract` | every shape hex answers in | shared |
-| `app/parts.contract` | the design system: surfaces, marks, chips, place tiles, words for times and endings | shared |
+| `app/parts.contract` | the design system: surfaces, marks, chips, place tiles, section heads (`StageHead`) and "Show N more" (`ShowMore`), words for times and endings | shared |
 | `app/data/*.ts`, `app/app.ts` | hex's endpoints (`hex.ts` is the client and the long poll) | shared |
 | `app/call.contract` | Home: the orb, captions, the call's asks, agent line, controls, toolbar | foundation, then (c) for the orb |
 | `app/home.contract` | Home with no call on: hex's face and live line, Needs you, Working on, what hex decided; on a book fold the page a row opens beside | Muse (1) |
@@ -66,6 +66,13 @@ AddMedia(menu, label, glass, size, disabled, add)   "+" with a Camera / Photos m
 Waiting(media, remove)                              what waits in a composer, each with ×
 Album(media, width) · Thumb(media, width, square)   pictures (the hex-media view: authed, tap to look)
 ```
+
+**Questions** look the same everywhere: `AskCard` (ask.contract) sits flat on the page, in a
+`section background-color="transparent"`, and every answer on the task page, the pick page and the
+call is an `AnswerRow`. **hex decided** is `asks.decided`: what hex's check took off Needs you
+in the last week as hex's own call, with its reason. Home and Tasks both read it; a question hex
+only has a pick for still needs Bassim and stays in Needs you ("hex picked for N · Take them").
+`undo` on a decided one puts it back on Needs you, and hex won't take it again.
 
 A composer passes its key (`thread:<id>`, `ask:<id>`): root `attach(key, source)` picks and
 uploads, `attached` (Media[]) holds them while `attachedTo == key`, `detach(id)` takes one out.

@@ -104,7 +104,14 @@ scripts/sim / /tasks /settings                 # simulator build on the Mac, sho
 BUILT=1 POSES=open-up APPEARANCES="dark light" scripts/sim /calls   # reuse the last build
 scripts/ship                                   # new install link on the Duo
 scripts/publish                                # screens only, over the air
+cd app && bun exact.mjs test web               # app.test.contract, about 3 minutes
 ```
+
+`app.test.contract` drives the main flows without hex or the shell (Home, the screens it opens,
+what Settings keeps on the phone); its tests read no hex data, so they pass offline. On the server
+Exact's web build prints "built" and then never exits (the app's data keeps a timer alive in its
+build-time realm), so `exact test web` waits forever: run it with an `EXACT` whose
+`host/web-js/build.mjs` ends in `process.exit(0);` until Exact exits there itself.
 
 `scripts/sim` shoots into `~/hex/scratch/hex-exact/shots/<commit>/`, poses `cover-up` (folded),
 `open-up` (book fold), `open-side` (laptop fold), `cover-side`. Check `memory_pressure` on the Mac

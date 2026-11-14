@@ -1,0 +1,87 @@
+size 390x844
+epoch "2026-11-13T15:00:00Z"
+time-zone "America/New_York"
+
+test "Home rests with the call ready to start"
+  expect tree has "orb"
+  expect enabled "call"
+  expect tree missing "mute"
+  expect tree missing "footer"
+  expect state call.status == "idle"
+
+test "without the shell a call doesn't start, and Home stays as it was"
+  tap "call"
+  clock data
+  expect state call.status == "idle"
+  expect tree missing "connecting"
+  expect enabled "call"
+
+test "Tasks, Calls and Settings open from Home and go back to it"
+  tap "open-tasks"
+  clock settle
+  clock +500
+  expect tree has "tasks"
+  back
+  clock settle
+  clock +500
+  expect tree missing "tasks"
+  tap "open-calls"
+  clock settle
+  clock +500
+  expect tree has "calls"
+  back
+  clock settle
+  clock +500
+  expect tree missing "calls"
+  tap "open-settings"
+  clock settle
+  clock +500
+  expect tree has "settings"
+  tap "open-voice"
+  clock settle
+  clock +500
+  expect tree has "voice"
+  back
+  clock settle
+  clock +500
+  expect tree missing "voice"
+  tap "settings-done"
+  clock settle
+  clock +500
+  expect tree missing "settings"
+  expect tree has "orb"
+
+test "the persona, its colour, the reaction and the call's sounds are kept on this phone"
+  at "/settings"
+  clock settle
+  clock +500
+  tap "persona-halo"
+  clock settle
+  clock +500
+  tap "swatch-Sky"
+  tap "reaction-lively"
+  type "sounds" "false"
+  expect state persona == "halo"
+  expect state personaColor == "#A9CCFF"
+  expect state reaction == "lively"
+  expect state sounds == false
+  reload
+  expect state persona == "halo"
+  expect state personaColor == "#A9CCFF"
+  expect state reaction == "lively"
+  expect state sounds == false
+
+test "Opal takes a palette, and Mana keeps its own colour"
+  at "/settings"
+  clock settle
+  clock +500
+  tap "persona-opal"
+  clock settle
+  clock +500
+  tap "swatch-Teal"
+  expect state opalPalette == "6"
+  tap "persona-mana"
+  clock settle
+  clock +500
+  expect tree has "mana-note"
+  expect disabled "swatch-White"

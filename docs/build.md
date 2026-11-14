@@ -108,15 +108,18 @@ before a build; builds share it with other work. Commit to main, signed, small.
 
 - Over the air, Exact sends screens (Contract and assets), not `app.ts` or the shell: a data or
   Swift change needs `scripts/ship`.
-- A long poll's mapper can't touch storage, so lists aren't kept offline yet; a failed read keeps
-  its last answer while the app runs.
-- `openURL` in an embedded session goes to the shell, which opens links out (Telegram, T3 Code).
-- Exact has no colour well (`input type="color"`), so Settings offers the eight preset colours
-  and Opal's nine palettes, without the stable app's custom colour.
-- Voice previews are Exact sound effects (WAV, 10 s at most), converted from the stable app's
-  m4a files into `assets/voices/`. Exact's audio session is app-wide (`audio_session` in
-  app.json); it stays the default `ambient`, so previews follow the silent switch, because a
-  `playback` session could take the shell's call audio away mid-call.
+- A long poll's mapper can't touch storage, so it notes each answer and a second read keyed on the
+  poll's version (`keep`, data/kept.ts) writes it to app storage; a launch that can't reach hex
+  shows the kept Tasks, questions, counts and Calls until it can.
+- `openURL` in an embedded session goes to the shell, which opens links out (Telegram, T3 Code)
+  and says whether they opened (`openURL(url, "opened")`, how "isn't on this iPhone" shows).
+- Exact has no colour well (`input type="color"`), so the custom persona colour is the module's
+  `hex-color` view, iOS's `UIColorWell`.
+- Exact's sounds follow the silent switch (its audio session is app-wide and stays `ambient`, so
+  it can't take the call's audio), so voice previews are the shell's: `callCommand("preview")`
+  plays the stable app's m4a with a `playback` session, only between calls.
+- The update toast hears of a build from hangar's server-sent `apps` events while the app is in
+  front; a dropped stream comes back the next time the app does.
 - An `image` can't carry hex's token, so hex's photos and videos are the module's `hex-media`
   view (media.contract `Thumb`, `Album`): it fetches with the token and opens Quick Look on a tap.
 - The orb is the stable app's six Rive personas, drawn by RiveRuntime in the module

@@ -15,14 +15,16 @@ import UIKit
 ///   app.ts  native.watch('call');     native.call({op: 'call'})      → the call's state
 ///           native.watch('captions'); native.call({op: 'captions'})  → its words and shared media
 ///           native.watch('pose');     native.call({op: 'pose'})      → the Duo's bar side, fold, occlusions
-///           native.later({op: start | mute | end | share | attach | retry, …})
+///           native.later({op: start | mute | end | preview | share | attach | retry, …})
 ///   views   hex-orb state=… silenced=… persona=… tint=… palette=… reaction=… still=… speak=…
 ///           hex-media media=<id> kind=photo|video anchor=top|center  → an authed thumbnail; tap to look
+///           hex-color hue=#RRGGBB custom=true|false change=…  → iOS's colour well; change hears #RRGGBB
 final class Hex: ExactModule {
   override class var views: [String: ExactNativeFactory] {
     [
       "hex-orb": ExactNativeFactory(for: Hex.self) { _, props, events in OrbInstance(props, events) },
       "hex-media": ExactNativeFactory(for: Hex.self, reuse: true) { _, props, events in MediaInstance(props, events) },
+      "hex-color": ExactNativeFactory(for: Hex.self) { _, props, events in ColorInstance(props, events) },
     ]
   }
 
@@ -479,6 +481,37 @@ final class DrawnOrb: UIView {
 }
 
 // MARK: Media
+
+/// `hex-color`: the persona's own colour, picked with iOS's colour well (Exact has no colour input).
+/// It shows the colour chosen; a pick says it as `#RRGGBB`. `custom` rings it when that colour is
+/// none of the presets.
+final class ColorInstance: ExactNativeInstance {
+  private let well = UIColorWell()
+
+  init(_ props: [String: String], _ events: ExactNativeEvents) {
+    super.init(events: events)
+    well.supportsAlpha = false
+    well.title = "Persona color"
+    well.addAction(UIAction { [weak self] _ in self?.picked() }, for: .valueChanged)
+    try? setProps(props)
+  }
+
+  override var view: ExactNativeView { well }
+
+  override func setProps(_ props: [String: String]) throws {
+    let custom = props["custom"] == "true"
+    well.accessibilityLabel = custom ? "Custom color, selected" : "Custom color"
+    if let color = UIColor(hex: props["hue"] ?? ""), custom { well.selectedColor = color }
+  }
+
+  private func picked() {
+    guard let color = well.selectedColor else { return }
+    var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+    color.resolvedColor(with: well.traitCollection).getRed(&r, green: &g, blue: &b, alpha: &a)
+    let byte = { (v: CGFloat) in Int((min(max(v, 0), 1) * 255).rounded()) }
+    events.change(String(format: "#%02X%02X%02X", byte(r), byte(g), byte(b)))
+  }
+}
 
 /// `hex-media`: a photo or video hex holds (`media` is its id from `POST /media`), or one still on
 /// this phone while it sends (a `file:` id). It fills its box, cropped about its centre, or showing

@@ -106,12 +106,17 @@ component Swatches
     chosen: string
     pick: action
   derive set = persona == "opal" ? palettes : colors
+  derive custom = persona != "opal" and chosen != "" and colors.filter(c => c.id == chosen).length == 0
   view
     column gap=8 align-items="center" testId="swatches"
       row role="radiogroup" appearance="none" aria-label=(persona == "opal" ? "Opal colors" : persona == "mana" ? "Mana keeps its own color" : "Persona color") gap=6 justify-content="center" flex-wrap="wrap" opacity=(persona == "mana" ? 0.35 : 1)
         for s in set key=s.id
           button role="radio" aria-checked=(chosen == s.id) press=pick(s.id) disabled=(persona == "mana") appearance="none" width=36 height=36 border-radius=18 border=(chosen == s.id and persona != "mana" ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" aria-label=s.label testId=`swatch-${s.label}`
             box width=26 height=26 border-radius=13 background-color=(persona == "mana" ? "-exact-tertiary-fill" : s.color == "" ? "transparent" : s.color) background-image=(persona != "mana" and s.color == "" ? "linear-gradient(135deg, #2FB5AD, #9B4DD6 50%, #F07B3F)" : "none") border="0.5px solid -exact-separator"
+        // The persona's own colour, past the presets (not Opal's palettes; Mana keeps its own).
+        if persona != "opal" and persona != "mana"
+          box width=36 height=36 border-radius=18 border=(custom ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" testId="swatch-custom"
+            hex-color hue=chosen custom=(custom ? "true" : "false") change=pick width=28 height=28 aria-label=(custom ? "Custom color, selected" : "Custom color") testId="custom-color"
       if persona == "mana"
         text "Mana keeps its own color" font="-exact-footnote" color="-exact-secondary-label" testId="mana-note"
 

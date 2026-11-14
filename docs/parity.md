@@ -19,7 +19,7 @@ Source: `~/Developer/hex-voice` at `b406d5e3`. Server: `~/hex/.hex/channels/voic
 |---|---|---|
 | `live.voice` | one of 22 voice ids (`src/live/voices.ts`) | `marin` |
 | `live.persona` | obsidian, mana, opal, halo, glint, command | `opal` |
-| `live.personaColor` | `#RRGGBB`, one of 8 presets | `#FFFFFF` |
+| `live.personaColor` | `#RRGGBB`, one of 8 presets or a custom colour from the colour picker | `#FFFFFF` |
 | `live.opalPalette` | `original`, `2`…`9` | `original` |
 | `live.reaction` | off / subtle (0.07) / lively (0.16) | `subtle` |
 | `live.sounds`, `live.haptics` | on/off | on |
@@ -553,7 +553,7 @@ Opened from the toolbar sliders button ("Voice and appearance settings").
 
 **Page 1: Settings**
 - **Persona carousel**: swipe between the 6 orbs with a live preview orb that reacts like a phrase when you change reaction.
-- **Colour swatches** (8 presets, light-mode variants such as White → "Ink"). For opal, 9 palette swatches. For mana: "Mana keeps its own color".
+- **Colour swatches** (8 presets, light-mode variants such as White → "Ink"). A colour picker after them for a custom colour. For opal, 9 palette swatches. For mana: "Mana keeps its own color".
 - **Reacts to you** picker: Off / Subtle / Lively.
 - **Voice** row: shows "Marin · Friend · Brisk" and opens page 2.
 - **Call sounds** toggle and **Haptics** toggle.

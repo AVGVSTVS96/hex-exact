@@ -2,7 +2,7 @@
 // call, Siri and the Live Activity; this root holds everything the screens read and write, as
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
-use Viewport, Pose, Delivery, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
+use CallRow, Viewport, Pose, Delivery, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
 use Home from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
@@ -82,6 +82,8 @@ component App
   // for a moment on the agent line.
   state agentsRunning = [""].slice(0, 0)
   state agentDone = ""
+  // On a phone and the cover screen: the call's words pulled up to read, the orb docked.
+  state reading = false
   // Milliseconds since launch, a minute at a time: "Today", "3 min ago" and the like move on.
   state tick = 0
 
@@ -189,6 +191,11 @@ component App
   derive trouble = call.status != "live" ? "" : tried == `${call.id}|talk` ? talkTrouble : tried == `${call.id}|share` ? shareTrouble : ""
   derive stopFailed = pending(stopped) ? "" : match stopped { case some(r) => r.ok ? "" : r.id, case none => "" }
   derive stopWords = pending(stopped) ? "" : match stopped { case some(r) => r.ok ? "" : `Not stopped · ${r.error}`, case none => "" }
+  // The call that just ended here, listed at once, as hex will list it once it has saved it.
+  derive endedHere = call.status == "idle" and call.ending != "" and call.ending != "no-connect" and captions.call != "" and captions.call != "demo" and calls.calls.filter(c => c.id == captions.call).length == 0
+  derive firstWords = match captions.turns.at(0) { case some(t) => t.at, case none => 0 }
+  derive heard = match captions.turns.filter(t => t.who == "you" and t.text != "").at(0) { case some(t) => t.text.trim().slice(0, 160), case none => "" }
+  derive callsShown = endedHere ? Calls(calls, calls=[CallRow(id=captions.call, started=firstWords, ended=firstWords + call.seconds * 1000, ending=call.ending, source="app", voice=voice, title="", reason="", why="", summary="", waiting=[], seconds=call.seconds, tasks=0, preview=heard, live=false)].concat(calls.calls)) : calls
   derive removeError = pending(removed) ? "" : match removed { case some(r) => r.error, case none => "" }
 
   task minute mount
@@ -212,6 +219,21 @@ component App
     agentsRunning = activity.tasks.filter(t => t.state == "running").map(t => t.id)
   action letAgentGo
     agentDone = ""
+
+  // A question hex puts on screen brings the words up; a call that ends puts them away, so its
+  // wrap-up shows under the orb.
+  task askArrives when call.status == "live" and activity.asks.length > 0 key=activity.asks.length
+    change(bringWords)
+  task callEnds when call.status == "idle" key=call.ending
+    change(restWords)
+  action bringWords
+    reading = true
+  action restWords
+    reading = false
+  action setReading(on: bool)
+    reading = on
+    if haptics
+      haptic("selection")
 
   // Places
   action follow(url: string)
@@ -471,9 +493,9 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=calls, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, trouble=trouble)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, pose=pose, reading=reading, setReading=setReading, trouble=trouble)
         if e.name == "calls"
-          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=calls, loading=(not current(liveCalls)), failed=failed(liveCalls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
+          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=callsShown, loading=(not current(liveCalls)), failed=failed(liveCalls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"
           PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"

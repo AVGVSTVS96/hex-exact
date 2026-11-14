@@ -6,6 +6,8 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 env=${HEX_VOICE_ENV:-$HOME/.local/share/hex-voice/release/.env.local}
 set -a && . "$env" && set +a
 install=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
-printf 'export const HEX_URL = %s;\nexport const HEX_TOKEN = %s;\nexport const INSTALL_URL = %s;\n' \
-  "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_URL" '$v')" "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_TOKEN" '$v')" "$(jq -Rn --arg v "$install" '$v')" >"$here/app/hex.ts"
+# hangar, which installs the new build in one tap and says when there is one; "" without it.
+hangar=${HANGAR_URL:-$(sed -n 's/^HANGAR_URL=//p' "$HOME/Developer/hangar/config" 2>/dev/null || true)}
+printf 'export const HEX_URL = %s;\nexport const HEX_TOKEN = %s;\nexport const INSTALL_URL = %s;\nexport const HANGAR_URL = %s;\n' \
+  "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_URL" '$v')" "$(jq -Rn --arg v "$EXPO_PUBLIC_HEX_TOKEN" '$v')" "$(jq -Rn --arg v "$install" '$v')" "$(jq -Rn --arg v "$hangar" '$v')" >"$here/app/hex.ts"
 echo "HEX_URL=$EXPO_PUBLIC_HEX_URL HEX_TOKEN=$EXPO_PUBLIC_HEX_TOKEN"

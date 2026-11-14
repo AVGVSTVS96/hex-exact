@@ -1,5 +1,6 @@
-// The update toast (§11): a new build of hex Exact is on its install link. Install opens it there
-// (ending the call first); "Not now" hides it until the build after.
+// The update toast (§11): a new build of hex Exact is out. Install hands it to hangar, which
+// installs it and opens the new build (ending the call first); without hangar, the install link
+// installs it. "Not now" hides it until the build after.
 use Viewport, Build from "./shapes.contract"
 
 component UpdateToast
@@ -17,6 +18,8 @@ component UpdateToast
   // ready | installing | failed. The root rebuilds the toast when the app comes back to the front,
   // so an install that didn't happen is offered again.
   state step = "ready"
+  // Where the open went: hangar first, then the install link.
+  state via = ""
   derive shown = build.running > 0 and build.latest > build.running and build.latest != skipped and build.install != ""
   derive book = viewport.horizontalViewportSegments == 2
   derive atTop = place == "home"
@@ -28,9 +31,13 @@ component UpdateToast
         haptic("impact-medium")
       if live
         end()
-      openURL(build.install, "update-install")
+      via = "hangar"
+      openURL("hangar://update/com.shahidy.hexexact", "update-install")
   action heard(how: string)
-    if how == "failed"
+    if how == "failed" and via == "hangar"
+      via = "link"
+      openURL(build.install, "update-install")
+    else if how == "failed"
       step = "failed"
   view
     if shown

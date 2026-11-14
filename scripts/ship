@@ -33,14 +33,16 @@ fi
 
 echo "making its profiles with xtool and signing it with the Mac's certificate"
 rsync -a --delete "$mac:$app/" "$work/HexExact.app/"
-python3 - "$work/HexExact.app" "$number" "$HEX_URL" "$HEX_TOKEN" <<'PY'
+python3 - "$work/HexExact.app" "$number" "$HEX_URL" "$HEX_TOKEN" "$bundle" <<'PY'
 import glob, plistlib, sys
-app, number, origin, token = sys.argv[1:]
+app, number, origin, token, bundle = sys.argv[1:]
 for path in [f"{app}/Info.plist", *glob.glob(f"{app}/PlugIns/*.appex/Info.plist")]:
     info = plistlib.load(open(path, "rb"))
     info["CFBundleVersion"] = number
     if path == f"{app}/Info.plist":
         info.update(HexURL=origin, HexToken=token)
+        # Only this build answers <bundle>-<number>: hangar opens it to know the install finished.
+        info["CFBundleURLTypes"] = info.get("CFBundleURLTypes", []) + [{"CFBundleURLSchemes": [f"{bundle}-{number}"]}]
     plistlib.dump(info, open(path, "wb"), fmt=plistlib.FMT_BINARY)
 PY
 xtool sign "$work/HexExact.app" </dev/null
@@ -56,12 +58,15 @@ ssh "$mac" sh "$folder/scripts/resign" "$serial" "$signed" </dev/null
 
 echo "putting it on the install link"
 ssh "$mac" "cd Developer/hex-exact-build/signed && rm -rf Payload HexExact.ipa && mkdir Payload && cp -R HexExact.app Payload/ &&
-  ditto -c -k --keepParent Payload HexExact.ipa && rm -rf Payload" </dev/null
+  ditto -c -k --norsrc --noextattr --keepParent Payload HexExact.ipa && rm -rf Payload" </dev/null
 scp -q "$mac:Developer/hex-exact-build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
 mv "$link/hex-exact-$number.ipa.part" "$link/hex-exact-$number.ipa"
 find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
 # What the app's update toast reads: the newest build on the link.
 printf '{"number":%s,"install":"%s/"}\n' "$number" "$url" >"$link/latest.json"
+# hangar, where the app's toast hears of the build and installs it in one tap.
+hangar=$HOME/Developer/hangar/bin/hangar
+[ ! -x "$hangar" ] || "$hangar" put "$link/hex-exact-$number.ipa" --notes "$title"
 python3 - "$link" "$url" "$number" "$bundle" "$title" <<'PY'
 import html, plistlib, sys, urllib.parse
 link, url, number, bundle, title = sys.argv[1:]

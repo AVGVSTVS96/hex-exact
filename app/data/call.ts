@@ -1,5 +1,5 @@
 import type { Result, Sources } from '../app.contract.d.ts';
-import { INSTALL_URL } from '../hex.ts';
+import { HANGAR_URL, INSTALL_URL } from '../hex.ts';
 import { write } from './hex.ts';
 import { bool, list, num, obj, str, type Json } from './parse.ts';
 
@@ -77,10 +77,32 @@ export const call: Partial<Sources> = {
   },
 };
 
+const BUNDLE = 'com.shahidy.hexexact';
+
 export const build: Partial<Sources> = {
-  // The newest build scripts/ship put on the install link, beside the one running (0 off the phone).
+  // The newest build scripts/ship put out, beside the one running (0 off the phone). hangar pushes
+  // its list of builds the moment a new one lands (server-sent `apps` events) and installs it in
+  // one tap; it's told which build runs, so it shows this one as up to date. Without hangar, the
+  // install link's latest.json, read as the app comes to the front.
   checkBuild: async (_args, _store, _storage, native) => {
     const running = native?.available ? num(native.call({ op: 'build' }).number) : 0;
+    if (HANGAR_URL) {
+      if (running > 0) {
+        await fetch(`${HANGAR_URL}/running`, {
+          method: 'POST', exactTimeout: 10000, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: BUNDLE, build: running }),
+        }).catch(() => null);
+      }
+      let last = { latest: 0, running, install: '' };
+      return fetch(`${HANGAR_URL}/events`, {
+        exactStream: (event) => {
+          if (event.type === 'error') throw new Error(event.message || 'hangar stopped answering');
+          if (event.type !== 'apps') return last;
+          const app = obj((JSON.parse(String(event.data)) as Json[]).find((a) => str(obj(a).id) === BUNDLE));
+          last = { latest: num(app.build), running, install: str(app.install) };
+          return last;
+        },
+      });
+    }
     const response = await fetch(`${INSTALL_URL}/latest.json`, { exactTimeout: 20000, cache: 'no-store' });
     if (!response.ok) throw new Error(`the install link answered ${response.status}`);
     const latest = obj(await response.json());

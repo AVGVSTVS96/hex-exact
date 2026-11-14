@@ -60,6 +60,8 @@ component App
   // What Bassim did with each question and message here, as said.contract's lines, so screens show
   // it at once and say how it went.
   state said = [""].slice(0, 0)
+  // What hex decided that Bassim is taking back, until hex answers.
+  state takingBack = [""].slice(0, 0)
   state sends = [""].slice(0, 0)
   // hex's picks as Bassim leaves them before answering them all: `${askId}\t${label}`, "" for later.
   state picked = [""].slice(0, 0)
@@ -113,7 +115,9 @@ component App
   derive counts = current(liveCounts) ? liveCounts : keptCounts
   derive calls = liveCalls.version > 0 ? liveCalls : keptCalls
   derive tasks = liveTasks.version > 0 ? liveTasks : keptTasks
-  derive asks = liveAsks.version > 0 ? liveAsks : keptAsks
+  derive lists = liveAsks.version > 0 ? liveAsks : keptAsks
+  // What hex decided leaves its list the moment Bassim takes it back.
+  derive asks = Asks(lists, decided=lists.decided.filter(a => not takingBack.includes(a.id)))
   resource keepingCounts = keep("/tasks/summary", `${liveCounts.needs} ${liveCounts.working} ${liveCounts.yours}`) when current(liveCounts) as shape Reply else empty()
   resource keepingCalls = keep("/calls", `${liveCalls.version}`) when liveCalls.version > 0 as shape Reply else empty()
   resource keepingTasks = keep("/tasks", `${liveTasks.version}`) when liveTasks.version > 0 as shape Reply else empty()
@@ -355,6 +359,7 @@ component App
     send dismissed = dismissAsk(id)
   action undo(id: string)
     said = said.filter(l => field(l, 0) != id)
+    takingBack = lists.decided.filter(a => a.id == id).length > 0 ? takingBack.concat([id]) : takingBack
     send undone = undoAsk(id)
   // Answer again where a place was out of reach: one label as it was, several (verb "answers") as
   // they were joined.
@@ -390,6 +395,7 @@ component App
   action settleUndo
     match undone
       case some(r)
+        takingBack = takingBack.filter(x => x != r.id)
         if not r.ok
           said = said.concat([saidLine(Said(id=r.id, verb="undo", label="", status="failed", detail=r.error, missed=0, question="", topic="", task=""))])
       case none

@@ -30,6 +30,7 @@ export const ask = (a: Json): Ask => ({
   pictures: list(a.pictures, (p) => ({ id: str(p.id), aspect: num(p.shape) })),
   places: list(a.places, place),
   was: strings(a.was),
+  decided: at(a.decided),
 });
 
 // id: the ask it's about, so the screen knows which question the reply settles.
@@ -46,6 +47,7 @@ export const asks: Partial<Sources> = {
       return {
         version: num(b.version),
         asks: list(b.asks, ask),
+        decided: list(b.decided, ask),
         stuck: list(b.stuck, (s) => ({ id: str(s.id), app: str(s.app), title: str(s.title), why: str(s.why), action: str(s.action), mark: str(s.mark), at: at(s.at), sent: bool(s.sent) })),
         fresh: list(b.fresh, (f) => ({ id: str(f.id), app: str(f.app), topic: str(f.topic), title: str(f.title), line: str(f.line), at: at(f.at), read: bool(f.read) })),
         check: { at: at(check.at), why: str(check.why), fixed: num(check.fixed), flagged: num(check.flagged) },

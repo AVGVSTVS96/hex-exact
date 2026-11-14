@@ -9,7 +9,11 @@ export const kept: Partial<Sources> = {
     return { ok: true, error: '' };
   },
   keptTasks: async (_args, _store, storage) => read<Result<'keptTasks'>>(storage, '/tasks'),
-  keptAsks: async (_args, _store, storage) => read<Result<'keptAsks'>>(storage, '/asks'),
+  // A list kept before hex said what it decided has none.
+  keptAsks: async (_args, _store, storage) => {
+    const asks = await read<Result<'keptAsks'>>(storage, '/asks');
+    return { ...asks, decided: asks.decided ?? [] };
+  },
   keptCounts: async (_args, _store, storage) => read<Result<'keptCounts'>>(storage, '/tasks/summary'),
   keptCalls: async (_args, _store, storage) => {
     const calls = await read<Result<'keptCalls'>>(storage, '/calls');

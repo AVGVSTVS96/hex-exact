@@ -38,7 +38,8 @@ gets a new prop. Its own `state` (a draft, a chosen option) stays in the screen.
 
 ## What the root gives you
 
-**Routes** (`hexexact://go/<path>` opens any): `/` Home · `/needs` · `/calls` · `/calls/:id` · `/tasks` ·
+**Routes** (`hexexact://go/<path>` opens any): `/` Home · `/needs` · `/feed/:id` (a Feed story) ·
+`/ideas/:id` · `/goals/:id` · `/decided` · `/calls` · `/calls/:id` · `/tasks` ·
 `/tasks/t/:id` · `/tasks/t/:id/messages` · `/tasks/t/:id/steps` · `/tasks/picks` ·
 `/tasks/picks/:id` · `/tasks/check` · `/settings` · `/settings/voice` · `/settings/voice/words`.
 

@@ -1,14 +1,15 @@
-// Feed: what hex did and found, newest first, by day (Muse's Feed, with hex's own news in it). Each
-// entry is hex's own words from what it keeps: a goal it reached, with its proof; something its
-// check on an idea found; something it decided for Bassim. hex's server decides what's worth his eye.
+// Feed: what hex did and found, newest first, told by the part of the day it happened in, with
+// the week's shape beside its title (Muse's Feed, with hex's own news in it). Each entry is hex's
+// own words from what it keeps: a goal it reached, with its proof; something its check on an idea
+// found; something it decided for Bassim. hex's server decides what's worth his eye.
 //
 // Rows only: Home draws hex's face and the scroll this sits in (home.contract's hex pages).
 use Link, Picture, Media from "./shapes.contract"
-use Story, Head, Earlier, Note, PillTap, PillFace, dayWordOf from "./parts.contract"
+use Mark, Note, PillTap, PillFace, RowTap, Tap, Earlier, dayOf from "./parts.contract"
 use Pictures from "./media.contract"
 
 // kind: done (a goal reached; opens is its task) | found (an idea's check found news; opens is the
-// idea's task) | decided (hex decided it for Bassim; opens is the question).
+// idea) | decided (hex decided it for Bassim; opens is the question).
 shape FeedEntry
   id: string
   kind: string
@@ -38,20 +39,60 @@ shape FeedView
   more: bool
   loadingOlder: bool
 
+// A run of entries under one part of a day; `earlier` on the first Bassim has seen before.
+shape FeedPart
+  key: string
+  name: string
+  earlier: bool
+  entries: FeedEntry[]
+
 fn markOf(e: FeedEntry): string = e.kind == "decided" ? "decided" : e.kind == "found" ? "found" : "done"
-// The page an entry opens beside Feed with two columns: its goal, its idea, or what hex decided.
-fn besideOf(e: FeedEntry): string = e.kind == "done" ? `goal:${e.opens}` : e.kind == "found" ? `idea:${e.opens}` : `decided:${e.opens}`
-fn dayAt(es: FeedEntry[], i: number, now: number, offset: number): string = match es.at(i) { case some(e) => dayWordOf(e.at, now, offset), case none => "" }
-// The days a run of entries falls on, newest first, each once (the entries come newest first).
-fn daysOf(es: FeedEntry[], now: number, offset: number): string[] = range(es.length).filter(i => i == 0 or dayAt(es, i, now, offset) != dayAt(es, i - 1, now, offset)).map(i => dayAt(es, i, now, offset))
+// The page an entry opens: its story (story.contract), or what hex decided, which is its own story.
+fn besideOf(e: FeedEntry): string = e.kind == "decided" ? `decided:${e.opens}` : `story:${e.id}`
+
+// The part of the day something happened in: "Early this morning" before 5, "Last night" after 5 PM
+// yesterday, "Saturday afternoon" this week, then "Nov 7 morning".
+fn hourOf(at: number, offset: number): number = floor(((at + offset * 60000) % 86400000) / 3600000)
+fn partIndex(at: number, offset: number): number = hourOf(at, offset) < 5 ? 0 : hourOf(at, offset) < 12 ? 1 : hourOf(at, offset) < 17 ? 2 : 3
+fn weekdayName(at: number, offset: number): string = match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(dayOf(at, offset) % 7) { case some(d) => d, case none => "" }
+fn monthDayOf(at: number, offset: number): string = match formatDate(at, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }
+fn pick4(xs: string[], i: number): string = match xs.at(i) { case some(x) => x, case none => "" }
+fn partOf(at: number, now: number, offset: number): string = dayOf(now, offset) - dayOf(at, offset) <= 0 ? pick4(["Early this morning", "This morning", "This afternoon", "This evening"], partIndex(at, offset)) : dayOf(now, offset) - dayOf(at, offset) == 1 ? pick4(["Early yesterday", "Yesterday morning", "Yesterday afternoon", "Last night"], partIndex(at, offset)) : pick4(["Early ", "", "", ""], partIndex(at, offset)) + (dayOf(now, offset) - dayOf(at, offset) < 7 ? weekdayName(at, offset) : monthDayOf(at, offset)) + pick4(["", " morning", " afternoon", " evening"], partIndex(at, offset))
+fn partAt(es: FeedEntry[], i: number, now: number, offset: number): string = match es.at(i) { case some(e) => partOf(e.at, now, offset), case none => "" }
+// The parts a run of entries falls in, newest first, each once (entries come newest first, so a
+// part's are together).
+fn partsOf(es: FeedEntry[], now: number, offset: number, fresh: bool, earlier: bool): FeedPart[] = range(es.length).filter(i => i == 0 or partAt(es, i, now, offset) != partAt(es, i - 1, now, offset)).map(i => FeedPart(key=`${fresh ? "new" : "seen"}-${partAt(es, i, now, offset)}`, name=partAt(es, i, now, offset), earlier=(earlier and i == 0), entries=es.filter(e => partOf(e.at, now, offset) == partAt(es, i, now, offset))))
+
+// The week: a column a day, oldest first, of what hex got done, decided and found.
+fn weekOf(es: FeedEntry[], kind: string, now: number, offset: number): number[] = range(7).map(i => es.filter(e => e.kind == kind and dayOf(e.at, offset) == dayOf(now, offset) - 6 + i).length)
+fn dayLetter(now: number, offset: number, i: number): string = weekdayName(now - (6 - i) * 86400000, offset).slice(0, 1)
+
+// A link as a chip: what it is in a word or two, not its address. GitHub says the commit, pull
+// request or compare; Telegram says Telegram; anything else its site.
+fn urlPart(url: string, i: number): string = match url.split("?").at(0) { case some(u) => match u.split("/").at(i) { case some(p) => p, case none => "" }, case none => "" }
+fn hostOf(url: string): string = urlPart(url, 2).startsWith("www.") ? urlPart(url, 2).slice(4) : urlPart(url, 2)
+fn isGitHub(url: string): bool = hostOf(url) == "github.com"
+fn isTelegram(url: string): bool = hostOf(url) == "t.me"
+fn linkIcon(url: string): string = isGitHub(url) ? "symbol:sf/arrow.triangle.branch" : isTelegram(url) ? "symbol:sf/paperplane.fill" : "symbol:sf/link"
+fn chipOf(l: Link, topic: string): string = isGitHub(l.url) ? (urlPart(l.url, 5) == "commit" ? urlPart(l.url, 6).slice(0, 7) : urlPart(l.url, 5) == "pull" ? `#${urlPart(l.url, 6)}` : urlPart(l.url, 5) != "" ? urlPart(l.url, 5) : urlPart(l.url, 4)) : isTelegram(l.url) ? "Telegram" : hostOf(l.url)
+// The proof chip goes only where it fits whole beside the topic and time.
+fn chipFits(e: FeedEntry, width: number): bool = match e.links.at(0) { case some(l) => e.topic.length * 6.8 + 72 + chipOf(l, e.topic).length * 7.4 + 34 + 44 <= width, case none => false }
+
+// About how tall an entry draws at `width`, so a wide room can split Feed into two even columns.
+fn linesAt(t: string, perChar: number, width: number): number = min(2, max(1, ceil(t.length * perChar / max(width, 100))))
+fn storyHeight(e: FeedEntry, width: number): number = 48 + 22 * linesAt(e.title, 8.9, width - 44) + (e.body != "" and e.body != e.title ? 4 + 20 * linesAt(e.body, 7.4, width - 44) : 0) + (e.pictures.length > 0 ? 188 : 0)
+fn partHeight(p: FeedPart, width: number): number = 32 + (p.earlier ? 32 : 0) + sum(p.entries.map(e => storyHeight(e, width)))
+// The parts before `i` take less than half the whole, counting half of `i` itself: it goes left.
+fn leftOf(ps: FeedPart[], i: number, width: number): bool = i == 0 or sum(ps.slice(0, i).map(p => partHeight(p, width))) + (match ps.at(i) { case some(p) => partHeight(p, width), case none => 0 }) / 2 <= sum(ps.map(p => partHeight(p, width))) / 2
 
 component FeedList
   props
     feed: FeedView
     now: number
     offset: number
-    // The width the rows have, for pictures.
+    // The width the rows have, and whether the room is wider than tall (two columns).
     width: number
+    wide: bool
     // With two columns, the page beside (besideOf), marked open in the list.
     beside: string
     open: action
@@ -63,11 +104,15 @@ component FeedList
   derive mark = feed.mark
   derive fresh = entries.filter(e => mark > 0 and e.at > mark)
   derive seen = entries.filter(e => not (mark > 0 and e.at > mark))
+  derive parts = partsOf(fresh, now, offset, true, false).concat(partsOf(seen, now, offset, false, fresh.length > 0))
+  derive column = wide ? (width - 4) / 2 : width
+  derive lefts = range(parts.length).filter(i => leftOf(parts, i, column))
   action reach(e: IntersectionObserverEntry)
     if e.isIntersecting and feed.more and not feed.loadingOlder
       older()
   view
     column testId="feed"
+      FeedTitle(entries=entries, now=now, offset=offset)
       if feed.failed and not feed.known
         Note(kind="failed", text=(feed.error != "" ? feed.error : "Can't reach hex."), pad="24px 10px 4px", id="feed-failed")
         row justify-content="center"
@@ -77,25 +122,100 @@ component FeedList
       else if not feed.known
         Note(kind="loading", text="Loading Feed", pad="24px 10px", id="feed-loading")
       else if entries.length == 0
-        Note(kind="empty", text="Nothing new yet. What hex finishes and finds shows here.", pad="20px 10px", id="feed-empty")
-      for d in daysOf(fresh, now, offset) key=`new-${d}`
-        Head(label=d, n=-1, pad="18px 10px 2px", id=`feed-day-new-${d}`)
-        for e in fresh.filter(x => dayWordOf(x.at, now, offset) == d) key=e.id
-          FeedStory(entry=e, offset=offset, width=width, selected=(beside != "" and beside == besideOf(e)), open=open, discuss=discuss, undo=undo)
-      if fresh.length > 0 and seen.length > 0
-        Earlier(pad="14px 10px 0")
-      for d in daysOf(seen, now, offset) key=`seen-${d}`
-        Head(label=d, n=-1, pad="18px 10px 2px", id=`feed-day-${d}`)
-        for e in seen.filter(x => dayWordOf(x.at, now, offset) == d) key=e.id
-          FeedStory(entry=e, offset=offset, width=width, selected=(beside != "" and beside == besideOf(e)), open=open, discuss=discuss, undo=undo)
+        Note(kind="empty", text="Nothing yet. What hex finishes and finds shows here.", pad="20px 10px", id="feed-empty")
+      if wide
+        row gap=4 align-items="flex-start"
+          column flex=1 min-width=0 testId="feed-left"
+            for p, i in parts key=p.key
+              if lefts.includes(i)
+                FeedSection(part=p, offset=offset, width=column, beside=beside, open=open, discuss=discuss, undo=undo)
+          column flex=1 min-width=0 testId="feed-right"
+            for p, i in parts key=p.key
+              if not lefts.includes(i)
+                FeedSection(part=p, offset=offset, width=column, beside=beside, open=open, discuss=discuss, undo=undo)
+      else
+        for p in parts key=p.key
+          FeedSection(part=p, offset=offset, width=column, beside=beside, open=open, discuss=discuss, undo=undo)
       if feed.more
         row justify-content="center" min-height=44 align-items="center" intersect=reach testId="feed-older"
           if feed.loadingOlder
             progress aria-label="Loading older days"
 
-// One entry: its mark, the news in bold, said in full, pictures of what hex found, then its topic
-// and time (the day is its head's), with Discuss, or Undo on what hex decided.
+// "Feed", and beside it the week: a bar a day of what hex got done (mint), decided (mint, fainter)
+// and found (blue), today's letter in full strength.
+component FeedTitle
+  props
+    entries: FeedEntry[]
+    now: number
+    offset: number
+  derive done = weekOf(entries, "done", now, offset)
+  derive decided = weekOf(entries, "decided", now, offset)
+  derive found = weekOf(entries, "found", now, offset)
+  derive totals = range(7).map(i => (match done.at(i) { case some(n) => n, case none => 0 }) + (match decided.at(i) { case some(n) => n, case none => 0 }) + (match found.at(i) { case some(n) => n, case none => 0 }))
+  derive most = max(1, match sortBy(totals, n => n, "desc").at(0) { case some(n) => n, case none => 1 })
+  view
+    row align-items="flex-end" justify-content="space-between" gap=12 padding="0 10px 2px" testId="feed-title"
+      text "Feed" role="heading" aria-level=1 font="-exact-title1" font-weight=700 color="-exact-label"
+      row gap=7 align-items="flex-end" flex-shrink=0 aria-label=`This week: ${sum(done)} done, ${sum(decided)} decided, ${sum(found)} found` testId="feed-week"
+        for t, i in totals key=i
+          column width=12 gap=4 align-items="center" aria-hidden=true
+            column height=30 justify-content="flex-end"
+              if t == 0
+                box width=10 height=3 border-radius=2 background-color="-exact-tertiary-fill"
+              else
+                column width=10 height=max(3, round(t / most * 30)) border-radius=3 overflow="hidden" gap=1
+                  if (match found.at(i) { case some(n) => n, case none => 0 }) > 0
+                    box width=10 flex=(match found.at(i) { case some(n) => n, case none => 0 }) min-height=2 background-color="hex.progress"
+                  if (match decided.at(i) { case some(n) => n, case none => 0 }) > 0
+                    box width=10 flex=(match decided.at(i) { case some(n) => n, case none => 0 }) min-height=2 background-color="hex.accent" opacity=0.5
+                  if (match done.at(i) { case some(n) => n, case none => 0 }) > 0
+                    box width=10 flex=(match done.at(i) { case some(n) => n, case none => 0 }) min-height=2 background-color="hex.accent"
+            text dayLetter(now, offset, i) font-size=10 line-height="12px" font-weight=(i == 6 ? 600 : 400) color=(i == 6 ? "-exact-label" : "-exact-tertiary-label")
+
+// A part of a day: its name in grey with what hex did in it counted by kind, then its entries.
+component FeedSection
+  props
+    part: FeedPart
+    offset: number
+    width: number
+    beside: string
+    open: action
+    discuss: action
+    undo: action
+  derive done = part.entries.filter(e => e.kind == "done").length
+  derive decided = part.entries.filter(e => e.kind == "decided").length
+  derive found = part.entries.filter(e => e.kind == "found").length
+  view
+    column testId=`feed-part-${part.key}`
+      if part.earlier
+        Earlier(pad="14px 10px 0")
+      row gap=8 align-items="center" padding="12px 10px 4px" role="heading" aria-level=2 aria-label=`${part.name}: ${done} done, ${decided} decided, ${found} found` testId=`feed-head-${part.key}`
+        text part.name font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+        row gap=8 align-items="center" flex-shrink=0 aria-hidden=true
+          if done > 0
+            Tally(icon="symbol:sf/checkmark", n=done)
+          if decided > 0
+            Tally(icon="symbol:icon.pick", n=decided)
+          if found > 0
+            Tally(icon="symbol:icon.found", n=found)
+      for e in part.entries key=e.id
+        FeedStory(entry=e, offset=offset, width=width, selected=(beside != "" and beside == besideOf(e)), open=open, discuss=discuss, undo=undo)
+
+component Tally
+  props
+    icon: string
+    n: number
+  view
+    row gap=3 align-items="center"
+      image icon width=10 height=10 object-fit="contain" color="-exact-tertiary-label"
+      text `${n}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+// One entry: its mark, the news in bold (two lines at most), what hex said of it, pictures of what
+// it found, then its topic and time with its proof as a chip, and on the right Discuss (a call that
+// opens on it), or Undo on what hex decided. A tap anywhere else opens it.
 component FeedStory
+  inject
+    haptics: bool
   props
     entry: FeedEntry
     offset: number
@@ -104,12 +224,35 @@ component FeedStory
     open: action
     discuss: action
     undo: action
+  derive body = entry.body == entry.title ? "" : entry.body
+  derive proof = match entry.links.at(0) { case some(l) => l, case none => Link(label="", url="") }
   action act
     if entry.kind == "decided"
       undo(entry.opens)
     else
       discuss(entry.id)
   view
-    Story(mark=markOf(entry), title=entry.title, body=(entry.body == entry.title ? "" : entry.body), quoted=false, meta=(entry.topic == "" ? formatTime(entry.at, offset, "short") : `${entry.topic} · ${formatTime(entry.at, offset, "short")}`), offer=(entry.kind == "decided" ? "undo" : "discuss"), selected=selected, id=`feed-${entry.id}`, open=open(entry), act=act)
-      if entry.pictures.length > 0
-        Pictures(media=entry.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=max(width - 64, 120), height=180)
+    column border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") testId=`feed-${entry.id}`
+      button press=open(entry) class=RowTap gap=10 padding="9px 10px 0" aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(body == "" ? entry.title : `${entry.title}. ${body}`) testId=`feed-${entry.id}-open`
+        box padding-top=1 flex-shrink=0
+          Mark(state=markOf(entry), size=22)
+        column flex=1 min-width=0 gap=2
+          text entry.title font="-exact-headline" color="-exact-label" line-clamp=2 overflow-wrap="anywhere"
+          if body != ""
+            text body font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2 overflow-wrap="anywhere"
+          if entry.pictures.length > 0
+            box padding-top=6
+              Pictures(media=entry.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=max(width - 54, 120), height=180)
+      // Its topic and time, the proof and the offer: the line keeps a thumb's height, drawn tight
+      // under the words.
+      row gap=6 align-items="center" padding="0 0 2px 42px" min-height=34
+        button press=open(entry) class=Tap flex-shrink=1 min-width=40 min-height=34 display="flex" flex-direction="row" align-items="center" text-align="left" aria-hidden=true testId=`feed-${entry.id}-meta`
+          text entry.topic font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+          text `${entry.topic == "" ? "" : " · "}${formatTime(entry.at, offset, "short")}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" flex-shrink=0
+        if chipFits(entry, width)
+          link href=proof.url class=Tap display="flex" flex-direction="row" align-items="center" gap=4 height=22 padding="0 8px" border-radius=11 background-color="-exact-quaternary-fill" min-width=0 flex-shrink=100 aria-label=`${proof.label}, opens in Safari` testId=`feed-${entry.id}-proof`
+            image linkIcon(proof.url) width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+            text chipOf(proof, entry.topic) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+        box flex=1
+        button press=act class=Tap width=44 height=34 margin-right=2 display="flex" align-items="center" justify-content="flex-end" padding-right=8 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(entry.kind == "decided" ? `Undo, put ${entry.title} back on your list` : `Discuss ${entry.title} with hex`) testId=(entry.kind == "decided" ? `feed-${entry.id}-undo` : `feed-${entry.id}-discuss`)
+          image (entry.kind == "decided" ? "symbol:sf/arrow.uturn.backward" : "symbol:sf/bubble.left") width=16 height=16 object-fit="contain" color="-exact-secondary-label"

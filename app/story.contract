@@ -1,0 +1,222 @@
+// A Feed story, opened: the news in full with its proof, the goal or idea it came from one tap
+// away, and what else hex did in the same topic this week. "Discuss with hex" docks at its foot:
+// words go to the story's thread (its goal's task, its idea), the mic starts a call on it. Over
+// Home when folded (StoryScreen), beside Feed with two columns (StoryPane in Home's slot). What hex
+// decided is its own story (decided.contract), so it doesn't open here.
+use Link, Viewport from "./shapes.contract"
+use Mark, Note, Prose, RowTap, Tap, ShowMore, Send, whenOf, dayOf, springOf from "./parts.contract"
+use Room, Chrome from "./room.contract"
+use FeedEntry, FeedView, markOf, urlPart, hostOf, isGitHub, isTelegram, linkIcon from "./feed.contract"
+
+fn noStory(): FeedEntry = FeedEntry(id="", kind="", title="", body="", topic="", at=0, opens="", links=[], pictures=[])
+fn storyOf(feed: FeedView, id: string): FeedEntry = match feed.entries.filter(e => e.id == id).at(0) { case some(e) => e, case none => noStory() }
+// Its kind as a word in its colour: done mint, found blue.
+fn kindWord(e: FeedEntry): string = e.kind == "found" ? "hex found" : e.kind == "decided" ? "hex decided" : "Done"
+fn kindInk(e: FeedEntry): string = e.kind == "found" ? "hex.progress" : "hex.accent"
+fn dayAndClock(at: number, now: number, offset: number): string = `${dayOf(at, offset) == dayOf(now, offset) ? "Today" : whenOf(at, now, offset)} ${dayOf(at, offset) >= dayOf(now, offset) - 1 ? formatTime(at, offset, "short") : ""}`.trim()
+
+// A link as a card line: what it is, where it lives, and that it leaves the app.
+fn whatOf(l: Link): string = isGitHub(l.url) ? (urlPart(l.url, 5) == "compare" ? `Changes ${urlPart(l.url, 6).replaceAll("...", " → ")}` : urlPart(l.url, 5) == "commit" ? `Commit ${urlPart(l.url, 6).slice(0, 7)}` : urlPart(l.url, 5) == "pull" ? `Pull request #${urlPart(l.url, 6)}` : urlPart(l.url, 4)) : isTelegram(l.url) ? `${l.label} in Telegram` : (l.label != "" and l.label != l.url ? l.label : hostOf(l.url))
+fn whereOf(l: Link): string = isGitHub(l.url) ? `${urlPart(l.url, 3)}/${urlPart(l.url, 4)}` : isTelegram(l.url) ? "Telegram" : hostOf(l.url)
+
+// The topic's last seven days, oldest first: how many stories on each.
+fn topicWeek(es: FeedEntry[], topic: string, now: number, offset: number): number[] = range(7).map(i => es.filter(e => e.topic == topic and dayOf(e.at, offset) == dayOf(now, offset) - 6 + i).length)
+
+// The story without its frame: shared by the page over Home and the page beside.
+component StoryBody
+  inject
+    haptics: bool
+  props
+    entry: FeedEntry
+    feed: FeedView
+    now: number
+    offset: number
+    // Wider than tall: the news on the left, the topic on the right.
+    wide: bool
+    // How many of the topic's other stories show before "Show N more".
+    rows: number
+    // How far the title stays off the column's trailing edge, and the heading's least height (as
+    // IdeaBody).
+    inset: number
+    head: number
+    // open(entry) another story; openGoal(id) its goal; openIdea(id) its idea.
+    open: action
+    openGoal: action
+    openIdea: action
+  state all = false
+  derive same = entry.topic == "" ? feed.entries.slice(0, 0) : feed.entries.filter(e => e.topic == entry.topic and e.id != entry.id)
+  derive shown = all ? same : same.slice(0, rows)
+  derive week = topicWeek(feed.entries, entry.topic, now, offset)
+  derive most = max(1, match sortBy(week, n => n, "desc").at(0) { case some(n) => n, case none => 1 })
+  derive body = entry.body == entry.title ? "" : entry.body
+  action toggle
+    all = not all
+  action from
+    if entry.kind == "found"
+      openIdea(entry.opens)
+    else
+      openGoal(entry.opens)
+  view
+    row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 20 : 18) testId="story"
+      column flex=(wide ? 1 : 0) min-width=0 gap=0
+        row gap=6 align-items="center" min-height=24 padding-right=inset
+          Mark(state=markOf(entry), size=22)
+          text kindWord(entry) font="-exact-subheadline" font-weight=600 color=kindInk(entry) margin-left=4 flex-shrink=0
+          text `${entry.topic != "" ? `${entry.topic} · ` : ""}${dayAndClock(entry.at, now, offset)}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+        column padding-right=inset min-height=max(0, head - 24) box-sizing="border-box" margin-top=6
+          text entry.title role="heading" aria-level=1 font="-exact-title2" font-weight=700 color="-exact-label" user-select="text" overflow-wrap="break-word" testId="story-title"
+        if body != ""
+          box margin-top=8
+            Prose(text=body, font="-exact-callout", color="-exact-label")
+        column margin-top=14 border-radius=16 background-color="-exact-quaternary-fill" overflow="hidden" testId="story-links"
+          if entry.opens != ""
+            button press=from class=RowTap align-items="center" gap=12 padding="10px 14px 10px 10px" border-radius=0 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(entry.kind == "found" ? "Open the idea" : "Open the goal") testId="story-from"
+              box width=32 height=32 border-radius=9 flex-shrink=0 background-color="-exact-quaternary-fill" display="flex" align-items="center" justify-content="center"
+                image (entry.kind == "found" ? "symbol:icon.ideas" : "symbol:icon.goals") width=15 height=15 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              column flex=1 min-width=0
+                text (entry.kind == "found" ? "The idea" : "The goal") font="-exact-subheadline" font-weight=600 color="-exact-label" white-space="nowrap"
+                text (entry.kind == "found" ? "What you said, every check, what's next" : "Its proof, its thread, what's next") font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+              image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+          for l, i in entry.links key=l.url
+            link href=l.url class=RowTap align-items="center" gap=12 padding="10px 14px 10px 10px" border-radius=0 border-top=(i > 0 or entry.opens != "" ? "0.5px solid -exact-separator" : "none") aria-label=`${whatOf(l)}, opens in Safari` testId=`story-link-${i}`
+              box width=32 height=32 border-radius=9 flex-shrink=0 background-color="-exact-quaternary-fill" display="flex" align-items="center" justify-content="center"
+                image linkIcon(l.url) width=15 height=15 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              column flex=1 min-width=0
+                text whatOf(l) font="-exact-subheadline" font-weight=600 color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                text whereOf(l) font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+              image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+      if same.length > 0
+        column flex=(wide ? 1 : 0) min-width=0 testId="story-topic"
+          row gap=8 align-items="center" min-height=40 padding-right=(wide ? inset : 0) role="heading" aria-level=2 aria-label=`More in ${entry.topic}, ${sum(week)} this week`
+            text `More in ${entry.topic}` font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+            text `${sum(week)} this week` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+            row gap=3 align-items="flex-end" height=18 flex-shrink=0 aria-hidden=true
+              for n, i in week key=i
+                if n > 0
+                  box width=4 height=max(3, round(n / most * 18)) border-radius=2 background-color="hex.accent"
+                else
+                  box width=3 height=3 margin="0 0.5px" border-radius=1.5 background-color="-exact-tertiary-label"
+          for x in shown key=x.id
+            button press=open(x) class=RowTap align-items="center" gap=10 min-height=38 padding="0 6px" margin="0 -6px" width="auto" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=x.title testId=`story-more-${x.id}`
+              Mark(state=markOf(x), size=20)
+              text x.title font="-exact-subheadline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+              text whenOf(x.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+          if same.length > rows
+            box margin="0 -10px"
+              ShowMore(n=same.length - rows, shown=all, pad="6px 10px", id="story-show-more", press=toggle)
+
+// "Discuss with hex", docked at the foot: typed words go to the story's thread, the mic starts a
+// call on it. The keyboard stays up through a send, and the draft is kept if he leaves.
+component DiscussBar
+  inject
+    haptics: bool
+  props
+    entry: FeedEntry
+    draft: string
+    // sending | sent | failed, and why, for the last words sent from here.
+    sent: string
+    error: string
+    keep: action
+    send: action
+    call: action
+  state text = ""
+  state started = false
+  derive words = started ? text : draft
+  derive empty = words.trim() == ""
+  action edit(v: string)
+    text = v
+    started = true
+    keep(`story:${entry.id}`, v)
+  action submit
+    if not empty
+      send(entry, words.trim())
+      text = ""
+      started = true
+  view
+    column position="relative" testId="story-discuss"
+      if sent != ""
+        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${entry.topic != "" ? entry.topic : "its thread"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="2px 14px 4px" aria-live="polite" testId="story-sent"
+      row backgroundMaterial="glass" border-radius=24 min-height=48 padding="0 6px 0 16px" gap=6 align-items="flex-end" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
+        box position="relative" flex=1 min-width=0 display="flex"
+          if words == ""
+            text "Discuss with hex" position="absolute" left=0 top=13 right=0 font="-exact-body" color="-exact-placeholder" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" pointer-events="none" aria-hidden=true
+          textarea id="story-field" border="none" background-color="transparent" padding="13px 0" flex=1 min-width=0 font="-exact-body" color="-exact-label" value=words input=edit rows=1 field-sizing="content" max-height=130 aria-label=`Discuss ${entry.title} with hex; goes to ${entry.topic != "" ? entry.topic : "its thread"}` testId="story-field"
+        if empty
+          button press=call class=Tap width=36 height=36 margin="6px 0" border-radius=18 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" flex-shrink=0 -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=`Call hex about ${entry.title}` testId="story-call"
+            image "symbol:waveform" width=17 height=17 object-fit="contain" color="-exact-label"
+        else
+          button press=submit class=Send margin="6px 0" retainFocus=true aria-label="Send" testId="story-send"
+            image "symbol:send" width=16 height=16 object-fit="contain" color="-exact-background"
+
+// The page itself: the story scrolling, Discuss at its foot with what scrolls fading out behind it.
+// `bottom` is how far the foot stands off the window's edge (the keyboard when it's up).
+component StoryPane
+  props
+    entry: FeedEntry
+    feed: FeedView
+    now: number
+    offset: number
+    wide: bool
+    rows: number
+    inset: number
+    head: number
+    // How far Discuss stands off the column's trailing edge, clear of a camera in that corner.
+    end: number
+    bottom: number
+    draft: string
+    sent: string
+    error: string
+    open: action
+    openGoal: action
+    openIdea: action
+    keep: action
+    send: action
+    call: action
+  view
+    column flex=1 min-height=0 padding-bottom=bottom testId="story-pane"
+      scroll flex=1 min-height=0 padding="4px 16px 24px" box-sizing="border-box" testId="story-scroll"
+        if entry.id == ""
+          if feed.failed and not feed.known
+            Note(kind="failed", text="Can't reach hex, so this story can't open. Trying again…", pad="24px 0", id="story-offline")
+          else if not feed.known
+            Note(kind="loading", text="Opening the story", pad="24px 0", id="story-loading")
+          else
+            Note(kind="empty", text="This story has left Feed.", pad="24px 0", id="story-gone")
+        else
+          StoryBody(entry=entry, feed=feed, now=now, offset=offset, wide=wide, rows=rows, inset=inset, head=head, open=open, openGoal=openGoal, openIdea=openIdea)
+      if entry.id != ""
+        // Wide, Discuss sits under the news, on the left.
+        row margin-top=-24 padding="24px 12px 0" padding-right=max(12, end) background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 testId="story-foot"
+          box flex=1 min-width=0 max-width=(wide ? "50%" : "100%")
+            DiscussBar(entry=entry, draft=draft, sent=sent, error=error, keep=keep, send=send, call=call)
+
+// The story over Home, folded: the chrome with Back, and the page under it.
+component StoryScreen
+  props
+    entry: Entry
+    viewport: Viewport
+    room: Room
+    needsYou: number
+    working: number
+    callOn: bool
+    story: FeedEntry
+    feed: FeedView
+    now: number
+    offset: number
+    draft: string
+    sent: string
+    error: string
+    open: action
+    openStory: action
+    openGoal: action
+    openIdea: action
+    keep: action
+    send: action
+    call: action
+    openTasks: action
+    back: action
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="story-screen"
+      Chrome(room=room, on="story", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
+      column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="story-column"
+        StoryPane(entry=story, feed=feed, now=now, offset=offset, wide=(room.width > room.height), rows=(room.width > room.height ? 7 : 5), inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), head=0, end=(room.clear.x + room.clear.width - room.footEnd), bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), draft=draft, sent=sent, error=error, open=openStory, openGoal=openGoal, openIdea=openIdea, keep=keep, send=send, call=call)

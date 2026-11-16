@@ -1,8 +1,9 @@
-// Ideas: what Bassim floated for later, and what hex has found on each since (plan §10). Its
-// rows go under hex's face as one of hex's pages; Home gives them their scroll. The ones hex found
-// something on come first, until he opens them; the rest follow, a few at a time.
+// Ideas: what Bassim floated for later, in his words, and what hex has found on each since (plan
+// §10). Its rows go under hex's face as one of hex's pages; Home gives them their scroll. What hex
+// is looking into comes first, what it found news on at the top; the rest sit on shelves by
+// project, a few each, the projects with one idea together under "Everything else".
 use Link from "./shapes.contract"
-use Head, Story, ShowMore, Note, PillTap, PillFace, whenOf from "./parts.contract"
+use Mark, StageHead, ShowMore, Note, PillTap, PillFace, RowTap, whenOf from "./parts.contract"
 
 // One check of hex's on an idea: when, whether it was news, what it found (its words without the
 // links) and the links.
@@ -53,11 +54,19 @@ fn dayWord(at: number, now: number, offset: number): string = formatDate(at, off
 // The list as it shows: the one whose page is open stays where it was until it's left, even once
 // it's started or put away.
 fn ideasShown(ideas: Ideas, held: Idea): Idea[] = held.id != "" and ideas.ideas.filter(i => i.id == held.id).length == 0 ? sortBy(ideas.ideas.concat([held]), i => i.at, "desc") : ideas.ideas
-fn foundIdeas(ideas: Idea[]): Idea[] = sortBy(ideas.filter(i => i.found), i => foundAt(i), "desc")
-fn otherIdeas(ideas: Idea[]): Idea[] = ideas.filter(i => not i.found)
+// What hex is looking into: news it found first, newest found first, then the newest floated.
+fn lookingOf(ideas: Idea[]): Idea[] = sortBy(sortBy(ideas.filter(i => i.looking), i => i.at, "desc"), i => (i.found ? 0 : 1))
+fn restOf(ideas: Idea[]): Idea[] = sortBy(ideas.filter(i => not i.looking), i => i.at, "desc")
+fn firstIdea(ideas: Ideas): option<Idea> = match lookingOf(ideas.ideas).at(0) { case some(i) => some(i), case none => restOf(ideas.ideas).at(0) }
+// A shelf is a project (its topic when it has none) with more than one idea; the rest share one.
+fn shelfOf(i: Idea): string = i.project != "" ? i.project : i.topic
+fn shelvesOf(rest: Idea[]): string[] = sortBy(rest.map(i => shelfOf(i)).filter(k => k != "" and rest.filter(i => shelfOf(i) == k).length > 1), k => rest.filter(i => shelfOf(i) == k).length, "desc")
+fn uniq(xs: string[]): string[] = range(xs.length).filter(i => xs.indexOf(match xs.at(i) { case some(x) => x, case none => "" }) == i).map(i => match xs.at(i) { case some(x) => x, case none => "" })
+fn everythingElse(): string = "Everything else"
+fn onShelf(rest: Idea[], shelf: string, shelves: string[]): Idea[] = shelf == everythingElse() ? rest.filter(i => not shelves.includes(shelfOf(i))) : rest.filter(i => shelfOf(i) == shelf)
 // A finding in a list reads as its first sentence; the idea's page has it whole.
-fn briefOf(t: string): string = t.length <= 200 ? t : match t.split(". ").at(0) { case some(s) => s.length <= 240 ? `${s}.` : `${s.slice(0, 200).trim()}…`, case none => t }
-fn metaOf(i: Idea, found: bool, now: number, offset: number): string = `${i.topic != "" ? `${i.topic} · ` : ""}${found ? `found ${dayWord(foundAt(i), now, offset)}` : `floated ${dayWord(i.at, now, offset)}`}`
+fn briefOf(t: string): string = match t.split(". ").at(0) { case some(s) => s.length < t.length ? `${s}.` : s, case none => t }
+fn checksWord(day: string): string = day == "daily" ? "checks daily" : day != "" ? `checks each ${day}` : "looking into it"
 
 component IdeasList
   props
@@ -67,20 +76,27 @@ component IdeasList
     failed: bool
     now: number
     offset: number
+    // Wider than tall: what hex is looking into on the left, the shelves on the right.
+    wide: bool
     // With two columns, the idea open beside the list.
     selected: string
     open: action
     retry: action
-  state more = false
+  // The shelves Bassim opened in full.
+  state opened = [""].slice(0, 0)
   derive all = ideasShown(ideas, held)
-  derive found = foundIdeas(all)
-  derive others = otherIdeas(all)
-  derive few = more ? others : others.slice(0, 4)
+  derive looking = lookingOf(all)
+  derive rest = restOf(all)
+  derive shelves = uniq(shelvesOf(rest))
+  derive named = shelves.concat(onShelf(rest, everythingElse(), shelves).length > 0 ? [everythingElse()] : [])
+  derive few = wide ? 2 : 3
   derive known = ideas.version > 0
-  action toggleMore
-    more = not more
+  derive split = wide and looking.length > 0 and rest.length > 0
+  action toggle(shelf: string)
+    opened = opened.includes(shelf) ? opened.filter(s => s != shelf) : opened.concat([shelf])
   view
     column testId="ideas"
+      text "Ideas" role="heading" aria-level=1 font="-exact-title1" font-weight=700 color="-exact-label" padding="0 10px 2px" testId="ideas-title"
       if failed and not known
         row gap=4 align-items="center" padding="16px 10px"
           Note(kind="failed", text="Can't reach hex, so no ideas yet", pad="0", id="ideas-offline")
@@ -92,13 +108,58 @@ component IdeasList
         Note(kind="loading", text="Loading your ideas", pad="24px 10px", id="ideas-loading")
       else if all.length == 0
         Note(kind="empty", text="No ideas yet. Say one to hex and it keeps it here.", pad="20px 10px", id="ideas-empty")
-      if found.length > 0
-        Head(label="hex found something", n=found.length, pad="16px 10px 4px", id="ideas-head-found")
-        for i in found key=i.id
-          Story(mark="found", title=i.title, body=match foundOf(i) { case some(c) => briefOf(c.words), case none => "" }, quoted=false, meta=metaOf(i, true, now, offset), offer="", selected=(selected == i.id), id=`idea-row-${i.id}`, open=open(i.id), act=open(i.id))
-      if others.length > 0
-        Head(label=(found.length > 0 ? "Other ideas" : "Your ideas"), n=others.length, pad="20px 10px 4px", id="ideas-head-other")
-        for i in few key=i.id
-          Story(mark="idea", title=i.title, body=match lastOf(i) { case some(c) => briefOf(c.words), case none => briefOf(i.said) }, quoted=(i.checks.length == 0), meta=metaOf(i, false, now, offset), offer="", selected=(selected == i.id), id=`idea-row-${i.id}`, open=open(i.id), act=open(i.id))
-        if others.length > 4
-          ShowMore(n=others.length - 4, shown=more, pad="6px 10px", id="ideas-more", press=toggleMore)
+      row flex-direction=(split ? "row" : "column") align-items=(split ? "flex-start" : "stretch") gap=(split ? 4 : 0)
+        if looking.length > 0
+          column flex=(split ? 1 : 0) min-width=0 testId="ideas-looking"
+            StageHead(state="working", label="hex is looking into", n=looking.length, known=true, pad="6px 10px 2px", id="ideas-head-looking")
+            for i in looking key=i.id
+              IdeaRow(idea=i, now=now, offset=offset, selected=(selected == i.id), open=open(i.id))
+        if rest.length > 0
+          column flex=(split ? 1 : 0) min-width=0 testId="ideas-shelves"
+            for k in named key=k
+              ShelfHead(label=k, n=onShelf(rest, k, shelves).length, first=(split and k == match named.at(0) { case some(x) => x, case none => "" }))
+              for i in (opened.includes(k) ? onShelf(rest, k, shelves) : onShelf(rest, k, shelves).slice(0, few)) key=i.id
+                IdeaRow(idea=i, now=now, offset=offset, selected=(selected == i.id), open=open(i.id))
+              if onShelf(rest, k, shelves).length > few
+                ShowMore(n=onShelf(rest, k, shelves).length - few, shown=opened.includes(k), pad="6px 10px 8px", id=`ideas-more-${k}`, press=toggle(k))
+
+// A shelf's head: its project in bold, how many in grey.
+component ShelfHead
+  props
+    label: string
+    n: number
+    first: bool
+  view
+    row gap=8 align-items="center" min-height=40 padding=(first ? "0 10px" : "8px 10px 0") role="heading" aria-level=2 aria-label=`${label}, ${n}` testId=`ideas-shelf-${label}`
+      text label font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      text `${n}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+// One idea: a lens on blue while hex looks into it, else a bulb; its name; what hex found last, or
+// what Bassim said in his words; and while hex looks, when it found something and when it checks.
+component IdeaRow
+  inject
+    haptics: bool
+  props
+    idea: Idea
+    now: number
+    offset: number
+    selected: bool
+    open: action
+  derive found = foundOf(idea)
+  derive brief = match found { case some(c) => briefOf(c.words), case none => `“${idea.said.trim()}”` }
+  view
+    button press=open class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${idea.title}. ${brief}` testId=`idea-row-${idea.id}`
+      box padding-top=1 flex-shrink=0
+        Mark(state=(idea.looking ? "found" : "idea"), size=22)
+      column flex=1 min-width=0 gap=1
+        row gap=8 align-items="baseline"
+          text idea.title font="-exact-headline" color="-exact-label" line-clamp=2 flex=1 min-width=0
+          text whenOf(idea.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+        if idea.said != "" or idea.checks.length > 0
+          text brief font="-exact-subheadline" color="-exact-label" line-clamp=2
+        if idea.looking
+          text font="-exact-footnote" color="hex.progress" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" margin-top=2
+            if foundAt(idea) > 0
+              text `Found ${whenOf(foundAt(idea), now, offset)}` font-weight=600
+              text " · "
+            text checksWord(idea.day)

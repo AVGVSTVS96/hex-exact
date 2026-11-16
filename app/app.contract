@@ -22,8 +22,9 @@ use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
 use Room, roomOf, homeRoomOf, belowIn, stacked from "./room.contract"
 use DecidedPage, decidedPath, DecidedPane from "./decided.contract"
-use Feed, FeedEntry, FeedView from "./feed.contract"
-use Ideas, IdeaOne, IdeaDone from "./ideas.contract"
+use Feed, FeedEntry, FeedView, besideOf from "./feed.contract"
+use StoryScreen, StoryPane, storyOf from "./story.contract"
+use Ideas, IdeaOne, IdeaDone, firstIdea from "./ideas.contract"
 use IdeaScreen, IdeaPane, IdeaAct, ideaActOf, ideaActLine, undoOf, weekdayNumber from "./idea.contract"
 use Goals from "./shapes.contract"
 use GoalPage, GoalBody from "./goal.contract"
@@ -37,6 +38,7 @@ routes nav
     decided "/decided"
     needs "/needs"
     idea "/ideas/:id"
+    story "/feed/:id"
     goal "/goals/:id"
     watch "/goals/w/:id"
     calls "/calls"
@@ -159,6 +161,13 @@ component App
   derive feedFresh = hexPage != "feed" and feedLatest > feedSeen
   derive feed = FeedView(entries=newestFeed.entries.concat(olderFeed.entries.filter(e => e.at < (match newestFeed.entries.at(-1) { case some(l) => l.at, case none => now }))).filter(e => not (e.kind == "decided" and takingBack.includes(e.opens))), mark=feedMark, known=(newestFeed.version > 0), failed=failed(liveFeed), error=(match failure(liveFeed) { case some(f) => f.message, case none => "" }), more=(newestFeed.older > 0 and (feedReach == 0 or olderFeed.older > 0)), loadingOlder=(feedReach > 0 and not current(olderFeed)))
 
+  // A Feed story (story.contract), over Home or beside Feed: the entry, and how its last words went.
+  derive storyId = top(nav).name == "story" ? top(nav).params.id : (top(nav).name == "home" and besideId.startsWith("story:") ? besideId.slice(6) : "")
+  derive story = storyOf(feed, storyId)
+  derive storySent = story.kind == "found" ? (field(ideaSent, 0) == story.opens ? field(ideaSent, 1) : "") : match sends.map(l => sendingOf(l)).filter(x => x.task == story.opens and story.opens != "").at(-1) { case some(x) => x.status, case none => "" }
+  derive storyError = story.kind == "found" ? field(ideaSent, 2) : match sends.map(l => sendingOf(l)).filter(x => x.task == story.opens and story.opens != "").at(-1) { case some(x) => x.error, case none => "" }
+  derive storyDraft = match drafts.filter(l => field(l, 0) == `story:${storyId}`).at(0) { case some(l) => field(l, 1), case none => "" }
+
   // Ideas (ideas.contract, idea.contract): the last list hex gave shows until it answers. The idea
   // open (over Home, or beside with two columns) is read on its own, so its page holds once it's
   // started or put away; what Bassim did on it is a line in ideaActs, his last words to it ideaSent
@@ -170,7 +179,7 @@ component App
   resource keptIdeas = keptIdeas() as shape Ideas else empty()
   derive ideas = liveIdeas.version > 0 ? liveIdeas : keptIdeas
   resource keepingIdeas = keep("/ideas", `${liveIdeas.version}`) when liveIdeas.version > 0 as shape Reply else empty()
-  derive ideaId = top(nav).name == "idea" ? top(nav).params.id : (top(nav).name == "home" and room.columns == 2 and beside.startsWith("idea:") ? beside.slice(5) : "")
+  derive ideaId = top(nav).name == "idea" ? top(nav).params.id : (top(nav).name == "home" and room.columns == 2 and besideId.startsWith("idea:") ? besideId.slice(5) : "")
   resource idea = watchIdea(ideaId) when ideaId != "" as shape IdeaOne else empty()
   derive ideaAct = match ideaActs.map(l => ideaActOf(l)).filter(a => a.id == ideaId).at(-1) { case some(a) => a, case none => IdeaAct(id="", verb="", status="", error="") }
   mutation ideaDid as shape IdeaDone queue then settleIdea
@@ -231,7 +240,10 @@ component App
   // picks one.
   // On Goals the page beside it starts on what needs Bassim first, in the order Goals lists it.
   derive firstGoal = match sortBy(sortBy(goals.goals.filter(g => g.state == "needs"), g => g.asked, "desc"), g => (asks.asks.map(a => a.id).includes(g.ask) ? asks.asks.map(a => a.id).indexOf(g.ask) : 100000)).at(0) { case some(g) => `goal:${g.id}`, case none => "" }
-  derive homeBeside = room.columns == 2 and top(nav).name == "home" and call.status == "idle" and activity.call == "" ? (beside != "" ? beside : hexPage == "goals" and firstGoal != "" ? firstGoal : firstNeed(tasks, asks, saids, now)) : ""
+  derive homeBeside = room.columns == 2 and top(nav).name == "home" and call.status == "idle" and activity.call == "" ? (beside != "" ? beside : hexPage == "goals" and firstGoal != "" ? firstGoal : hexPage == "feed" ? feedFirst : hexPage == "ideas" ? ideasFirst : firstNeed(tasks, asks, saids, now)) : ""
+  // Feed and Ideas show their first item's page beside them until Bassim picks one.
+  derive feedFirst = match feed.entries.at(0) { case some(e) => besideOf(e), case none => "" }
+  derive ideasFirst = match firstIdea(ideas) { case some(i) => `idea:${i.id}`, case none => "" }
   derive needsOpen = split and top(nav).name == "needs"
   derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : needsOpen ? (needsBeside == "check" ? "" : needsBeside != "" ? needsBeside : firstNeed(tasks, asks, saids, now)) : homeBeside
   derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => besideId }
@@ -386,13 +398,13 @@ component App
   task overOnFold key=`${room.columns}`
     after(1, pageOver)
   action pageBeside
-    if room.columns == 2 and (under == "home" or under == "") and ["goal", "watch", "idea"].includes(top(nav).name)
+    if room.columns == 2 and (under == "home" or under == "") and ["goal", "watch", "idea", "story"].includes(top(nav).name)
       beside = `${top(nav).name}:${top(nav).params.id}`
       nav = under == "" ? go(nav, "/") : back(nav)
   action pageOver
-    if room.columns == 1 and top(nav).name == "home" and ["goal", "watch", "idea", "decided"].includes(besideKind)
+    if room.columns == 1 and top(nav).name == "home" and ["goal", "watch", "idea", "story", "decided"].includes(besideKind)
       let id = beside.slice(besideKind.length + 1)
-      nav = push(nav, besideKind == "goal" ? path("goal", id) : besideKind == "watch" ? path("watch", id) : besideKind == "decided" ? decidedPath(id) : path("idea", id))
+      nav = push(nav, besideKind == "goal" ? path("goal", id) : besideKind == "watch" ? path("watch", id) : besideKind == "decided" ? decidedPath(id) : besideKind == "story" ? path("story", id) : path("idea", id))
       beside = ""
   action pickNeed(page: string)
     needsBeside = page
@@ -407,6 +419,8 @@ component App
       feedMark = feedSeen
     if page == "feed" or hexPage == "feed"
       feedSeen = max(feedSeen, feedLatest)
+    if page != hexPage
+      beside = ""
     hexPage = page
 
   // The shell's bars (shell/Shell/Frame.swift), where the binary draws them: hex's pages as the
@@ -487,14 +501,17 @@ component App
     feedReach = feedReach + 1
   action retryFeed
     refresh liveFeed
-  // An entry opens its goal, its idea or what hex decided: beside Feed with two columns, else over Home.
+  // An entry opens its story, or what hex decided: beside Feed with two columns, else over Home.
+  // From a story, another one takes its place.
   action openFeed(e: FeedEntry)
     if haptics
       haptic("selection")
-    if e.kind == "done"
-      openGoal(e.opens)
-    else if e.kind == "found"
-      openIdea(e.opens)
+    if e.kind != "decided" and room.columns == 2
+      besidePage(`story:${e.id}`)
+    else if e.kind != "decided" and top(nav).name == "story"
+      nav = go(nav, path("story", e.id))
+    else if e.kind != "decided"
+      open(path("story", e.id))
     else if e.kind == "decided" and room.columns == 2
       besidePage(`decided:${e.opens}`)
     else if e.kind == "decided"
@@ -506,6 +523,14 @@ component App
       send talked = discussFeed(id)
     else
       send commanded = callCommand("start", voice, `feed:${id}`, phone)
+
+  // Words from a story go to its thread: a goal's task, or the idea.
+  action sendStory(e: FeedEntry, words: string)
+    drafts = drafts.filter(l => field(l, 0) != `story:${e.id}`)
+    if e.kind == "found"
+      addIdea(e.opens, words)
+    else
+      message(e.opens, words)
 
   // Ideas
   action retryIdeas
@@ -797,8 +822,10 @@ component App
       for e in stack(nav) key=e.id
         if e.name == "home"
           Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, answerAll=answerAll, talk=talk, said=saids, finished=agentDone, room=homeRoom, notice=noticeOf(offered, skippedBuild), pages=hexPages, page=hexPage, pickPage=pickPage, feedFresh=feedFresh, feed=feed, openFeed=openFeed, discuss=discussFeed, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=idea.idea, ideasFailed=failed(liveIdeas), openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpen, goalsChosen=goalsChosen, goalsFailed=failed(liveGoals), goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
-            if besideId.startsWith("idea:")
-              IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, inset=max(0, homeRoom.clear.x + homeRoom.clear.width - 20 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), end=(homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? 8 : homeRoom.foot + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
+            if besideId.startsWith("story:")
+              StoryPane(entry=story, feed=feed, now=now, offset=clock.utcOffset, wide=stacked(homeRoom), rows=(stacked(homeRoom) ? 8 : 9), inset=max(0, homeRoom.clear.x + homeRoom.clear.width - 20 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), end=(homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), bottom=(viewport.keyboardHeight > 0 ? 8 : homeRoom.foot + 8), draft=storyDraft, sent=storySent, error=storyError, open=openFeed, openGoal=openGoal, openIdea=openIdea, keep=keepDraft, send=sendStory, call=discussFeed(story.id))
+            else if besideId.startsWith("idea:")
+              IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, wide=stacked(homeRoom), inset=max(0, homeRoom.clear.x + homeRoom.clear.width - 20 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), end=(homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? 8 : homeRoom.foot + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
             else if besideId.startsWith("goal:")
               GoalBody(foot=(viewport.keyboardHeight > 0 ? 0 : homeRoom.foot), end=max(0, homeRoom.clear.x + homeRoom.clear.width - 16 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), footRight=max(12, homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), wide=(homeRoom.across < homeRoom.height), id=besideId.slice(5), goals=goalsShown, asks=asks, said=saids, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, answer=answer, unanswer=undo, again=again, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
             else if besideId.startsWith("decided:")
@@ -807,6 +834,8 @@ component App
               WatchBody(foot=(viewport.keyboardHeight > 0 ? 0 : homeRoom.foot), end=max(0, homeRoom.clear.x + homeRoom.clear.width - 16 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), footRight=max(12, homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), wide=(homeRoom.across < homeRoom.height), id=besideId.slice(6), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask)
             else if besideId != ""
               TaskBody(id=besideId, pane=true, room=homeRoom, clearTop=0, end=max(0, homeRoom.clear.x + homeRoom.clear.width - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), foot=homeRoom.foot, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, answerAll=answerAll, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+        if e.name == "story"
+          StoryScreen(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, callOn=callOn, story=story, feed=feed, now=now, offset=clock.utcOffset, draft=storyDraft, sent=storySent, error=storyError, open=open, openStory=openFeed, openGoal=openGoal, openIdea=openIdea, keep=keepDraft, send=sendStory, call=discussFeed(story.id), openTasks=openTasks, back=back)
         if e.name == "idea"
           IdeaScreen(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, callOn=callOn, idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea, open=open, openTasks=openTasks, back=back)
         if e.name == "needs"

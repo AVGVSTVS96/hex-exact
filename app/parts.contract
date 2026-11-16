@@ -115,9 +115,9 @@ keyframes markSpin
 // A state's mark, in a square of `size`, as the drawings have them: a question an amber disc with
 // ?; something only Bassim can do an empty box; hex's pick mint with ✦, and what hex decided a mint ✦
 // on its wash; working a turning blue half ring; done a mint-checked box; failed red with a warning
-// triangle. Feed, Ideas and Goals add theirs: something hex found (a lens), something it watches (a
-// clock), an idea (a bulb) and a goal not started (a dashed box). Otherwise read a dot; paused,
-// stopped, pending (dashed) and idle (a ring) in grey.
+// triangle. Feed, Ideas and Goals add theirs: something hex found or looks into (binoculars on
+// blue), something it watches (a clock), an idea (a bulb) and a goal not started (a dashed box).
+// Otherwise read a dot; paused, stopped, pending (dashed) and idle (a ring) in grey.
 component Mark
   inject
     still: bool
@@ -153,9 +153,12 @@ component Mark
       else if state == "paused"
         box width=size height=size border-radius=(size / 2) background-color=washOf(state) display="flex" align-items="center" justify-content="center"
           image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
-      else if state == "found" or state == "watch" or state == "idea"
+      else if state == "found"
+        box width=size height=size border-radius=(size / 2) background-color="hex.progress.wash" display="flex" align-items="center" justify-content="center"
+          image "symbol:icon.found" width=glyph height=glyph object-fit="contain" color="hex.progress"
+      else if state == "watch" or state == "idea"
         box width=size height=size border-radius=(size / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
-          image (state == "found" ? "symbol:icon.found" : state == "watch" ? "symbol:icon.watch" : "symbol:icon.ideas") width=glyph height=glyph object-fit="contain" color="-exact-label"
+          image (state == "watch" ? "symbol:icon.watch" : "symbol:icon.ideas") width=glyph height=glyph object-fit="contain" color=(state == "idea" ? "-exact-secondary-label" : "-exact-label")
       else if state == "read"
         box width=dot height=dot border-radius=(dot / 2) background-color="-exact-tertiary-label"
       else if state == "stopped"
@@ -410,10 +413,6 @@ component HexTabs
               box position="absolute" top=6 right=9 width=7 height=7 border-radius=4 background-color="-exact-label" aria-hidden=true
       children
 
-// Under which day something happened, as Feed sorts it: This morning, This afternoon, This
-// evening, Yesterday, then the weekday this week, then the date.
-fn dayWordOf(at: number, now: number, offset: number): string = dayOf(at, offset) == dayOf(now, offset) ? (((at + offset * 60000) % 86400000) < 43200000 ? "This morning" : ((at + offset * 60000) % 86400000) < 64800000 ? "This afternoon" : "This evening") : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : whenOf(at, now, offset)
-
 // The small grey head over a list on Feed, Ideas and Goals (a day, "hex found something",
 // "Watching"), with how many on the right where that's worth saying (n < 0: none).
 component Head
@@ -437,50 +436,6 @@ component Earlier
       box flex=1 height=0 border-top="0.5px solid -exact-separator"
       text "Earlier" font="-exact-footnote" color="-exact-tertiary-label"
       box flex=1 height=0 border-top="0.5px solid -exact-separator"
-
-// One story (a Feed entry, an idea): its mark, the news in bold (two lines at most), then said in
-// full in reading text, or in grey quotes when they're Bassim's own words. Its pictures come in as
-// children. Under it the topic and time in grey, and on the right what it offers: "Discuss" (a
-// call that opens on it), "Undo" (what hex decided), or nothing. A tap anywhere else opens it.
-component Story
-  inject
-    haptics: bool
-  props
-    mark: string
-    title: string
-    body: string
-    quoted: bool
-    meta: string
-    // discuss | undo | ""
-    offer: string
-    selected: bool
-    id: string
-    open: action
-    act: action
-  slot
-  view
-    column gap=0 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") testId=id
-      // The whole entry opens it, its pictures and its topic and time too; only Discuss or Undo
-      // are targets of their own, so no part of an entry is dead under a thumb.
-      button press=open class=RowTap padding="10px 10px 0" aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${title}. ${body}` testId=`${id}-open`
-        box padding-top=1 flex-shrink=0
-          Mark(state=mark, size=22)
-        column flex=1 min-width=0 gap=4
-          text title font="-exact-headline" color="-exact-label" line-clamp=2 overflow-wrap="anywhere"
-          if body != ""
-            text (quoted ? `“${body}”` : body) font="-exact-body" color=(quoted ? "-exact-secondary-label" : "-exact-label") overflow-wrap="anywhere"
-          column gap=8 testId=`${id}-slot`
-            children
-      // Up under the words: its line keeps a thumb's height, but its text sits right below them.
-      row gap=12 align-items="center" padding="0 10px 0 0" margin-top=-9
-        button press=open class=Tap flex=1 min-width=0 min-height=44 display="flex" align-items="center" padding="0 0 4px 44px" text-align="left" aria-hidden=true testId=`${id}-meta`
-          text meta font="-exact-footnote" color="-exact-secondary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-        if offer == "discuss"
-          Discuss(title=title, id=`${id}-discuss`, press=act)
-        else if offer == "undo"
-          button press=act class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put ${title} back on your list` testId=`${id}-undo`
-            box class=PillFace
-              text "Undo" font="-exact-subheadline" font-weight=600
 
 // "Discuss": a call that opens on this. A pill of its own, a thumb's target apart from the row.
 component Discuss

@@ -120,9 +120,9 @@ component HexHome
             children
             NowList(wide=(width > height), width=(width - 12), height=(height - under - pad), now=now, offset=offset, tasks=tasks, needs=needs, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll)
           else if p == "feed"
-            FeedList(feed=feed, now=now, offset=offset, width=(width - 12), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
+            FeedList(feed=feed, now=now, offset=offset, width=(width - 12), wide=(width > height), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
           else if p == "ideas"
-            IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
+            IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, wide=(width > height), selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
           else if p == "goals"
             GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
       // The page fades out under hex at the top and at the foot, so no row shows cut in half.

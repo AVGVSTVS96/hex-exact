@@ -48,6 +48,6 @@ icons
   icon.stuck = icon(sf "exclamationmark.triangle", svg "icons/warning.svg")
   icon.paused = icon(sf "pause.fill", svg "icons/pause.svg")
   icon.offline = icon(sf "wifi.exclamationmark", svg "icons/wifi-off.svg")
-  icon.found = icon(sf "magnifyingglass", svg "icons/lens.svg")
+  icon.found = icon(sf "binoculars", svg "icons/lens.svg")
   icon.watch = icon(sf "clock", svg "icons/clock.svg")
   icon.open = icon(sf "chevron.down", svg "icons/chevron-down.svg")

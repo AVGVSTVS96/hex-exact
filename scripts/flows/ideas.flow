@@ -1,10 +1,10 @@
-# Ideas: the tab, the idea hex found something on, its earlier checks, Start it and Undo, Stop
+# Ideas: the tab, the first idea hex looks into, its earlier checks, Start it and Undo, Stop
 # looking, a word added to it (nothing moves when it's sent), Back where there is one, then the list
 # shown in full and scrolled to its end. The stand-in keeps every write from reaching hex.
 launch /
 tap hex-tab-ideas
 shoot ideas
-tap idea-row-t-906
+tap idea-row-*
 shoot idea
 tap idea-earlier
 shoot earlier
@@ -26,8 +26,8 @@ swipe-down idea-scroll
 no-keyboard
 tap chrome-back
 shoot back
-reveal ideas-more
-tap ideas-more
+reveal ideas-more-*
+tap ideas-more-*
 scroll home-list-ideas
 scroll home-list-ideas
 shoot ideas-end

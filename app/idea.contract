@@ -1,11 +1,11 @@
-// An idea, opened (plan §10): what Bassim said, in his words; what hex found last, with its links,
-// and the checks before it in place; then three answers, each saying what a tap does, all in view
-// on the folded Duo; and "Add to this idea" docked at the foot. Over Home when folded (IdeaScreen),
-// beside hex's column with two (IdeaBody in Home's slot).
+// An idea, opened (plan §10): what Bassim said, in his words; what hex found, newest first on a
+// rail ending at its next check; then what he can do with it (Start it, look or stop looking, Not
+// needed), each confirmed in place with Undo; and "Add to this idea" docked at the foot. Over Home
+// when folded (IdeaScreen), beside hex's column with two (IdeaPane in Home's slot). Wider than
+// tall, what he said sits on the left and the rail on the right.
 use Viewport from "./shapes.contract"
-use Tap, PillTap, PillFace, Composer, ComposerField, Send, Note, springOf, whenOf, FieldHint from "./parts.contract"
+use Mark, Tap, PillTap, PillFace, Primary, Send, Note, springOf, whenOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
-use AnswerRow from "./ask.contract"
 use Idea, IdeaCheck, dayWord from "./ideas.contract"
 
 // What Bassim did with an idea here, as a root line: `${id}\t${verb}\t${status}\t${error}`, verb
@@ -25,28 +25,59 @@ fn undoOf(verb: string): string = verb == "start" or verb == "drop" ? "keep" : v
 fn weekdayNumber(now: number, offset: number): number = (floor((now + offset * 60000) / 86400000) + 4) % 7
 fn weekdayName(n: number): string = match ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].at(n) { case some(d) => d, case none => "" }
 fn checkName(day: string): string = day == "daily" ? "daily check" : day != "" ? `${day} check` : "checks"
-// The head over a check: "Found today, 1:40 PM" when it was news, else "Checked …"; the time only today.
-fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}${dayWord(c.at, now, offset) == "today" ? `, ${formatTime(c.at, offset, "short")}` : ""}`
+// The head over a check: "Found Nov 11" when it was news, else "Checked …"; its time beside it.
+fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}`
+fn nextCheck(day: string): string = day == "daily" ? "Next check tomorrow" : day != "" ? `Next check ${day}` : "hex looks again soon"
 
-// One check: its words, its links (each leaves the app, so its arrow says so).
-component CheckWords
+// A button of the page's that isn't its main one: a grey capsule.
+style Second
+  appearance="none" box-sizing="border-box" display="flex" flex-direction="row" align-items="center" justify-content="center" min-height=44 padding="0 16px" border-radius=999 background-color="-exact-tertiary-fill" color="-exact-label" font="-exact-subheadline" font-weight=600
+  :active
+    opacity=0.6
+    -exact-press-scale=0.97
+
+// One check on the rail: its dot (blue for the newest, grey before it), when, what it found and
+// its links, each leaving the app.
+component CheckStep
   inject
     haptics: bool
   props
     check: IdeaCheck
+    newest: bool
+    now: number
+    offset: number
+    // Lines its words show (0: all), and how many checks came before it ("" when none or not newest).
     lines: number
+    earlier: string
+    open: bool
     id: string
+    whole: action
+    toggleEarlier: action
   view
-    column gap=10
-      text check.words font="-exact-body" color="-exact-label" line-clamp=lines user-select="text"
-      if check.links.length > 0
-        row gap=4 flex-wrap="wrap" margin-left=-8
-          for l in check.links key=l.url
-            link href=l.url class=Tap min-height=44 padding="0 8px" display="flex" flex-direction="row" align-items="center" gap=4 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${l.label}, opens in Safari` testId=`${id}-link-${l.label}`
-              text l.label font="-exact-subheadline" font-weight=600 color="-exact-label"
-              image "symbol:sf/arrow.up.right" width=10 height=10 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+    row gap=10 align-items="stretch" testId=id
+      column width=18 align-items="center" flex-shrink=0 aria-hidden=true
+        box width=18 height=18 margin-top=1 border-radius=9 background-color=(newest ? "hex.progress.wash" : "transparent") display="flex" align-items="center" justify-content="center"
+          box width=10 height=10 border-radius=5 background-color=(newest ? "hex.progress" : "-exact-tertiary-label")
+        box width=1.5 flex=1 margin-top=3 background-color="-exact-separator"
+      column flex=1 min-width=0 gap=4 padding-bottom=14
+        row gap=8 align-items="baseline" min-height=20
+          text checkHead(check, now, offset) font="-exact-subheadline" font-weight=600 color=(newest and check.news ? "hex.progress" : "-exact-secondary-label") white-space="nowrap"
+          text formatTime(check.at, offset, "short") font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" flex=1 white-space="nowrap"
+          if earlier != ""
+            button press=toggleEarlier class=Tap display="flex" flex-direction="row" align-items="center" gap=4 min-height=32 margin="-6px 0" aria-expanded=open -exact-press-haptic=(haptics ? "selection" : "none") testId="idea-earlier"
+              text earlier font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap"
+              image "symbol:sf/chevron.right" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" rotate=(open ? "90deg" : "0deg") aria-hidden=true
+        button press=whole class=Tap display="flex" flex-direction="column" align-items="stretch" text-align="left" aria-expanded=(lines == 0) testId=`${id}-words`
+          text check.words font="-exact-callout" color="-exact-label" line-clamp=lines user-select="text"
+        if check.links.length > 0
+          row gap=6 flex-wrap="wrap" margin-top=4
+            for l in check.links key=l.url
+              link href=l.url class=Tap display="flex" flex-direction="row" align-items="center" gap=5 height=28 padding="0 10px" border-radius=14 background-color="-exact-quaternary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${l.label}, opens in Safari` testId=`${id}-link-${l.label}`
+                image "symbol:sf/link" width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                text l.label font="-exact-footnote" font-weight=600 color="-exact-secondary-label" white-space="nowrap"
+                image "symbol:sf/arrow.up.right" width=9 height=9 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
 
-// An answer that has been tapped, in its row's place: what it did, and Undo.
+// What a tap on one of the idea's buttons did, in their place: what it did, and Undo.
 component IdeaDoneRow
   inject
     haptics: bool
@@ -58,11 +89,10 @@ component IdeaDoneRow
     undo: action
     again: action
   view
-    row gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" min-height=44 aria-live="polite" testId=id
-      box width=22 height=22 border-radius=11 flex-shrink=0 background-color=(act.status == "failed" ? "hex.danger" : "AccentColor") display="flex" align-items="center" justify-content="center" opacity=(act.status == "sending" ? 0.6 : 1) aria-hidden=true
-        image (act.status == "failed" ? "symbol:sf/exclamationmark" : "symbol:checkmark") width=11 height=11 object-fit="contain" color="ink.on-accent"
-      column flex=1 min-width=0 gap=2
-        text label font="-exact-body" font-weight=600 color="-exact-label"
+    row gap=12 align-items="center" padding="8px 0" min-height=44 aria-live="polite" testId=id
+      Mark(state=(act.status == "failed" ? "failed" : "done"), size=22)
+      column flex=1 min-width=0 gap=1
+        text label font="-exact-headline" color="-exact-label"
         text (act.status == "failed" ? `Didn't go · ${act.error}` : detail) font="-exact-subheadline" color=(act.status == "failed" ? "hex.danger" : "-exact-secondary-label")
       if act.status == "failed"
         button press=again class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") testId=`${id}-again`
@@ -76,7 +106,7 @@ component IdeaDoneRow
 // The idea's page, without its frame: shared by the page over Home and the page beside.
 component IdeaBody
   inject
-    still: bool
+    haptics: bool
   props
     idea: Idea
     loading: bool
@@ -85,9 +115,9 @@ component IdeaBody
     offset: number
     // The last thing done with this idea here.
     act: IdeaAct
+    wide: bool
     // How far the title stays off the column's trailing edge, clear of the status icons beside it,
-    // and the heading's least height, so what follows it starts below them: with one, the heading
-    // shares the chrome row, in the smaller title drawn for it.
+    // and the heading's least height, so what follows it starts below them.
     inset: number
     head: number
     // do(id, verb), redo(id), undo(id, verb).
@@ -97,10 +127,11 @@ component IdeaBody
   state earlier = false
   state saidWhole = false
   state foundWhole = false
-  derive last = idea.checks.at(0)
   derive older = idea.checks.slice(1)
   derive today = weekdayNumber(now, offset)
   derive acted = act.id == idea.id and act.verb != ""
+  derive settled = acted and (act.verb == "start" or act.verb == "drop")
+  derive project = idea.project != "" ? idea.project : idea.topic
   action toggleEarlier
     earlier = not earlier
   action toggleSaid
@@ -108,55 +139,53 @@ component IdeaBody
   action toggleFound
     foundWhole = not foundWhole
   view
-    column gap=12 padding="0 4px" testId="idea"
+    column padding="0 4px" testId="idea"
       if idea.id == ""
         if failed
           Note(kind="failed", text="Can't reach hex, so this idea can't open. Trying again…", pad="24px 0", id="idea-offline")
         else
           Note(kind="loading", text="Opening the idea", pad="24px 0", id="idea-loading")
       else
-        column gap=4 padding-right=inset min-height=head box-sizing="border-box"
-          text idea.title font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=2 testId="idea-title"
-          text `Idea${idea.topic != "" ? ` · ${idea.topic}` : ""} · floated ${dayWord(idea.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
-        if idea.said != ""
-          button press=toggleSaid class=Tap display="flex" flex-direction="column" align-items="stretch" gap=4 padding="2px 0 2px 14px" border-left="2.5px solid -exact-separator" text-align="left" aria-expanded=saidWhole aria-label=`You said: ${idea.said}` testId="idea-said"
-            text "You said" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-            text idea.said font="-exact-body" color="-exact-label" line-clamp=(saidWhole ? 0 : 2)
-        match last
-          case some(c)
-            column gap=8
-              row gap=8 align-items="center" min-height=44
-                text checkHead(c, now, offset) font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1 line-clamp=1
-                if older.length > 0
-                  button press=toggleEarlier class=Tap display="flex" flex-direction="row" align-items="center" gap=6 min-height=44 aria-expanded=earlier testId="idea-earlier"
-                    text `${older.length} earlier ${older.length == 1 ? "check" : "checks"}` font="-exact-subheadline" color="-exact-secondary-label"
-                    image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-secondary-label" rotate=(earlier ? "90deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
-              button press=toggleFound class=Tap display="flex" flex-direction="column" align-items="stretch" text-align="left" aria-expanded=foundWhole testId="idea-found"
-                CheckWords(check=c, lines=(foundWhole ? 0 : 3), id="idea-found")
+        row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 20 : 16)
+          column flex=(wide ? 1 : 0) min-width=0 gap=0
+            row gap=6 align-items="center" min-height=24 padding-right=inset
+              Mark(state=(idea.looking ? "found" : "idea"), size=22)
+              if project != ""
+                text project font="-exact-subheadline" font-weight=600 color=(idea.looking ? "hex.progress" : "-exact-secondary-label") margin-left=4 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+              text `Idea · floated ${dayWord(idea.at, now, offset)}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" margin-left=(project == "" ? 4 : 0) flex-shrink=0
+            column padding-right=inset min-height=max(0, head - 24) box-sizing="border-box" margin-top=6
+              text idea.title role="heading" aria-level=1 font="-exact-title2" font-weight=700 color="-exact-label" user-select="text" overflow-wrap="break-word" testId="idea-title"
+            if idea.said != ""
+              button press=toggleSaid class=Tap display="flex" flex-direction="column" align-items="stretch" gap=2 margin-top=12 padding="1px 0 1px 12px" border-left="2.5px solid -exact-separator" text-align="left" aria-expanded=saidWhole aria-label=`You said: ${idea.said}` testId="idea-said"
+                text `You said · ${dayWord(idea.at, now, offset)}` font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+                text idea.said font="-exact-callout" color="-exact-label" line-clamp=(saidWhole ? 0 : wide ? 12 : 4)
+          column flex=(wide ? 1 : 0) min-width=0 gap=0 testId="idea-rail"
+            for c in idea.checks.slice(0, 1) key=c.at
+              CheckStep(check=c, newest=true, now=now, offset=offset, lines=(foundWhole ? 0 : wide ? 4 : 6), earlier=(older.length > 0 ? `${older.length} earlier` : ""), open=earlier, id="idea-found", whole=toggleFound, toggleEarlier=toggleEarlier)
               if earlier
                 for o, n in older key=n
-                  column gap=6 padding="10px 0 0 14px" border-left="2.5px solid -exact-separator" testId=`idea-check-${n}`
-                    text checkHead(o, now, offset) font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
-                    CheckWords(check=o, lines=0, id=`idea-check-${n}`)
-          case none
-            text (idea.looking ? `hex hasn't looked yet; its first look is on its ${checkName(idea.day)}.` : "hex isn't looking into it.") font="-exact-subheadline" color="-exact-secondary-label"
-        column border-top="0.5px solid -exact-separator" testId="idea-answers"
-          if acted and act.verb == "start"
-            IdeaDoneRow(label="Started", detail="It's a goal now; hex is on it", act=act, id="idea-start", undo=undo(idea.id, "keep"), again=redo(idea.id))
-          else
-            box opacity=(acted and act.verb == "drop" ? 0.4 : 1)
-              AnswerRow(label="Start it", detail="Becomes a goal hex works on", pick=false, chosen=false, role="", disabled=(acted and act.verb == "drop"), id="idea-start", press=do(idea.id, "start"))
-          if acted and (act.verb == "stop" or act.verb == "look")
-            IdeaDoneRow(label=(act.verb == "stop" ? "Stopped looking" : "Looking into it weekly"), detail=(act.verb == "stop" ? `Its ${checkName(idea.day)} is off` : `Each ${weekdayName(today)}`), act=act, id="idea-look", undo=undo(idea.id, undoOf(act.verb)), again=redo(idea.id))
-          else if idea.looking
-            AnswerRow(label="Stop looking into it", detail=`hex stops its ${checkName(idea.day)}`, pick=false, chosen=false, role="", disabled=false, id="idea-look", press=do(idea.id, "stop"))
-          else
-            AnswerRow(label="Look into it every week", detail=`hex checks on it each ${weekdayName(today)}`, pick=false, chosen=false, role="", disabled=false, id="idea-look", press=do(idea.id, "look"))
-          if acted and act.verb == "drop"
-            IdeaDoneRow(label="Not needed", detail="Off your ideas", act=act, id="idea-drop", undo=undo(idea.id, "keep"), again=redo(idea.id))
-          else
-            box opacity=(acted and act.verb == "start" ? 0.4 : 1)
-              AnswerRow(label="Not needed", detail="Take it off your ideas", pick=false, chosen=false, role="", disabled=(acted and act.verb == "start"), id="idea-drop", press=do(idea.id, "drop"))
+                  CheckStep(check=o, newest=false, now=now, offset=offset, lines=0, earlier="", open=false, id=`idea-check-${n}`, whole=toggleFound, toggleEarlier=toggleEarlier)
+            row gap=10 align-items="center" min-height=22 testId="idea-next"
+              box width=18 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+                box width=10 height=10 border-radius=5 border="1.5px dashed -exact-tertiary-label" box-sizing="border-box"
+              text (idea.looking ? (idea.checks.length == 0 ? `hex hasn't looked yet · ${nextCheck(idea.day).toLowerCase()}` : nextCheck(idea.day)) : "hex isn't looking into it") font="-exact-footnote" color="-exact-secondary-label"
+            column margin-top=16 gap=8 testId="idea-answers"
+              if acted and act.verb == "start"
+                IdeaDoneRow(label="Started", detail="It's a goal now; hex is on it", act=act, id="idea-start", undo=undo(idea.id, "keep"), again=redo(idea.id))
+              else if acted and act.verb == "drop"
+                IdeaDoneRow(label="Not needed", detail="Off your ideas", act=act, id="idea-drop", undo=undo(idea.id, "keep"), again=redo(idea.id))
+              else if acted
+                IdeaDoneRow(label=(act.verb == "stop" ? "Stopped looking" : "Looking into it weekly"), detail=(act.verb == "stop" ? `Its ${checkName(idea.day)} is off` : `Each ${weekdayName(today)}`), act=act, id="idea-look", undo=undo(idea.id, undoOf(act.verb)), again=redo(idea.id))
+              if not settled
+                row gap=8 flex-wrap=(wide ? "wrap" : "nowrap")
+                  button press=do(idea.id, "start") class=Primary flex=1 flex-basis=(wide ? "100%" : "auto") font="-exact-subheadline" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label="Start it: it becomes a goal hex works on" testId="idea-start"
+                    image "symbol:icon.goals" width=15 height=15 object-fit="contain" color="-exact-background" aria-hidden=true
+                    text "Start it"
+                  if not acted
+                    button press=do(idea.id, (idea.looking ? "stop" : "look")) class=Second flex=(wide ? 1 : 0) -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(idea.looking ? `Stop looking: hex stops its ${checkName(idea.day)}` : `Look weekly: hex checks on it each ${weekdayName(today)}`) testId="idea-look"
+                      text (idea.looking ? "Stop looking" : "Look weekly") white-space="nowrap"
+                  button press=do(idea.id, "drop") class=Second flex=(wide ? 1 : 0) -exact-press-haptic=(haptics ? "selection" : "none") aria-label="Not needed: take it off your ideas" testId="idea-drop"
+                    text "Not needed" white-space="nowrap"
 
 // "Add to this idea", docked at the page's foot: Bassim's words go to the idea's topic. The
 // keyboard stays up through a send, and the draft is kept if he leaves.
@@ -183,18 +212,20 @@ component AddToIdea
       text = ""
       started = true
   view
-    column position="relative" testId="idea-add"
-      row class=Composer
-        if words == ""
-          FieldHint(text="Add to this idea")
-        textarea id="idea-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=120 aria-label=`Add to this idea; goes to ${idea.topic != "" ? idea.topic : "its topic"}` testId="idea-field"
-        button press=submit disabled=empty class=Send retainFocus=true aria-label="Send" testId="idea-send"
-          image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")
+    column testId="idea-add"
       if sent != ""
-        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="2px 14px 4px" position="absolute" bottom="100%" left=0 right=0 background-color="-exact-background" aria-live="polite" testId="idea-sent"
+        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="2px 14px 4px" aria-live="polite" testId="idea-sent"
+      row backgroundMaterial="glass" border-radius=24 min-height=48 padding="0 6px 0 16px" gap=6 align-items="flex-end" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
+        box position="relative" flex=1 min-width=0 display="flex"
+          if words == ""
+            text "Add to this idea" position="absolute" left=0 top=13 right=0 font="-exact-body" color="-exact-placeholder" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" pointer-events="none" aria-hidden=true
+          textarea id="idea-field" border="none" background-color="transparent" padding="13px 0" flex=1 min-width=0 font="-exact-body" color="-exact-label" value=words input=edit rows=1 field-sizing="content" max-height=120 aria-label=`Add to this idea; goes to ${idea.topic != "" ? idea.topic : "its topic"}` testId="idea-field"
+        button press=submit disabled=empty class=Send margin="6px 0" retainFocus=true aria-label="Send" testId="idea-send"
+          image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")
 
 // The page itself: the idea scrolling, the composer at its foot with what scrolls fading out
 // behind it. `bottom` is how far the foot stands off the window's edge (the keyboard when it's up).
+// Wide, the composer sits under the rail, on the right.
 component IdeaPane
   props
     idea: Idea
@@ -203,6 +234,7 @@ component IdeaPane
     now: number
     offset: number
     act: IdeaAct
+    wide: bool
     inset: number
     head: number
     // How far the composer stands off the column's trailing edge, clear of a camera in that corner.
@@ -219,10 +251,11 @@ component IdeaPane
   view
     column flex=1 min-height=0 padding-bottom=bottom testId="idea-pane"
       scroll flex=1 min-height=0 padding="4px 16px 24px" box-sizing="border-box" testId="idea-scroll"
-        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=inset, head=head, do=do, redo=redo, undo=undo)
+        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, wide=wide, inset=inset, head=head, do=do, redo=redo, undo=undo)
       if idea.id != ""
-        column margin-top=-24 padding="24px 16px 0" padding-right=max(16, end) background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 position="relative" testId="idea-foot"
-          AddToIdea(idea=idea, draft=draft, sent=sent, error=error, keep=keep, add=add)
+        row margin-top=-24 padding="24px 12px 0" padding-right=max(12, end) justify-content="flex-end" background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 testId="idea-foot"
+          box flex=1 min-width=0 max-width=(wide ? "50%" : "100%")
+            AddToIdea(idea=idea, draft=draft, sent=sent, error=error, keep=keep, add=add)
 
 // The idea over Home, folded: the chrome with Back, and the page under it.
 component IdeaScreen
@@ -255,4 +288,4 @@ component IdeaScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="idea-screen"
       Chrome(room=room, on="idea", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="idea-column"
-        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), head=0, end=(room.clear.x + room.clear.width - room.footEnd), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)
+        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, wide=(room.width > room.height), inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), head=0, end=(room.clear.x + room.clear.width - room.footEnd), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)

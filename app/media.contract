@@ -80,7 +80,7 @@ component Waiting
     if media.length > 0
       row gap=8 padding="4px 0" testId="waiting"
         for m in media key=m.id
-          box position="relative"
+          box position="relative" border-radius=14 box-shadow="0 6px 20px light-dark(rgba(20,20,40,0.14), rgba(0,0,0,0.45))"
             Thumb(media=m, width=56, square=true)
-            button press=remove(m.id) class=Tap position="absolute" top=-6 right=-6 width=22 height=22 border-radius=11 background-color="-exact-label" display="flex" align-items="center" justify-content="center" aria-label="Remove" testId=`waiting-remove-${m.id}`
+            button press=remove(m.id) class=Tap position="absolute" top=-6 right=-6 width=22 height=22 border-radius=11 border="2px solid -exact-background" background-color="-exact-label" display="flex" align-items="center" justify-content="center" aria-label="Remove" testId=`waiting-remove-${m.id}`
               image "symbol:sf/xmark" width=9 height=9 object-fit="contain" color="-exact-background"

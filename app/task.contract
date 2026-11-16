@@ -1,32 +1,45 @@
-// A task's page (§9.2, 9.7, 9.8): what it needs from Bassim, what it's doing now, what it did, its
-// pinned post, its messages, every place it lives, its week and its history. The same route opens
-// a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
+// A task's page (§9.2, 9.7, 9.8), as Muse's agent page reads: its name and where it stands, a link
+// out to where it lives; its week as a lane a day, blue where hex worked and amber where it waited on
+// Bassim; what needs him, each question with hex's pick and Take N for all of them; what hex is doing
+// now with its agents and the way into every step; the thread's last words and the way into all of
+// them; its pinned status post. Wider than tall it flows into two columns. A question opens on its own
+// page (`?ask=<id>`), as do a topic with only questions (`topic:<name>`) and the page beside Home; a
+// finished thing (`done:<id>`) opens on its proof.
 use Viewport, Counts, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
-use Mark, PlaceTile, Row, Head, Note, Discuss, ShowMore, RowTap, PillTap, PillFace, Composer, whenOf, appName, lengthOf, Tap, inlineOf, plainOf, runStarted from "./parts.contract"
+use Mark, PlaceTile, Row, Head, Note, ShowMore, RowTap, PillTap, PillFace, whenOf, dayOf, weekdayOf, appName, appSymbol, lengthOf, Tap, inlineOf, plainOf, tintOf, washOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
 use EntryRow from "./rows.contract"
 use AskCard, StuckCard, DecidedCard, ReplyComposer from "./ask.contract"
 
-// A working stretch of a thread's week, as fractions of the lane (log-like: the last hour is a
-// fifth of it, the week before three days ago another).
-shape Span
+// A stretch of a thread's track: from one change to the next (or now), and how it stood.
+shape Stretch
   start: number
   end: number
+  state: string
 
-fn hoursAgo(at: number, now: number): number = max(0, (now - at) / 3600000)
-fn laneX(h: number): number = h <= 1 ? 1 - 0.2 * h : h <= 6 ? 0.8 - 0.2 * (h - 1) / 5 : h <= 24 ? 0.6 - 0.2 * (h - 6) / 18 : h <= 72 ? 0.4 - 0.2 * (h - 24) / 48 : h <= 168 ? 0.2 - 0.2 * (h - 72) / 96 : 0
 fn trackAt(track: Track[], i: number, now: number): number = match track.at(i) { case some(t) => t.at, case none => now }
-fn spansOf(track: Track[], now: number): Span[] = range(track.length).filter(i => match track.at(i) { case some(t) => t.state == "working", case none => false }).map(i => Span(start=laneX(hoursAgo(trackAt(track, i, now), now)), end=laneX(hoursAgo(trackAt(track, i + 1, now), now))))
-fn failsOf(track: Track[], now: number): number[] = track.filter(t => t.state == "failed").map(t => laneX(hoursAgo(t.at, now)))
+fn stretchesOf(track: Track[], now: number): Stretch[] = range(track.length).map(i => Stretch(start=trackAt(track, i, now), end=trackAt(track, i + 1, now), state=match track.at(i) { case some(t) => t.state, case none => "" }))
+// A day's midnight on the phone's clock.
+fn midnightOf(day: number, offset: number): number = day * 86400000 - offset * 60000
+// The days its week shows, oldest first: from its first change, a week at most.
+fn weekOf(track: Track[], now: number, offset: number): number[] = match track.at(0) { case some(t) => range(dayOf(now, offset) - max(dayOf(t.at, offset), dayOf(now, offset) - 6) + 1).map(i => max(dayOf(t.at, offset), dayOf(now, offset) - 6) + i), case none => [0].slice(0, 0) }
+fn hoursOf(stretches: Stretch[], state: string, from: number): number = round(sum(stretches.filter(s => s.state == state and s.end > from).map(s => s.end - max(s.start, from))) / 3600000)
+fn laneInk(state: string): string = state == "working" ? "hex.progress" : state == "needs" ? "hex.ask" : "hex.danger"
+
 fn blankSaid(): Said = Said(id="", verb="", label="", status="", detail="", missed=0, question="", topic="", task="")
 fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
 // A question's draft, or the one left on an earlier id of it (hex asks again under a new id).
 fn askDraft(drafts: string[], a: Ask): string = match [a.id].concat(a.was).map(id => draftOf(drafts, `ask:${id}`)).filter(d => d.trim() != "").at(0) { case some(d) => d, case none => "" }
-fn kindWord(kind: string): string = kind == "think" ? "Thought" : kind == "say" ? "Said" : kind == "run" ? "Ran" : kind == "read" ? "Read" : kind == "edit" ? "Edited" : kind == "search" ? "Searched" : kind == "web" ? "Looked up" : kind == "agent" ? "Agent" : kind == "plan" ? "Planned" : "Used a tool"
+fn askPick(a: Ask): string = match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
 // "(Asked Siri) words" from Bassim is an event: its label and its words.
 fn eventOf(text: string): string = text.startsWith("(") and text.indexOf(") ") > 1 ? text.slice(1, text.indexOf(") ")) : ""
+// An agent's own name: the last part of "Topic/name".
+fn agentName(label: string): string = match label.split("/").at(-1) { case some(n) => n, case none => label }
+
+keyframes standDot
+  50% opacity=0.25
 
 component TaskScreen
   props
@@ -54,6 +67,7 @@ component TaskScreen
     openTask: action
     answer: action
     answerMany: action
+    answerAll: action
     note: action
     dismiss: action
     undo: action
@@ -78,7 +92,7 @@ component TaskScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="task"
       Chrome(room=room, on="task", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, end=0, head=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, end=0, head=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, answerAll=answerAll, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
 
 // A page's head: its title (two lines at most) and where it stands, clear of the status icons beside
 // it, then what it offers (its children: a way out to where it lives, a call about it). Whatever
@@ -98,31 +112,86 @@ component PageHead
     line: string
     id: string
   slot
-  derive inset = pane or room.columns == 2 ? 20 : max(20, room.clear.x + room.clear.width - room.bar.end)
+  derive inset = pane or room.columns == 2 ? 16 : max(16, room.clear.x + room.clear.width - room.bar.end)
   view
-    column flex-shrink=0 gap=4 padding-left=20 padding-right=max(inset, end) padding-top=(pane ? 6 : 0) padding-bottom=10 min-height=(pane ? head : max(0, clearTop - room.below)) box-sizing="border-box" testId=id
-      text title role="heading" aria-level=1 font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=2
+    column flex-shrink=0 gap=2 padding-left=16 padding-right=max(inset, end) padding-top=(pane ? 6 : 0) padding-bottom=8 min-height=(pane ? head : max(0, clearTop - room.below)) box-sizing="border-box" testId=id
+      row gap=10 align-items="flex-start"
+        text title role="heading" aria-level=1 font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=600 color="-exact-label" line-clamp=2 flex=1 min-width=0
+        row gap=6 align-items="center" margin="-7px -4px -7px 0" flex-shrink=0
+          children
       if line != ""
-        text line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
-      row gap=8 flex-wrap="wrap" align-items="center" margin-left=-4
-        children
+        text line font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
 
-// A row that goes further in the app: its words and a chevron pointing right.
+// Where it stands, as Muse's agent page says it under the name: Working with blue dots and for how
+// long, Needs you in amber, Failed in red, Done in mint.
+component Standing
+  inject
+    still: bool
+  props
+    state: string
+    parent: string
+    since: number
+    at: number
+    agents: number
+    now: number
+    offset: number
+  view
+    row gap=6 align-items="center" padding="0 16px" min-height=18 testId="task-stand"
+      if parent != ""
+        text `${parent} ·` font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap"
+      if state == "working"
+        row gap=3 flex-shrink=0 aria-hidden=true
+          for i in [0, 1, 2] key=i
+            box width=4 height=4 border-radius=2 background-color="hex.progress" opacity=(i == 0 ? 0.35 : i == 1 ? 0.65 : 1) animation=(still ? "none" : `standDot 1.2s ease-in-out ${i * 0.2}s infinite`)
+        text "Working" font="-exact-footnote" font-weight=600 color="hex.progress"
+        text `${lengthOf((now - since) / 1000)}${agents > 0 ? ` · ${agents} ${agents == 1 ? "agent" : "agents"}` : ""}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+      else if state == "needs"
+        text "Needs you" font="-exact-footnote" font-weight=600 color="hex.ask"
+        text `since ${whenOf(since, now, offset)}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap"
+      else if state == "failed"
+        text "Failed" font="-exact-footnote" font-weight=600 color="hex.danger"
+        text whenOf(at, now, offset) font="-exact-footnote" color="-exact-tertiary-label"
+      else if state == "done"
+        text "Done" font="-exact-footnote" font-weight=600 color="hex.accent"
+        text whenOf(at, now, offset) font="-exact-footnote" color="-exact-tertiary-label"
+      else
+        text stateWord(state) font="-exact-footnote" color="-exact-secondary-label"
+
+// A section's head: its colour's dot on its wash, its name in that colour, how many (n < 0: none).
+// "quiet" is the grey head of a section that has no state of its own.
+component Section
+  props
+    tone: string
+    label: string
+    n: number
+    id: string
+  view
+    row gap=10 align-items="center" height=40 padding="0 10px" role="heading" aria-level=2 testId=id
+      box width=22 height=22 border-radius=11 background-color=(tone == "quiet" ? "-exact-quaternary-fill" : washOf(tone)) display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-hidden=true
+        box width=8 height=8 border-radius=4 background-color=(tone == "quiet" ? "-exact-tertiary-label" : tintOf(tone))
+      text label font="-exact-headline" color=(tone == "quiet" ? "-exact-secondary-label" : tintOf(tone)) flex=1
+      if n >= 0
+        text `${n}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+// A row that goes further in the app: a symbol in the marks' column, its name, a count, a chevron.
 component Further
   inject
     haptics: bool
   props
+    icon: string
     label: string
-    line: string
+    n: number
+    selected: bool
     id: string
     press: action
   view
-    button press=press class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(line != "" ? `${label}, ${line}` : label) testId=id
-      column flex=1 min-width=0 gap=2
-        text label font="-exact-headline" color="-exact-label"
-        if line != ""
-          text line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
-      image "symbol:forward-chevron" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+    button press=press class=RowTap align-items="center" gap=10 padding="11px 10px" border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(n >= 0 ? `${label}, ${n}` : label) testId=id
+      box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+        image icon width=17 height=17 object-fit="contain" color="-exact-secondary-label"
+      text label font="-exact-callout" font-weight=600 color="-exact-label" flex=1 min-width=0 line-clamp=1
+      if n >= 0
+        text `${n}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+      image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
 
 // One line of what happened, with its mark and when.
 component Happened
@@ -132,11 +201,163 @@ component Happened
     stamp: string
     failed: bool
   view
-    row gap=12 align-items="flex-start" padding="7px 10px"
+    row gap=10 align-items="flex-start" padding="9px 10px"
       box padding-top=1 flex-shrink=0
         Mark(state=mark, size=22)
-      text text font="-exact-body" color=(failed ? "hex.danger" : "-exact-label") line-clamp=3 flex=1 min-width=0
-      text stamp font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" padding-top=3
+      text text font="-exact-callout" color=(failed ? "hex.danger" : "-exact-label") line-clamp=3 flex=1 min-width=0
+      if stamp != ""
+        text stamp font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" padding-top=2
+
+// Its week: hours hex worked and hours it waited on Bassim, then a lane a day, midnight to midnight,
+// blue where hex worked, amber where it waited, red where it failed, a tick at now.
+component Week
+  props
+    track: Track[]
+    now: number
+    offset: number
+  derive stretches = stretchesOf(track, now)
+  derive days = weekOf(track, now, offset)
+  derive from = match days.at(0) { case some(d) => midnightOf(d, offset), case none => now }
+  derive today = dayOf(now, offset)
+  view
+    column padding="4px 16px 6px" gap=3 testId="task-week"
+      row gap=14 align-items="center" margin-bottom=5
+        row gap=4 align-items="center"
+          box width=8 height=8 border-radius=4 background-color="hex.progress" margin-right=2 aria-hidden=true
+          text `${hoursOf(stretches, "working", from)}h` font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="-exact-label"
+          text "working" font="-exact-footnote" color="-exact-tertiary-label"
+        row gap=4 align-items="center"
+          box width=8 height=8 border-radius=4 background-color="hex.ask" margin-right=2 aria-hidden=true
+          text `${hoursOf(stretches, "needs", from)}h` font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="-exact-label"
+          text "waiting on you" font="-exact-footnote" color="-exact-tertiary-label"
+      for d in days key=d
+        row gap=8 align-items="center" height=14 aria-hidden=true
+          text (d == today ? "Today" : weekdayOf(midnightOf(d, offset) + 43200000, offset)) font="-exact-caption1" color="-exact-tertiary-label" width=36 flex-shrink=0
+          box flex=1 height=8 position="relative"
+            box position="absolute" left=0 top=0 height=8 width=`${(min(midnightOf(d + 1, offset), now) - midnightOf(d, offset)) / 864000}%` border-radius=4 background-color="-exact-quaternary-fill"
+            for s, i in stretches.filter(x => (x.state == "working" or x.state == "needs" or x.state == "failed") and x.end > midnightOf(d, offset) and x.start < midnightOf(d + 1, offset)) key=i
+              box position="absolute" top=0 height=8 left=`${(max(s.start, midnightOf(d, offset)) - midnightOf(d, offset)) / 864000}%` width=`${(min(s.end, midnightOf(d + 1, offset)) - max(s.start, midnightOf(d, offset))) / 864000}%` min-width=2 border-radius=3 background-color=laneInk(s.state)
+            if d == today
+              box position="absolute" top=-3 height=14 width=2 margin-left=-1 left=`${(now - midnightOf(d, offset)) / 864000}%` border-radius=1 background-color="-exact-label"
+      row gap=8 aria-hidden=true
+        box width=36 flex-shrink=0
+        for l in ["12a", "6a", "12p", "6p"] key=l
+          text l font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" flex=1
+
+// A question on the task's page: its mark, the question, hex's pick in mint and when. A tap opens it.
+component AskLine
+  inject
+    haptics: bool
+  props
+    ask: Ask
+    // What Bassim answered here ("" while it's open).
+    answered: string
+    now: number
+    offset: number
+    press: action
+  derive pick = askPick(ask)
+  view
+    button press=press class=RowTap gap=10 border-radius=14 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(pick != "" ? `${ask.question}, hex’s pick ${pick}` : ask.question) testId=`task-ask-${ask.id}`
+      box padding-top=1 flex-shrink=0
+        Mark(state=(answered != "" ? "done" : "asks"), size=22)
+      column flex=1 min-width=0 gap=3
+        text ask.question font="-exact-headline" color=(answered != "" ? "-exact-secondary-label" : "-exact-label") line-clamp=2
+        row gap=8 align-items="center"
+          if answered != ""
+            text answered font="-exact-footnote" font-weight=600 color="-exact-secondary-label" line-clamp=1 flex-shrink=1 min-width=0
+          else if pick != ""
+            row gap=3 align-items="center" flex-shrink=1 min-width=0
+              image "symbol:sf/sparkle" width=11 height=11 object-fit="contain" color="hex.accent" aria-hidden=true
+              text pick font="-exact-footnote" font-weight=600 color="hex.accent" line-clamp=1
+          text whenOf(ask.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+
+// An agent hex started, in the colour of how it stands, so it never reads as a step or a task.
+component AgentTile
+  props
+    state: string
+    size: number
+  view
+    box width=size height=size border-radius=round(size * 0.3) flex-shrink=0 display="flex" align-items="center" justify-content="center" background-color=(state == "working" ? "hex.progress.wash" : state == "failed" ? "hex.danger.wash" : state == "stopped" ? "-exact-quaternary-fill" : "hex.accent.wash") aria-hidden=true
+      image "symbol:sf/person.wave.2" width=round(size * 0.58) height=round(size * 0.58) object-fit="contain" color=(state == "working" ? "hex.progress" : state == "failed" ? "hex.danger" : state == "stopped" ? "-exact-secondary-label" : "hex.accent")
+
+// An agent at work under Now: its tile, its name and model, how long, what it's on.
+component AgentLine
+  inject
+    haptics: bool
+  props
+    agent: Agent
+    now: number
+    press: action
+  view
+    button press=press class=RowTap gap=10 padding="7px 10px" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${agentName(agent.label)}, ${agent.line}` testId=`task-agent-${agent.id}`
+      box padding-top=1 flex-shrink=0
+        AgentTile(state=agent.state, size=22)
+      column flex=1 min-width=0 gap=1
+        row gap=8 align-items="baseline"
+          text flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+            text agentName(agent.label) font="-exact-callout" font-weight=600 color="-exact-label"
+            if agent.who != ""
+              text ` ${agent.who}` font="-exact-footnote" color="-exact-tertiary-label"
+          text lengthOf((now - agent.since) / 1000) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+        if agent.line != ""
+          text agent.line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
+
+// The thread's pinned status post: what to watch, then each section with its items, the first few of
+// each and "Show N more".
+component Status
+  props
+    pins: PinSection[]
+    few: number
+  state opened = [""].slice(0, 0)
+  action more(title: string)
+    opened = opened.includes(title) ? opened.filter(o => o != title) : opened.concat([title])
+  view
+    column testId="task-status"
+      Section(tone="quiet", label="Status", n=-1, id="head-status")
+      for p, i in pins key=`${p.title}${i}`
+        if p.title.toLowerCase() == "watch"
+          for l, j in p.lines key=`${j}`
+            row gap=10 align-items="flex-start" padding="6px 10px"
+              box width=22 display="flex" justify-content="center" padding-top=1 flex-shrink=0 aria-hidden=true
+                image "symbol:sf/eye" width=17 height=17 object-fit="contain" color="-exact-secondary-label"
+              text inlineOf(l.text) font="-exact-subheadline" color="-exact-secondary-label" flex=1 user-select="text"
+        else
+          if p.title != ""
+            row padding="0 10px 6px" height=32 align-items="flex-end" gap=8
+              text p.title font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" flex=1 line-clamp=1
+              text `${p.lines.filter(l => l.kind == "item").length}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+          for l, j in p.lines.slice(0, opened.includes(p.title) ? p.lines.length : few) key=`${j}`
+            PinRow(kind=l.kind, text=l.text, mark=l.mark, url=l.url)
+          if p.lines.length > few
+            ShowMore(n=(p.lines.length - few), shown=opened.includes(p.title), pad="4px 10px 8px", id=`pin-more-${p.title}`, press=more(p.title))
+
+// One line of the status post: an item with its mark (done mint and checked, the rest an empty box,
+// working blue, failed red), code in a box, a line of text; one with a link opens it.
+component PinRow
+  props
+    kind: string
+    text: string
+    mark: string
+    url: string
+  derive shown = mark == "done" ? "done" : mark == "working" ? "working" : mark == "failed" ? "failed" : "needs"
+  view
+    if kind == "code"
+      text text font-family="ui-monospace" font="-exact-footnote" margin="4px 10px 4px 42px" padding="8px 10px" border-radius=10 background-color="-exact-quaternary-fill" white-space="pre-wrap" user-select="text"
+    else if url != ""
+      link href=url class=RowTap gap=10 padding="6px 10px"
+        if kind == "item"
+          Mark(state=shown, size=22)
+        else
+          box width=22 flex-shrink=0
+        text inlineOf(text) font="-exact-callout" color=(mark == "done" ? "-exact-secondary-label" : "-exact-label") flex=1 min-width=0
+        image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" margin-top=5
+    else
+      row gap=10 align-items="flex-start" padding="6px 10px"
+        if kind == "item"
+          Mark(state=shown, size=22)
+        else
+          box width=22 flex-shrink=0
+        text inlineOf(text) font=(kind == "item" ? "-exact-callout" : "-exact-subheadline") color=(kind != "item" or mark == "done" ? "-exact-secondary-label" : "-exact-label") flex=1 min-width=0 user-select="text"
 
 // The page itself: a route's (TaskScreen), or a page beside a list (Tasks, Home) with two columns.
 component TaskBody
@@ -172,6 +393,7 @@ component TaskBody
     openTask: action
     answer: action
     answerMany: action
+    answerAll: action
     note: action
     dismiss: action
     undo: action
@@ -202,34 +424,42 @@ component TaskBody
   derive known = task.id == id
   derive title = kind == "topic" ? topicName : kind == "done" ? finished.title : (row.place != "" ? row.place : row.name)
   derive parent = isPart(row) ? row.name : ""
-  derive pageAsks = kind == "topic" ? asks.asks.filter(a => a.topic == topicName) : asksOf(row, asks.asks)
+  // The question this page was opened on.
+  derive askId = searchParam(entry, "ask")
+  derive allAsks = kind == "topic" ? asks.asks.filter(a => a.topic == topicName) : asksOf(row, asks.asks)
+  derive pageAsks = sortBy(allAsks, a => (a.id == askId ? 0 : 1))
   derive pageDecided = kind == "topic" ? asks.decided.filter(a => a.topic == topicName) : kind == "task" ? asksOf(row, asks.decided) : asks.decided.slice(0, 0)
-  derive waiting = pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).length
+  derive settled = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
+  derive openAsks = pageAsks.filter(a => not settled.includes(a.id))
+  derive picksOpen = openAsks.filter(a => askPick(a) != "")
   derive siblings = sortBy(tasks.tasks.filter(t => t.name == row.name and t.id != row.id), t => t.at, "desc")
   derive places = [row].concat(siblings)
   derive working = siblings.filter(t => t.state == "working")
   derive busyAgents = task.agents.filter(a => a.state == "working")
-  derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${row.state == "needs" ? `Waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `Working · ${runStarted(row.since, now)}` : row.state == "done" ? `Done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}${waiting > 0 ? ` · ${waiting} need you` : ""}`
   derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
   derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
+  derive stuckHere = topicEntries.filter(e => e.kind == "stuck")
+  // A question opens on its own page: one opened on it, a topic of only questions, and the page beside
+  // Home (it opens on what needs Bassim first). Its mark and topic head it.
+  derive asking = kind != "done" and (pageAsks.length > 0 or stuckHere.length > 0) and (kind == "topic" or askId != "" or entry.name == "home")
   // The reply box docked at the foot: for the question Bassim picked, else the first still open, else
   // the first on the page, so answering doesn't swap it away.
-  derive replyAsk = replying != "" ? pageAsks.filter(a => a.id == replying) : pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).concat(pageAsks).slice(0, 1)
-  derive weekly = places.filter(t => t.track.length > 0)
+  derive replyAsk = not asking ? pageAsks.slice(0, 0) : replying != "" ? pageAsks.filter(a => a.id == replying) : openAsks.concat(pageAsks).slice(0, 1)
+  derive track = known ? task.track : row.track
   // The door out to where this lives: the thread's own place, the finished item's, or a topic's
   // first question's.
   derive door = kind == "task" ? match places.filter(t => t.place == row.place and t.link != "").at(0) { case some(t) => Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), case none => Place(app="", place="", task="", call="", link="") } : kind == "done" ? Place(app=finished.app, place="", task="", call="", link=finished.link) : match pageAsks.map(a => a.places).flat().filter(p => p.link != "").at(0) { case some(p) => p, case none => Place(app="", place="", task="", call="", link="") }
   derive width = pane ? room.second.width : room.clear.width
   // A page beside a list opened like a laptop has the half under the hinge.
   derive tall = pane and room.across < room.height ? room.height - room.across : room.height
-  // Wider than tall (folded on its side, under a laptop's hinge): a question and its answers side by side.
+  // Wider than tall (folded on its side, under a laptop's hinge): two columns.
   derive wide = width >= 520 and width > tall
-  derive stuckHere = topicEntries.filter(e => e.kind == "stuck")
-  // A page that holds questions (or stuck runs) opens on the first: its own mark and topic head it.
-  derive asking = kind != "done" and (pageAsks.length > 0 or stuckHere.length > 0)
-  // A composer docked at the foot: the page scrolls to its top edge and fades over the 24 above it.
-  // Beside its own thread (open like a book) the thread's composer is the one.
-  derive docked = replyAsk.length == 0 and kind == "task" and chat.sends and entry.name != "thread"
+  // The thread's composer floats at the foot; it opens the thread to write. Beside its own thread
+  // (open like a book) the thread's composer is the one.
+  derive docked = not asking and kind == "task" and chat.sends and entry.name != "thread"
+  derive peek = chat.turns.filter(t => t.text.trim() != "").slice(-2)
+  derive draft = draftOf(drafts, `thread:${id}`)
+  derive rightEnd = max(12, room.clear.x + room.clear.width - room.footEnd)
   action reply(askId: string)
     replying = askId
   action closeReply
@@ -240,49 +470,62 @@ component TaskBody
     open(path("steps", id))
   action toMessages
     open(path("thread", id))
+  action toAsk(a: string)
+    open(`${path("task", id)}?ask=${encodeURIComponent(a)}`)
+  action toPage
+    open(path("task", id))
   action toProject
     openTask(finished.run)
+  action takePicks
+    answerAll(picksOpen.map(a => a.id), picksOpen.map(a => askPick(a)))
   view
-    column flex=1 min-height=0 height="100%"
-      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked ? "linear-gradient(to top, transparent 0, #000 24px)" : replyAsk.length > 0 ? `linear-gradient(to top, transparent 0, #000 ${foot + 4}px)` : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
+    column flex=1 min-height=0 height="100%" position="relative"
+      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" mask-image=(replyAsk.length > 0 ? `linear-gradient(to top, transparent 0, #000 ${foot + 4}px)` : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
         if asking
           box flex-shrink=0 min-height=(pane ? head : max(0, clearTop - room.below)) testId=(pane ? "pane-head" : "task-head")
         else
           // The head scrolls with the page.
-          PageHead(room=room, clearTop=clearTop, pane=pane, end=end, head=head, title=title, line=subtitle, id=(pane ? "pane-head" : "task-head"))
+          PageHead(room=room, clearTop=clearTop, pane=pane, end=end, head=head, title=title, line="", id=(pane ? "pane-head" : "task-head"))
             if door.link != ""
               button press=openOut(door.link, door.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(door.app)}` testId=(pane ? "pane-door" : "task-door-bar")
-                box class=PillFace gap=8 padding="5px 12px 5px 6px"
-                  PlaceTile(place=door, size=22)
-                  text appName(door.app) font="-exact-subheadline" font-weight=600 color="-exact-label"
+                box class=PillFace gap=5 height=30 padding="0 11px" box-sizing="border-box" background-color="-exact-quaternary-fill"
+                  image appSymbol(door.app) width=12 height=12 object-fit="contain" color="-exact-label" aria-hidden=true
+                  text appName(door.app) font="-exact-footnote" font-weight=600 color="-exact-label"
+                  image "symbol:sf/arrow.up.right" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
             if kind != "done"
-              Discuss(title=title, id=(pane ? "pane-talk" : "task-talk"), press=talk(kind == "task" ? id : "asks"))
-            if missing.includes(door.app)
-              text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding-left=4 width="100%" testId="door-missing"
-        column padding="0 10px" padding-bottom=(docked ? 30 : replyAsk.length > 0 ? foot + 8 + 48 + 20 : foot + 24) gap=0
+              button press=talk(kind == "task" ? id : "asks") class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Discuss ${title} with hex` testId=(pane ? "pane-talk" : "task-talk")
+                box width=30 height=30 border-radius=15 background-color="-exact-quaternary-fill" display="flex" align-items="center" justify-content="center"
+                  image "symbol:waveform" width=14 height=14 object-fit="contain" color="-exact-label" aria-hidden=true
+          if kind == "task" and row.id != ""
+            Standing(state=row.state, parent=parent, since=row.since, at=row.at, agents=busyAgents.length, now=now, offset=offset)
+          else if kind == "topic"
+            text `${openAsks.length > 0 ? `${openAsks.length} need you` : `${topicEntries.length} here`}` font="-exact-footnote" color="-exact-secondary-label" padding="0 16px"
+          else if kind == "done"
+            text `Done · ${whenOf(finished.at, now, offset)}` font="-exact-footnote" font-weight=600 color="hex.accent" padding="0 16px"
+          if missing.includes(door.app)
+            text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding="4px 16px 0" testId="door-missing"
+        column padding="0 6px" padding-bottom=(docked ? foot + 8 + 48 + 24 : replyAsk.length > 0 ? foot + 8 + 48 + 20 : foot + 24) gap=0
           if kind == "done"
+            box height=6
             Happened(mark="done", text=finished.title, stamp="", failed=false)
             if finished.said != "" or finished.links.length > 0
-              Head(label="Proof", n=-1, pad="18px 10px 4px", id="head-proof")
+              Section(tone="quiet", label="Proof", n=-1, id="head-proof")
               // Proof that is only its link says it once, as the link.
               if finished.said.trim() != "" and finished.links.filter(l => l.label.trim() == finished.said.trim() or l.url == finished.said.trim()).length == 0
-                text finished.said font="-exact-body" user-select="text" padding="2px 10px"
+                text finished.said font="-exact-callout" user-select="text" padding="2px 10px 2px 42px"
               for l in finished.links key=l.url
-                link href=l.url class=RowTap align-items="center" testId=`proof-${l.label}`
-                  text l.label font="-exact-body" color="-exact-label" flex=1
+                link href=l.url class=RowTap align-items="center" gap=10 testId=`proof-${l.label}`
+                  box width=22 flex-shrink=0
+                  text l.label font="-exact-callout" color="-exact-label" flex=1
                   image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
             if finished.run != ""
-              Further(label=finished.topic, line="The project it was for", id="done-project", press=toProject)
-          else
-            if kind == "task" and loading and not known and row.id == ""
-              Note(kind="loading", text="Loading", pad="24px 10px", id="task-loading")
-            if kind == "task" and failed and not known and row.id == ""
-              Note(kind="failed", text="hex didn't answer, so this can't open yet.", pad="24px 10px", id="task-offline")
+              Further(icon="symbol:list", label=finished.topic, n=-1, selected=false, id="done-project", press=toProject)
+          else if asking
             for a, i in pageAsks key=a.id
               if i > 0
                 box height=0.5 background-color="-exact-separator" margin="10px 6px 14px"
               // An open question swipes to Not needed, as a row in the list does.
-              if said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0
+              if settled.includes(a.id)
                 AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, talk=talk(a.task != "" ? a.task : "asks"), openOut=openOut, missing=missing, width=(width - 32), wide=wide)
               else
                 scroll swipeContent=`${a.id}-card` swipeTrailing=`${a.id}-card-away` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`ask-swipe-${a.id}`
@@ -298,103 +541,99 @@ component TaskBody
             if kind == "topic" and topicEntries.length > stuckHere.length
               for e in topicEntries.filter(x => x.kind != "stuck") key=e.id
                 EntryRow(entry=e, asks=asks.asks, said=said, why="", now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openTask)
-            if kind == "task" and task.needs != "" and pageAsks.length == 0
-              Head(label="Needs you", n=-1, pad="18px 10px 4px", id="head-needs")
-              Happened(mark="needs", text=task.needs, stamp=whenOf(row.since, now, offset), failed=false)
-            if kind == "task" and (row.state == "working" or working.length > 0 or busyAgents.length > 0)
-              Head(label="Now", n=-1, pad="18px 10px 4px", id="head-now")
-              if row.state == "working"
-                Happened(mark="working", text=(row.line != "" ? row.line : "Working"), stamp=lengthOf((now - row.since) / 1000), failed=false)
-              for t in working key=t.id
-                Row(mark="working", title=t.place, line=t.line, lines=2, failed=false, stamp=whenOf(t.at, now, offset), n=0, agents=0, selected=false, href="", label=`${t.place}, working: ${t.line}`, id=`working-${t.id}`, press=openTask(t.id))
-            if kind == "task" and entry.name != "steps" and (task.steps.length > 0 or task.agents.length > 0)
-              Further(label="Steps", line=(task.agents.length > 0 ? `${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : match sortBy(task.steps, s => s.at, "desc").at(0) { case some(s) => `${kindWord(s.kind)}: ${s.text}`, case none => "" }), id="task-steps", press=toSteps)
-            if kind == "task"
-              for p, i in task.pins key=`${p.title}${i}`
-                Pinned(section=p, first=(i == 0))
-            if kind == "task" and entry.name != "thread" and chat.turns.length > 0
-              Head(label="Messages", n=chat.total, pad="18px 10px 4px", id="head-messages")
-              for t in chat.turns.slice(-2) key=t.id
-                row justify-content=(t.source == "me" ? "flex-end" : "flex-start") padding="3px 10px"
-                  text plainOf(eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-body" line-clamp=4 max-width=(t.source == "me" ? "85%" : "100%") padding=(t.source == "me" ? "8px 14px" : "0") border-radius=18 background-color=(t.source == "me" ? "-exact-tertiary-fill" : "transparent")
-              Further(label="All messages", line="", id="task-messages", press=toMessages)
-            if kind == "task" and weekly.length > 0
-              Head(label="This week", n=-1, pad="18px 10px 6px", id="head-week")
-              column gap=6 padding="4px 10px"
-                for t in weekly.slice(0, 6) key=t.id
-                  row gap=8 align-items="center"
-                    text (t.place != "" ? t.place : t.name) font="-exact-caption1" color="-exact-secondary-label" width="5.5rem" flex-shrink=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-                    svg flex=1 height=12 viewBox="0 0 1000 12" preserveAspectRatio="none" aria-hidden=true
-                      rect x=0 y=5 width=1000 height=2 rx=1 fill="-exact-quaternary-fill"
-                      for s, j in spansOf(t.track, now) key=`${j}`
-                        rect x=(s.start * 1000) y=2 width=max(6, (s.end - s.start) * 1000) height=8 rx=4 fill="hex.progress"
-                      for x, j in failsOf(t.track, now) key=`f${j}`
-                        rect x=(x * 1000 - 2) y=0 width=4 height=12 rx=2 fill="hex.danger"
-                row padding-left="6.0rem"
-                  for l, j in ["1w", "3d", "1d", "6h", "1h", "now"] key=l
-                    text l font="-exact-caption2" color="-exact-tertiary-label" flex=(j == 5 ? 0 : 1) font-variant-numeric="tabular-nums"
-            if kind == "task" and task.lately.length > 0
-              Head(label="Lately", n=-1, pad="18px 10px 4px", id="head-lately")
-              for l, i in task.lately.slice(0, 8) key=`${l.at}${i}`
-                Happened(mark=l.state, text=l.text, stamp=whenOf(l.at, now, offset), failed=(l.state == "failed"))
-            if pageDecided.length > 0
-              Head(label="hex decided", n=-1, pad="18px 10px 4px", id="head-decided")
+            if kind == "topic" and pageDecided.length > 0
+              Section(tone="decided", label="hex decided", n=pageDecided.length, id="head-decided")
               for a in pageDecided key=a.id
-                DecidedCard(ask=a, now=now, offset=offset, failed=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, undo=undo)
-            if kind == "task" and siblings.length > 0
-              Head(label="Other threads", n=siblings.length, pad="18px 10px 4px", id="head-threads")
-              for t in siblings.slice(0, allPlaces ? siblings.length : 4) key=t.id
-                button press=openTask(t.id) class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") testId=`place-${t.id}`
-                  PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=26)
-                  column flex=1 min-width=0 gap=1
-                    text (t.place != "" ? t.place : t.name) font="-exact-body" color="-exact-label" line-clamp=1
-                    text `${appName(t.app)} · ${whenOf(t.at, now, offset)} · ${stateWord(t.state)}` font="-exact-footnote" color="-exact-secondary-label"
-                  image "symbol:forward-chevron" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
-              if siblings.length > 4
-                ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
+                box padding="0 10px"
+                  DecidedCard(ask=a, now=now, offset=offset, failed=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, undo=undo)
+            // The task's own page, from a question opened beside or over Home.
+            if kind == "task" and row.id != ""
+              box height=0.5 background-color="-exact-separator" margin="10px 6px 4px"
+              Further(icon="symbol:list", label=title, n=-1, selected=false, id="task-page-link", press=toPage)
+          else
+            if kind == "task" and loading and not known and row.id == ""
+              Note(kind="loading", text="Loading", pad="24px 10px", id="task-loading")
+            if kind == "task" and failed and not known and row.id == ""
+              Note(kind="failed", text="hex didn't answer, so this can't open yet.", pad="24px 10px", id="task-offline")
+            row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 4 : 0)
+              column flex=(wide ? 1 : 0) min-width=0
+                if kind == "task" and track.length > 0
+                  Week(track=track, now=now, offset=offset)
+                if pageAsks.length > 0
+                  Section(tone="asks", label="Needs you", n=openAsks.length, id="head-needs")
+                  for a in pageAsks key=a.id
+                    AskLine(ask=a, answered=(settled.includes(a.id) ? match said.filter(s => s.id == a.id).at(-1) { case some(s) => s.verb == "dismiss" ? "Not needed" : s.label, case none => "" } : ""), now=now, offset=offset, press=toAsk(a.id))
+                  if picksOpen.length > 0
+                    row gap=10 align-items="center" padding="4px 10px 6px" testId="task-take"
+                      Mark(state="decided", size=22)
+                      text `hex has a pick for ${picksOpen.length == openAsks.length and openAsks.length > 1 ? `all ${picksOpen.length}` : `${picksOpen.length}`}` font="-exact-subheadline" color="-exact-secondary-label" flex=1 min-width=0 line-clamp=1
+                      button press=takePicks class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Take hex’s ${picksOpen.length == 1 ? "pick" : "picks"}` testId="task-take-all"
+                        box class=PillFace height=32 padding="0 12px" box-sizing="border-box"
+                          text `Take ${picksOpen.length}` font="-exact-subheadline" font-weight=600 color="-exact-label"
+                else if kind == "task" and task.needs != ""
+                  Section(tone="asks", label="Needs you", n=-1, id="head-needs")
+                  Happened(mark="needs", text=task.needs, stamp=whenOf(row.since, now, offset), failed=false)
+                for e, i in stuckHere key=e.id
+                  StuckCard(entry=e, n=(i + 1), of=stuckHere.length, now=now, offset=offset, act=act, openOut=openOut, wide=false)
+                if kind == "topic"
+                  for e in topicEntries.filter(x => x.kind != "stuck") key=e.id
+                    EntryRow(entry=e, asks=asks.asks, said=said, why="", now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openTask)
+                if wide and kind == "task" and task.pins.length > 0
+                  Status(pins=task.pins, few=2)
+              column flex=(wide ? 1 : 0) min-width=0
+                if kind == "task" and (row.state == "working" or working.length > 0 or busyAgents.length > 0)
+                  Section(tone="working", label="Now", n=-1, id="head-now")
+                  if row.state == "working"
+                    Happened(mark="working", text=(row.line != "" ? row.line : "Working"), stamp="", failed=false)
+                  for a in busyAgents key=a.id
+                    AgentLine(agent=a, now=now, press=toSteps)
+                  for t in working key=t.id
+                    Row(mark="working", title=t.place, line=t.line, lines=2, failed=false, stamp=whenOf(t.at, now, offset), n=0, agents=0, selected=false, href="", label=`${t.place}, working: ${t.line}`, id=`working-${t.id}`, press=openTask(t.id))
+                if kind == "task" and entry.name != "steps" and (task.steps.length > 0 or task.agents.length > 0)
+                  Further(icon="symbol:sf/list.bullet", label="Steps", n=task.steps.length, selected=false, id="task-steps", press=toSteps)
+                if kind == "task" and entry.name != "thread" and (peek.length > 0 or chat.sends)
+                  Section(tone="quiet", label="Thread", n=-1, id="head-thread")
+                  for t in peek key=t.id
+                    if t.source == "me"
+                      row justify-content="flex-end" padding="3px 10px 5px 58px"
+                        text plainOf(eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-subheadline" color="-exact-label" line-clamp=3 padding="8px 13px" border-radius=18 background-color="-exact-tertiary-fill"
+                    else
+                      row gap=10 align-items="flex-start" padding="5px 10px 4px"
+                        image "assets/orb.png" width=20 height=20 border-radius=10 margin-top=1 flex-shrink=0 aria-hidden=true
+                        text plainOf(t.text) font="-exact-subheadline" color="-exact-label" line-clamp=3 flex=1 min-width=0
+                  Further(icon="symbol:sf/bubble.left", label="All messages", n=chat.total, selected=false, id="task-messages", press=toMessages)
+                if not wide and kind == "task" and task.pins.length > 0
+                  Status(pins=task.pins, few=3)
+                if kind == "task" and task.pins.length == 0 and task.lately.length > 0
+                  Section(tone="quiet", label="Lately", n=-1, id="head-lately")
+                  for l, i in task.lately.slice(0, 5) key=`${l.at}${i}`
+                    Happened(mark=l.state, text=l.text, stamp=whenOf(l.at, now, offset), failed=(l.state == "failed"))
+                if pageDecided.length > 0
+                  Section(tone="decided", label="hex decided", n=pageDecided.length, id="head-decided")
+                  for a in pageDecided key=a.id
+                    box padding="0 10px"
+                      DecidedCard(ask=a, now=now, offset=offset, failed=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, undo=undo)
+                if kind == "task" and siblings.length > 0
+                  Section(tone="quiet", label="Other threads", n=siblings.length, id="head-threads")
+                  for t in siblings.slice(0, allPlaces ? siblings.length : 4) key=t.id
+                    button press=openTask(t.id) class=RowTap align-items="center" gap=10 -exact-press-haptic=(haptics ? "selection" : "none") testId=`place-${t.id}`
+                      PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=22)
+                      column flex=1 min-width=0 gap=1
+                        text (t.place != "" ? t.place : t.name) font="-exact-callout" color="-exact-label" line-clamp=1
+                        text `${appName(t.app)} · ${whenOf(t.at, now, offset)} · ${stateWord(t.state)}` font="-exact-footnote" color="-exact-secondary-label"
+                      image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+                  if siblings.length > 4
+                    ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=(viewport.keyboardHeight > 0 ? 0 : foot), answered=(said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0), left=(wide ? width / 2 : 12), end=max(12, room.clear.x + room.clear.width - room.footEnd))
+          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=(viewport.keyboardHeight > 0 ? 0 : foot), answered=settled.includes(a.id), left=(wide ? width / 2 : 12), end=rightEnd)
       else if docked
-        button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=16 right=max(16, room.clear.x + room.clear.width - room.footEnd) bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
-          row class=Composer flex=1 align-items="center" padding="0 16px"
-              text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) font="-exact-body" color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1 text-align="left"
-
-// A section of the pinned post: its mark and title, its items with their own marks, links that
-// open, code in a box. Done sections start folded to "Title · N".
-component Pinned
-  inject
-    haptics: bool
-  props
-    section: PinSection
-    first: bool
-  state flipped = false
-  derive folded = section.folded != flipped
-  action fold
-    flipped = not flipped
-    if haptics
-      haptic("selection")
-  view
-    column gap=0
-      if section.folded
-        button press=fold class=RowTap align-items="center" aria-expanded=(not folded) testId=`pin-fold-${section.title}`
-          Mark(state=section.mark, size=22)
-          text `${section.title} · ${section.lines.length}` flex=1 font="-exact-headline" color="-exact-secondary-label"
-          image "symbol:icon.open" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" rotate=(folded ? "-90deg" : "0deg")
-      else
-        Head(label=(section.title != "" ? section.title : first ? "Pinned" : ""), n=-1, pad="18px 10px 4px", id=`pin-${section.title}`)
-      if not folded
-        for l, i in section.lines key=`${i}`
-          if l.kind == "code"
-            text l.text font-family="ui-monospace" font="-exact-footnote" margin="4px 10px" padding="8px 10px" border-radius=10 background-color="-exact-tertiary-fill" white-space="pre-wrap" user-select="text"
-          else if l.url != ""
-            link href=l.url class=RowTap align-items="flex-start" padding="6px 10px"
-              if l.kind == "item"
-                Mark(state=l.mark, size=20)
-              text inlineOf(l.text) font="-exact-body" color="-exact-label" flex=1
-              image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" margin-top=5
-          else
-            row gap=12 align-items="flex-start" padding="6px 10px"
-              if l.kind == "item"
-                Mark(state=l.mark, size=20)
-              text inlineOf(l.text) font="-exact-body" color="-exact-label" flex=1 user-select="text"
+        // What scrolls under the composer fades out behind it.
+        box position="absolute" left=0 right=0 bottom=0 height=(foot + 8 + 48 + 28) background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 44px)" pointer-events="none" aria-hidden=true
+        button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=12 right=rightEnd bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
+          row backgroundMaterial="glass" border-radius=24 height=48 flex=1 padding="0 6px" gap=8 align-items="center" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
+            box width=36 height=36 border-radius=18 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-hidden=true
+              image "symbol:sf/plus" width=15 height=15 object-fit="contain" color="-exact-label"
+            text (draft != "" ? draft : `Message ${title}`) font="-exact-body" color=(draft != "" ? "-exact-label" : "-exact-placeholder") line-clamp=1 flex=1 min-width=0 text-align="left"
+            box width=36 height=36 border-radius=18 background-color=(draft != "" ? "-exact-label" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-hidden=true
+              image "symbol:send" width=16 height=16 object-fit="contain" color=(draft != "" ? "-exact-background" : "-exact-tertiary-label")

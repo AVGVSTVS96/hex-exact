@@ -1,15 +1,17 @@
-// A task's messages (§9.4): the thread as Bassim and hex wrote it, opening at the newest, and a
-// composer that becomes Stop while hex is working and nothing is typed. What Bassim sends shows at
-// once, dimmed until hex has it; one that didn't go says why, and a tap tries again.
+// A task's messages (§9.4): hex's face floating at the top with the task's name and what it's doing,
+// the thread under it as Bassim and hex wrote it, opening at the newest: hex's words flat on the page,
+// his in bubbles. The composer floats at the foot in glass; its send becomes Stop while hex is working
+// and nothing is typed. What Bassim sends shows at once, dimmed until hex has it; one that didn't go
+// says why, and a tap tries again. Wider than tall the thread reads in a measure down the middle.
 use Viewport, Counts, TaskPage, Chat, Media, Place from "./shapes.contract"
-use Mark, PlaceTile, Discuss, Note, appName, whenOf, lengthOf, Tap, PillTap, PillFace, Composer, ComposerField, Send, Prose, runStarted, FieldHint from "./parts.contract"
-use Room, Chrome from "./room.contract"
-use PageHead from "./task.contract"
+use Mark, Note, appName, whenOf, lengthOf, Tap, Send, Prose from "./parts.contract"
+use Room, Chrome, stacked, homeRoomOf from "./room.contract"
 use Sending from "./said.contract"
-use Album, AddMedia, Waiting from "./media.contract"
+use Pictures, AddMedia, Waiting from "./media.contract"
+use hexOrb, hexHeight from "./home.contract"
 
 // One line of the transcript: a turn, a message hex holds (waiting), one on its way from here
-// (sending), or a note at its top or foot (earlier, empty, working).
+// (sending), or a note at its top or foot (earlier, working).
 shape Line
   id: string
   kind: string
@@ -28,10 +30,17 @@ fn eventShown(label: string): string = label == "" or label.toLowerCase() == "vo
 fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
 // A refusal hex gave can't be fixed by trying again; a lost connection can.
 fn retries(error: string): bool = error == "" or error.startsWith("Cannot reach hex")
+fn sourceAt(lines: Line[], i: number): string = match lines.at(i) { case some(l) => l.kind == "turn" or l.kind == "waiting" or l.kind == "sending" ? l.source : l.kind, case none => "" }
+// The space above a line: more where the speaker changes, little between two of Bassim's.
+fn gapAbove(lines: Line[], i: number): number = i == 0 ? 0 : sourceAt(lines, i - 1) != sourceAt(lines, i) ? 18 : sourceAt(lines, i) == "me" ? 4 : 12
+
+keyframes typing
+  50% opacity=0.25
 
 component Thread
   inject
     haptics: bool
+    still: bool
   props
     entry: Entry
     room: Room
@@ -67,6 +76,10 @@ component Thread
     open: action
     openTasks: action
     back: action
+    // hex's face, as Settings has it.
+    persona: string
+    personaColor: string
+    palette: string
   // With two columns, the task page this belongs to, on the left of the fold.
   slot
   state typed = ""
@@ -78,18 +91,32 @@ component Thread
   derive stopping = empty and task.running
   // Sent from here and not yet in the thread: hex echoes a send's key at the end of a waiting key.
   derive mine = sends.filter(s => s.task == task.id and chat.waiting.map(w => w.key).filter(k => k.endsWith(`:${s.key}`) or k == s.key).length == 0 and not (s.status == "sent" and chat.turns.slice(-6).filter(t => t.source == "me" and t.text == s.text and t.media.length == s.media.length).length > 0))
-  derive subtitle = task.running ? `Working · ${runStarted(task.since, now)}` : `${appName(task.app)}${task.at > 0 ? ` · ${whenOf(task.at, now, offset)}` : ""}`
-  // The composer's foot: over the home indicator, or the call docked there, or just above the keyboard.
   derive two = room.columns == 2
+  // The composer's foot: over the home indicator, or the call docked there, or just above the keyboard.
   derive foot = viewport.keyboardHeight > 0 ? 8 : callOn ? room.foot + 64 + 12 : room.foot + 4
+  // Open like a laptop, the task's page is the window above the hinge and the thread the window below.
+  derive stack = stacked(room)
+  derive split = homeRoomOf(room)
+  derive colTop = stack ? room.across : 0
+  derive colX = two ? split.second.x : room.clear.x
+  derive colW = two ? split.second.width : room.clear.width
+  // Wider than tall, the thread reads in a measure of 560 down the middle.
+  derive measure = min(colW, 560)
+  derive inset = (colW - measure) / 2
+  derive faceTop = (two ? split.secondBelow : room.below) - 6 - colTop
+  derive under = faceTop + hexHeight()
+  derive tallest = min(440, round((room.height - colTop) * 0.4))
   derive noMedia = [Media(id="", kind="", aspect=0)].slice(0, 0)
   derive lines = (chat.total > chat.turns.length ? [Line(id="earlier", kind="earlier", source="", text="", media=noMedia, status="", error="", key="")] : []).concat(chat.turns.map(t => Line(id=`t${t.id}`, kind="turn", source=t.source, text=t.text, media=t.media, status="", error="", key=""))).concat(chat.waiting.map(w => Line(id=`w${w.key}`, kind="waiting", source="me", text=w.text, media=noMedia, status="", error="", key=w.key))).concat(mine.map(m => Line(id=`s${m.key}`, kind="sending", source="me", text=m.text, media=m.media, status=m.status, error=m.error, key=m.key))).concat(task.running ? [Line(id="working", kind="working", source="", text=task.line, media=noMedia, status="", error="", key="")] : [])
+  derive live = task.running ? (task.line != "" ? task.line : "Working") : ""
   action edit(v: string)
     typed = v
     started = true
     keepDraft(key, v)
   action add(source: string)
     attach(key, source)
+  action toSteps
+    open(path("steps", task.id))
   action submit
     if not empty
       message(task.id, draft.trim())
@@ -105,56 +132,78 @@ component Thread
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="thread" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="thread"
       Chrome(room=room, on="thread", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
       if two
-        column position="absolute" top=room.firstTop bottom=0 left=room.first.x width=room.first.width testId="thread-task"
+        column position="absolute" top=room.firstTop bottom=(stack ? room.height - room.across : 0) left=split.first.x width=split.first.width testId="thread-task"
           children
-      column position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=(two ? room.second.x : room.clear.x) width=(two ? room.second.width : room.clear.width)
-        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, end=0, head=0, title=title, line=(missing.includes(task.app) ? `${appName(task.app)} isn’t on this iPhone` : subtitle), id="thread-head")
-          if task.link != ""
-            button press=openOut(task.link, task.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(task.app)}` testId="thread-door"
-              box class=PillFace gap=8 padding="5px 12px 5px 6px"
-                PlaceTile(place=Place(app=task.app, place=task.place, task=task.id, call="", link=task.link), size=22)
-                text appName(task.app) font="-exact-subheadline" font-weight=600 color="-exact-label"
-          Discuss(title=title, id="thread-talk", press=talk(task.id))
+      column position="absolute" top=colTop bottom=0 left=colX width=colW
         if loading and chat.turns.length == 0
-          Note(kind="loading", text="Loading messages", pad="24px 20px", id="thread-loading")
+          Note(kind="loading", text="Loading messages", pad=`${under + 24}px 20px 0`, id="thread-loading")
         if not loading and chat.turns.length == 0 and mine.length == 0
-          Note(kind=(failed ? "failed" : "empty"), text=(failed ? "hex didn't answer, so these can't show yet." : "Nothing said here yet"), pad="48px 20px", id="thread-empty")
-        list id="thread" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding-bottom=20 scroll-padding-bottom=20 mask-image=(chat.sends ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
-          for l in lines key=l.id
-            column padding="5px 16px" gap=4 align-items=(l.source == "me" ? "flex-end" : "stretch") testId=`line-${l.id}`
+          Note(kind=(failed ? "failed" : "empty"), text=(failed ? "hex didn't answer, so these can't show yet." : "Nothing said here yet"), pad=`${under + 48}px 20px 0`, id="thread-empty")
+        list id="thread" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding-top=(under + 12) padding-bottom=(chat.sends ? foot + 48 + 16 + (attached.length > 0 ? 64 : 0) : foot + 16) scroll-padding-top=(under + 12) scroll-padding-bottom=(foot + 64)
+          for l, i in lines key=l.id
+            column padding-left=(inset + 16) padding-right=(inset + (l.source == "me" ? 16 : 20)) padding-top=gapAbove(lines, i) gap=4 align-items=(l.source == "me" ? "flex-end" : "stretch") testId=`line-${l.id}`
               if l.kind == "earlier"
-                text `Earlier messages are in ${appName(task.app)}` font="-exact-footnote" color="-exact-tertiary-label" text-align="center" padding="8px 0"
+                if task.link != ""
+                  button press=openOut(task.link, task.app) class=Tap display="flex" flex-direction="row" gap=4 align-items="center" justify-content="center" padding="8px 0" aria-label=`Earlier messages, in ${appName(task.app)}` testId="thread-earlier"
+                    text `Earlier messages are in ${appName(task.app)}` font="-exact-footnote" color="-exact-tertiary-label"
+                    image "symbol:sf/arrow.up.right" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+                else
+                  text `Earlier messages are in ${appName(task.app)}` font="-exact-footnote" color="-exact-tertiary-label" text-align="center" padding="8px 0"
+                if missing.includes(task.app)
+                  text `${appName(task.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" text-align="center" testId="thread-missing"
               else if l.kind == "working"
-                link href=path("steps", task.id) padding="6px 0" display="flex" flex-direction="row" gap=8 align-items="center" testId="thread-working"
-                  Mark(state="working", size=16)
-                  text l.text font="-exact-footnote" color="-exact-secondary-label" line-clamp=1 flex=1
-                  text `${lengthOf((now - task.since) / 1000)} · Steps ›` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+                // hex is at it: three dots in a bubble; a tap shows its steps.
+                button press=toSteps class=Tap align-self="flex-start" display="flex" flex-direction="row" gap=4 align-items="center" height=34 padding="0 14px" margin-top=(i == 0 ? 0 : -4) border-radius=17 background-color="-exact-tertiary-fill" aria-label=`hex is working: ${l.text}. Steps` testId="thread-working"
+                  for d in [0, 1, 2] key=d
+                    box width=6 height=6 border-radius=3 background-color="hex.progress" opacity=(d == 0 ? 0.35 : d == 1 ? 0.65 : 1) animation=(still ? "none" : `typing 1.2s ease-in-out ${d * 0.2}s infinite`)
               else
                 if l.source == "me" and eventShown(eventLabel(l.text)) != ""
                   text eventShown(eventLabel(l.text)) font="-exact-caption1" color="-exact-tertiary-label" padding="0 4px"
                 if l.media.length > 0
-                  Album(media=l.media, width=min(viewport.width * 0.6, 260))
+                  box opacity=(l.kind == "turn" ? 1 : 0.6) padding-left=(l.source == "me" ? 40 : 0)
+                    Pictures(media=l.media, width=min(measure * 0.6, 260), height=tallest)
                 if l.text != "" and l.source == "me"
-                  text eventWords(l.text) max-width="82%" padding="8px 14px" border-radius=18 background-color="-exact-tertiary-fill" color="-exact-label" opacity=(l.kind == "turn" ? 1 : l.kind == "waiting" ? 0.6 : 0.45) user-select="text" white-space="pre-wrap" overflow-wrap="break-word"
+                  text eventWords(l.text) font="-exact-callout" max-width="85%" padding="9px 14px" border-radius=20 background-color="-exact-tertiary-fill" color="-exact-label" opacity=(l.kind == "turn" ? 1 : 0.6) user-select="text" white-space="pre-wrap" overflow-wrap="break-word"
                 else if l.text != ""
-                  Prose(text=l.text, font="-exact-body", color="-exact-label")
+                  Prose(text=l.text, font="-exact-callout", color="-exact-label")
                 if l.kind == "sending" and l.status == "failed" and retries(l.error)
                   button press=resend(l.key) class=Tap testId=`resend-${l.key}`
-                    text "Not sent · Tap to try again" font="-exact-caption1" color="hex.danger"
+                    text "Not sent · Tap to try again" font="-exact-footnote" color="hex.danger"
                 else if l.kind == "sending" and l.status == "failed"
-                  text l.error font="-exact-caption1" color="hex.danger" max-width="82%" text-align="right"
+                  text l.error font="-exact-footnote" color="hex.danger" max-width="85%" text-align="right"
                 else if l.kind == "sending"
-                  text "Sending" font="-exact-caption1" color="-exact-tertiary-label"
+                  row gap=6 align-items="center" padding="1px 2px 0"
+                    Mark(state="working", size=13)
+                    text "Sending" font="-exact-footnote" color="-exact-tertiary-label"
+        // What scrolls under hex's face fades out behind it, and behind the composer at the foot.
+        box position="absolute" left=0 right=0 top=0 height=(under + 28) background-color="-exact-background" mask-image="linear-gradient(to bottom, #000 0, #000 70%, transparent 100%)" pointer-events="none" aria-hidden=true
         if chat.sends
-          box padding="0 12px"
-            Waiting(media=attached, error=addError, remove=detach)
-            if stopError != ""
-              text stopError font="-exact-footnote" color="hex.danger" padding="4px 4px 0" testId="thread-stop-error"
-          row gap=8 align-items="flex-end" margin="6px 12px 0" margin-right=max(12, room.clear.x + room.clear.width - room.footEnd) margin-bottom=foot
-            AddMedia(menu="thread-add", label="Add a photo or video", glass=false, size=40, disabled=(attached.length >= 4), add=add)
-            row class=Composer flex=1 min-width=0
-              if draft == ""
-                FieldHint(text=`Message ${title}`)
-              textarea id="composer" class=ComposerField value=draft input=edit autofocus=(fragment(entry) == "compose") rows=1 field-sizing="content" max-height=140 aria-label="Message" testId="composer"
-              button press=submit disabled=(empty and not task.running) class=Send retainFocus=true aria-label=(stopping ? "Stop" : "Send") testId="send"
-                image (stopping ? "symbol:stop-fill" : "symbol:send") width=16 height=16 object-fit="contain" color=(empty and not task.running ? "-exact-tertiary-label" : "-exact-background")
+          box position="absolute" left=0 right=0 bottom=0 height=(foot + 48 + 24) background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 40px)" pointer-events="none" aria-hidden=true
+        // hex's face: the orb over a glass pill with the task's name and what hex is doing; a tap
+        // while it works shows its steps.
+        column position="absolute" top=faceTop left=0 right=0 align-items="center" pointer-events="none" testId="thread-face"
+          box width=hexOrb() height=hexOrb() border-radius=(hexOrb() / 2) overflow="hidden" z-index=1 box-shadow="0 2px 10px rgba(0,0,0,0.25)"
+            hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction="off" still=(still ? "true" : "false") width=hexOrb() height=hexOrb() role="img" aria-label="hex"
+          button press=toSteps disabled=(not task.running) class=Tap pointer-events="auto" display="flex" flex-direction="row" align-items="center" gap=7 margin-top=-9 max-width=min(330, colW - 40) min-width=0 padding="13px 14px 6px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(live != "" ? `${title}, ${live}` : title) testId="thread-head"
+            text title font="-exact-footnote" font-weight=600 color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=0 max-width=160
+            if live != ""
+              row gap=6 align-items="center" min-width=0 flex-shrink=1
+                row gap=3 flex-shrink=0 aria-hidden=true
+                  for d in [0, 1, 2] key=d
+                    box width=4 height=4 border-radius=2 background-color="hex.progress" opacity=(d == 0 ? 0.35 : d == 1 ? 0.65 : 1) animation=(still ? "none" : `typing 1.2s ease-in-out ${d * 0.2}s infinite`)
+                text live font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0 flex-shrink=1
+        if chat.sends
+          column position="absolute" left=(inset + 12) right=max(inset + 12, colX + colW - room.footEnd) bottom=foot gap=8 testId="thread-compose"
+            box padding="0 4px"
+              Waiting(media=attached, error=addError, remove=detach)
+              if stopError != ""
+                text stopError font="-exact-footnote" color="hex.danger" padding="4px 0 0" testId="thread-stop-error"
+            row backgroundMaterial="glass" border-radius=24 min-height=48 padding="0 6px" gap=8 align-items="flex-end" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
+              box padding="6px 0" flex-shrink=0
+                AddMedia(menu="thread-add", label="Add a photo or video", glass=false, size=36, disabled=(attached.length >= 4), add=add)
+              box position="relative" flex=1 min-width=0 display="flex"
+                if draft == ""
+                  text `Message ${title}` position="absolute" left=0 top=13 right=0 font="-exact-body" color="-exact-placeholder" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" pointer-events="none" aria-hidden=true
+                textarea id="composer" border="none" background-color="transparent" padding="13px 0" flex=1 min-width=0 font="-exact-body" color="-exact-label" value=draft input=edit autofocus=(fragment(entry) == "compose") rows=1 field-sizing="content" max-height=140 aria-label="Message" testId="composer"
+              button press=submit disabled=(empty and not task.running) class=Send margin="6px 0" retainFocus=true aria-label=(stopping ? "Stop" : "Send") testId="send"
+                image (stopping ? "symbol:stop-fill" : "symbol:send") width=(stopping ? 13 : 16) height=(stopping ? 13 : 16) object-fit="contain" color=(empty and not task.running ? "-exact-tertiary-label" : "-exact-background")

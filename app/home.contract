@@ -208,6 +208,8 @@ component NowList
     else if split
       tapped = e.id
       select(pageFor(e, tasks))
+    else if e.kind == "ask"
+      open(`${path("task", pageFor(e, tasks))}?ask=${encodeURIComponent(e.id)}`)
     else
       openTask(pageFor(e, tasks))
   view

@@ -21,7 +21,7 @@ shape Face
   y: number
   size: number
 
-fn faceOf(width: number, compact: bool): Face = compact ? Face(compact=true, height=88, x=44, y=44, size=56) : Face(compact=false, height=140, x=width / 2, y=44, size=60)
+fn faceOf(width: number, compact: bool): Face = compact ? Face(compact=true, height=88, x=44, y=44, size=56) : Face(compact=false, height=140, x=width / 2, y=40, size=72)
 
 // What Bassim put away here leaves at once, as in Tasks.
 fn awayOf(said: Said[]): string[] = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
@@ -125,7 +125,7 @@ component HexHome
   derive fade = max(100 - 26 * 100 / listHeight, 0)
   derive wholeFade = max(100 - 26 * 100 / max(height, 1), 0)
   // The face in one row, as it heads Feed, Ideas and Goals scrolled: its live line on one line.
-  derive row = Face(compact=true, height=max(76, headDown + 8), x=30, y=38, size=40)
+  derive row = Face(compact=true, height=max(76, headDown + 8), x=37, y=38, size=54)
   // The pages scrolled past hex's face, where its one row shows at the top; written only when a
   // page crosses that line, so nothing redraws while a list scrolls.
   state past: string[] = []
@@ -146,14 +146,14 @@ component HexHome
       // takes its place at the top.
       if page == "now"
         box position="absolute" top=0 left=0 right=0 padding=`0 ${f.compact ? 6 + headRight : 6}px 0 6px` testId="hex-face"
-          HexFace(f=f, face=face, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
+          HexFace(f=f, face=face, inset=headRight, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
       for p in pages key=p
         scroll position="absolute" top=(p == "now" ? f.height : 0) left=0 right=0 bottom=0 padding="0 6px 34px" box-sizing="border-box" scroll=moved(p) opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) mask-image=`linear-gradient(to bottom, ${p == "now" ? "transparent 0, #000 12px" : "#000 0"}, #000 ${p == "now" ? fade : wholeFade}%, transparent 100%)` testId=`home-list-${p}`
           if p == "now"
             children
             NowList(height=listHeight, now=now, offset=offset, tasks=tasks, needs=needs, working=working, needing=needing, workingOn=workingOn, decided=asks.decided.length, known=known, failed=failed, liveId=liveId, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
           else
-            HexFace(f=f, face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
+            HexFace(f=f, face=true, inset=headRight, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
             if p == "feed"
               FeedList(feed=feed, now=now, offset=offset, width=(width - 12), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
             else if p == "ideas"
@@ -164,7 +164,7 @@ component HexHome
       if page != "now"
         box position="absolute" top=0 left=0 right=0 height=(row.height + 20) background-color="-exact-background" mask-image="linear-gradient(to top, transparent 0, #000 20px)" opacity=(past.includes(page) ? 1 : 0) pointer-events=(past.includes(page) ? "auto" : "none") aria-hidden=(not past.includes(page)) transition=springOf(still, "opacity") testId="hex-bar"
           box padding-right=headRight
-            HexFace(f=row, face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
+            HexFace(f=row, face=true, inset=0, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
 
 // hex's face at the head of a page: stacked (orb, name, live line) or one row with the window wider
 // than tall; the orb only where Home draws it itself.
@@ -172,6 +172,9 @@ component HexFace
   props
     f: Face
     face: bool
+    // Stacked, the live line keeps this far in from both edges, centred and clear of the status
+    // icons beside it (headRight).
+    inset: number
     persona: string
     personaColor: string
     palette: string
@@ -192,12 +195,13 @@ component HexFace
           text "hex" font="-exact-headline" color="-exact-label"
           LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=false, lines=(f.size < 56 ? 1 : 2), press=goLive)
     else
-      column align-items="center" padding="14px 10px 0" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
+      column align-items="center" padding="4px 10px 0" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
         box width=f.size height=f.size flex-shrink=0
           if face
             hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
-        text "hex" font="-exact-headline" color="-exact-label" margin-top=8
-        LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=true, lines=2, press=goLive)
+        text "hex" font="-exact-headline" color="-exact-label" margin-top=6
+        box align-self="stretch" display="flex" justify-content="center" padding=`0 ${inset}px` box-sizing="border-box"
+          LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=true, lines=2, press=goLive)
 
 // hex's live line: what it's doing, two lines at most, ending in an ellipsis; a tap opens that work.
 component LiveLine

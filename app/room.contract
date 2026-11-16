@@ -42,6 +42,9 @@ shape Room
   // icons too when they're above it.
   below: number
   secondBelow: number
+  // Where hex's column may start while nothing of the chrome row sits over it (two columns, the
+  // capsule over the second, no update notice): at the row's own top.
+  firstTop: number
   // How far fixed controls at the foot stand off the window's bottom edge.
   foot: number
   // Where hex's tabs and Call sit; a list in hex's column ends above `tabs.top`.
@@ -92,7 +95,7 @@ fn headBottomOf(v: Viewport, p: Pose): number = match sortBy(headCovers(v, p), o
 fn footCovers(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.y + o.height > v.height - max(v.safeAreaBottom, 12) - 8 - callSize() and o.y > v.height / 2 and o.x + o.width / 2 > v.width / 2)
 fn footEndOf(v: Viewport, p: Pose): number = min(clearOf(v).x + clearOf(v).width, match sortBy(footCovers(v, p), o => o.x).at(0) { case some(o) => o.x - 10, case none => v.width })
 
-fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p))
+fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), firstTop=(twoOf(v) and barEnd(v, p) - capsuleWidth() >= firstOf(v, p).x + firstOf(v, p).width ? barTop(v) : belowOf(v)), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p))
 
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()

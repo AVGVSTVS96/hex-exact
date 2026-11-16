@@ -75,6 +75,8 @@ component Home
     room: Room
     reading: bool
     setReading: action
+    // An update notice sits in the chrome row on hex's side.
+    notice: bool
     // hex's own pages (room.contract's tabs), the one under its face, and the switch.
     pages: string[]
     page: string
@@ -171,7 +173,9 @@ component Home
   // hex's column's trailing inset, and the second column's edges.
   derive hexRight = W - room.first.x - room.first.width
   derive secondLeft = room.second.x
-  derive below = room.below
+  // With two columns and the chrome row clear of hex's, hex starts at the row's top; the update
+  // notice, when there is one, takes that row on hex's side.
+  derive below = two and not notice ? room.firstTop : room.below
   derive compact = H < W
   derive face = faceOf(hexW, compact)
   // With more than one of hex's pages, its tabs take the foot at rest and Call stands beside them.

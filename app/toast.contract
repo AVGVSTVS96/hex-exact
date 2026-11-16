@@ -6,6 +6,9 @@ use Build from "./shapes.contract"
 use Tap from "./parts.contract"
 use Room, capsuleX from "./room.contract"
 
+// A new build is out that Bassim hasn't put off.
+fn noticeOf(build: Build, skipped: number): bool = build.running > 0 and build.latest > build.running and build.latest != skipped and build.install != ""
+
 component UpdateToast
   inject
     haptics: bool
@@ -23,7 +26,7 @@ component UpdateToast
   state step = "ready"
   // Where the open went: hangar first, then the install link.
   state via = ""
-  derive shown = build.running > 0 and build.latest > build.running and build.latest != skipped and build.install != ""
+  derive shown = noticeOf(build, skipped)
   // The free stretch of the chrome row: from its start to the capsule, and with two columns no
   // further than hex's.
   derive spanEnd = min(capsuleX(room), room.columns == 2 ? room.first.x + room.first.width : capsuleX(room)) - 10

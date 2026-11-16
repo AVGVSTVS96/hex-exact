@@ -67,9 +67,11 @@ component DecidedList
   derive beside = match decided.filter(a => a.id == shown).at(0) { case some(a) => a.id, case none => match decided.at(0) { case some(a) => a.id, case none => "" } }
   view
     scroll id="decided-list" position="absolute" top=room.below bottom=0 left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(room.foot + 24) scroll-padding-top=max(room.headBottom + 8 - room.below, 0) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="decided-list"
-      PageTitle(text="hex decided", room=room, left=(two ? 20 : room.clear.x + 20), id="decided-title")
+      // The title and its line stand beside the status icons; the rows start under their cover.
+      column min-height=(two ? 0 : max(0, room.headBottom + 8 - room.below))
+        PageTitle(text="hex decided", room=room, left=(two ? 20 : room.clear.x + 20), id="decided-title")
+        text (known ? `${decided.length} this week · Undo puts it back to you` : " ") font="-exact-subheadline" color="-exact-secondary-label" padding=`2px 20px 14px ${two ? 20 : room.clear.x + 20}px`
       column padding=(two ? "0 10px" : `0 ${max(room.width - room.clear.x - room.clear.width, 0) + 10}px 0 ${room.clear.x + 10}px`)
-        text (known ? `${decided.length} this week · Undo puts it back to you` : " ") font="-exact-subheadline" color="-exact-secondary-label" padding="2px 10px 14px"
         if known and decided.length == 0
           Note(kind="empty", text="Nothing this week. What hex decides for you shows here.", pad="24px 12px", id="decided-empty")
         if failed and not known

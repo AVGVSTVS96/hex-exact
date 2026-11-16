@@ -20,7 +20,6 @@ const watched = (w: Json): Result<'watchGoals'>['watching'][number] => ({
 type Goal = Result<'watchGoals'>['goals'][number];
 // What wants him first: working, waiting on him, not started, stopped, then reached.
 const RANK: Record<string, number> = { working: 0, needs: 1, unstarted: 2, idle: 3, done: 4, dropped: 5 };
-const BAR: Record<string, number> = { done: 0, working: 1, needs: 2 };
 
 // Projects with work going on or a question waiting first, then the one that moved last; in each,
 // its goals by rank, newest first. Not needed stays in `goals` (its page shows Undo) but leaves the list.
@@ -38,7 +37,7 @@ const goals = (b: Json): Result<'watchGoals'> => {
     goals: [...ranked, ...all.filter((g) => g.state === 'dropped')],
     groups: order.map(([name, gs]) => ({
       name,
-      states: gs.map((g) => (g.state === 'idle' ? 'unstarted' : g.state)).sort((x, y) => (BAR[x] ?? 3) - (BAR[y] ?? 3)),
+      states: gs.map((g) => g.state),
     })),
     watching: list(b.watching, watched),
   };

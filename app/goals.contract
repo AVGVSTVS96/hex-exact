@@ -1,35 +1,32 @@
-// Goals: what Bassim asked hex for and how far each is, and what hex keeps watch on for him. Muse's
-// Goals, with its Tracking on top. Only the rows: Home draws hex's face over them, scrolls them and
-// stops them above the tabs.
-use Goal, Goals, Watch from "./shapes.contract"
-use Head, GoalProject, Row, ShowMore, Note, whenOf, dayOf, Tap from "./parts.contract"
+// Goals: every goal hex holds for Bassim at a glance, a cell each coloured by where it stands, then
+// what needs him, what hex is on and what it reached this week, what it watches, and each project
+// as a bar as long as it is big. Muse's Goals, with the old app's counts. Only the rows: Home draws
+// hex's face over them, scrolls them and stops them above the tabs. A room wider than tall holds
+// them in two columns, what needs him and what hex is on to the right.
+use Goal, Goals, GoalGroup, Watch from "./shapes.contract"
+use StageHead, ShowMore, Note, Mark, RowTap, Tap, dayOf, springOf from "./parts.contract"
 
-fn markOfGoal(state: string): string = state == "needs" ? "asks" : state == "idle" ? "paused" : state
-// A project's goals, already ranked in data/goals.ts.
-fn groupGoals(g: Goals, name: string): Goal[] = g.goals.filter(x => x.group == name and x.state != "dropped")
-fn groupsOf(g: Goals): string[] = g.groups.map(x => x.name)
-fn toGo(g: Goals): number = g.goals.filter(x => x.state != "done" and x.state != "dropped").length
+// Where a goal can stand, in the order the grid, the legend and a project's bar take them.
+fn goalStates(): string[] = ["needs", "working", "done", "idle", "unstarted", "dropped"]
+fn stateAt(i: number): string = match goalStates().at(i) { case some(s) => s, case none => "" }
+fn stateWords(s: string): string = s == "needs" ? "need you" : s == "unstarted" ? "not started" : s
+fn cellInk(s: string): string = s == "needs" ? "hex.ask.fill" : s == "working" ? "hex.progress" : s == "done" ? "hex.accent" : s == "idle" ? "-exact-tertiary-label" : s == "unstarted" ? "transparent" : "-exact-tertiary-fill"
+// A goal's mark: a question waiting on him, hex working, reached; an empty box for one that rests,
+// dashed when it hasn't started.
+fn markOfGoal(state: string): string = state == "needs" ? "asks" : state == "working" or state == "done" or state == "unstarted" ? state : state == "dropped" ? "stopped" : "needs"
+fn countIn(states: string[], s: string): number = states.filter(x => x == s).length
+fn numAt(xs: number[], i: number): number = match xs.at(i) { case some(n) => n, case none => 0 }
 
-// Where a goal stands, in one line.
-fn standsOf(x: Goal, now: number, offset: number): string = x.state == "done" ? `Reached ${dayOrTime(x.at, now, offset)}` : x.state == "unstarted" ? "Not started" : x.line != "" ? x.line : x.state == "working" ? "Working on it" : x.state == "needs" ? "Waits on you" : "Nothing running now"
-fn dayOrTime(at: number, now: number, offset: number): string = whenOf(at, now, offset) == formatTime(at, offset, "short") ? "today" : whenOf(at, now, offset)
+// The grid: the fewest rows (6 to 16) whose cells still read as cells, a block per state side by
+// side, 4 apart. `pitch` is a cell and its gap.
+fn pitchOf(counts: number[], width: number, rows: number): number = floor((width - (counts.length - 1) * 4) / max(1, sum(counts.map(n => ceil(n / rows)))) * 10) / 10
+fn rowsOf(counts: number[], width: number): number = match range(11).map(i => i + 6).filter(r => pitchOf(counts, width, r) >= (width < 320 ? 6.4 : 7.6)).at(0) { case some(r) => r, case none => 16 }
 
-// A watch's last word: the first sentence its last finished run ended on.
-fn lastRun(w: Watch): string = match w.runs.filter(r => r.said != "").at(0) { case some(r) => r.said, case none => "" }
-fn lastRunAt(w: Watch): number = match w.runs.filter(r => r.said != "").at(0) { case some(r) => r.at, case none => 0 }
-fn plainOf(text: string): string = text.replaceAll("**", "").replaceAll("`", "")
-fn sentenceOf(text: string): string = match plainOf(text).split(". ").at(0) { case some(s) => s.endsWith(".") ? s.slice(0, -1) : s, case none => "" }
-// When it runs next, as Bassim would say it: "today at 9 AM", "tomorrow", "on Monday", "on Dec 6".
-fn nextWords(next: number, now: number, offset: number): string = next == 0 ? "" : dayOf(next, offset) == dayOf(now, offset) ? `today at ${formatTime(next, offset, "short")}` : dayOf(next, offset) == dayOf(now, offset) + 1 ? "tomorrow" : dayOf(next, offset) < dayOf(now, offset) + 7 ? `on ${match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(dayOf(next, offset) % 7) { case some(d) => d, case none => "" }}` : `on ${next - now > 300 * 86400000 ? formatDate(next, offset, "medium") : match formatDate(next, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }}`
-// What it last found, in its first sentence; when it checks next goes in the row's stamp.
-fn watchLine(w: Watch): string = w.stopped ? "Stopped" : lastRun(w) != "" ? sentenceOf(lastRun(w)) : "Nothing found yet"
-fn watchStamp(w: Watch, now: number, offset: number): string = w.stopped or w.next == 0 ? "" : capitalOf(shortNext(nextWords(w.next, now, offset)))
-fn shortNext(s: string): string = s.startsWith("on ") ? s.slice(3) : s.startsWith("today at ") ? s.slice(9) : s
+// The last seven days, oldest first: how many fell on each.
+fn weekOf(ats: number[], now: number, offset: number): number[] = range(7).map(i => ats.filter(a => dayOf(a, offset) == dayOf(now, offset) - 6 + i).length)
 fn capitalOf(s: string): string = s == "" ? "" : `${s.slice(0, 1).toUpperCase()}${s.slice(1)}`
 
 component GoalsList
-  inject
-    haptics: bool
   props
     goals: Goals
     now: number
@@ -37,7 +34,12 @@ component GoalsList
     failed: bool
     // Why hex couldn't be reached, when it couldn't.
     why: string
-    // Which projects are open; Bassim's choice once he's made one, else the top one.
+    // The list's own width; wider than tall, two columns.
+    width: number
+    wide: bool
+    // hex's queue of questions, so what needs him runs in the order Now has it.
+    queue: string[]
+    // Which projects are open, once Bassim has opened or shut one (`chosen`).
     opened: string[]
     chosen: bool
     // What's open beside the list with two columns: `goal:<id>` or `watch:<name>`.
@@ -46,14 +48,22 @@ component GoalsList
     openGoal: action
     openWatch: action
     retry: action
+  state allNeeds = false
+  state allWork = false
   state allWatches = false
   state allGroups = false
+  state showReached = false
   derive known = goals.version > 0
-  derive watches = goals.watching
-  derive groups = goals.groups
-  derive open = chosen ? opened : groupsOf(goals).slice(0, 1)
-  derive shownWatches = allWatches ? watches : watches.slice(0, 2)
-  derive shownGroups = allGroups ? groups : groups.slice(0, 5)
+  derive states = goals.goals.map(g => g.state)
+  derive counts = goalStates().map(s => countIn(states, s))
+  derive needs = sortBy(sortBy(goals.goals.filter(g => g.state == "needs"), g => g.asked, "desc"), g => (queue.includes(g.ask) ? queue.indexOf(g.ask) : 100000))
+  derive working = sortBy(goals.goals.filter(g => g.state == "working"), g => g.at, "desc")
+  derive reached = sortBy(goals.goals.filter(g => g.state == "done" and dayOf(g.at, offset) > dayOf(now, offset) - 7), g => g.at, "desc")
+  derive groups = sortBy(goals.groups, p => p.states.length, "desc")
+  derive biggest = match groups.at(0) { case some(p) => max(1, p.states.length), case none => 1 }
+  derive open = chosen ? opened : [""].slice(0, 0)
+  derive colW = wide ? (width - 4) / 2 : width
+  derive firstRows = wide ? 2 : 3
   view
     column testId="goals"
       if failed and not known
@@ -62,27 +72,246 @@ component GoalsList
           text "Try again" font="-exact-subheadline" font-weight=600 color="-exact-label"
       else if not known
         Note(kind="loading", text="Loading your goals", pad="24px 10px", id="goals-loading")
-      else if watches.length == 0 and groups.length == 0
+      else if goals.goals.length == 0 and goals.watching.length == 0
         Note(kind="empty", text="Nothing asked for yet. Ask hex for something and it shows here.", pad="24px 10px", id="goals-empty")
-      if watches.length > 0
-        Head(label="Watching", n=watches.length, pad="18px 10px 6px", id="goals-head-watching")
-        for w in shownWatches key=w.id
-          Row(mark="watch", title=w.title, line=watchLine(w), lines=1, failed=false, stamp=watchStamp(w, now, offset), n=0, agents=0, selected=(beside == `watch:${w.id}`), href="", label=`Watching ${w.title}: ${watchLine(w)}${watchStamp(w, now, offset) != "" ? `, checks again ${nextWords(w.next, now, offset)}` : ""}`, id=`goals-watch-${w.id}`, press=openWatch(w.id))
-        if watches.length > 2
-          ShowMore(n=watches.length - 2, shown=allWatches, pad="6px 10px", id="goals-more-watching", press=toggleWatches)
-      if groups.length > 0
-        row gap=12 align-items="baseline" padding="22px 10px 6px" role="heading" aria-level=2 aria-label=`Goals, ${toGo(goals)} to go` testId="goals-head-goals"
-          text "Goals" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1
-          text (toGo(goals) == 0 ? "All reached" : `${toGo(goals)} to go`) font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
-        for p in shownGroups key=p.name
-          GoalProject(name=p.name, states=p.states, open=open.includes(p.name), id=`goals-project-${p.name}`, toggle=toggle(p.name))
-          if open.includes(p.name)
-            for x in groupGoals(goals, p.name) key=x.id
-              box padding-left=34
-                Row(mark=markOfGoal(x.state), title=x.title, line=standsOf(x, now, offset), lines=1, failed=false, stamp=(x.state == "unstarted" or x.state == "idle" ? "" : whenOf(x.at, now, offset)), n=0, agents=0, selected=(beside == `goal:${x.id}`), href="", label=`${x.title}: ${standsOf(x, now, offset)}`, id=`goals-goal-${x.id}`, press=openGoal(x.id))
-        if groups.length > 5
-          ShowMore(n=groups.length - 5, shown=allGroups, pad="6px 10px", id="goals-more-projects", press=toggleGroups)
+      else
+        row align-items="flex-start" flex-direction=(wide ? "row" : "column")
+          column flex=(wide ? 1 : 0) min-width=0 testId="goals-left"
+            if goals.goals.length > 0
+              GoalsSummary(counts=counts, total=goals.goals.length, width=(colW - 20))
+              box height=10
+            if not wide
+              NeedsSection(needs=(allNeeds ? needs : needs.slice(0, firstRows)), n=needs.length, all=allNeeds, wide=wide, beside=beside, openGoal=openGoal, more=toggleNeeds)
+              WorkSection(working=(allWork ? working : working.slice(0, firstRows)), n=working.length, all=allWork, lines=2, wide=wide, reached=reached, open=showReached, now=now, offset=offset, beside=beside, openGoal=openGoal, more=toggleWork, toggleReached=toggleReached)
+            if goals.watching.length > 0
+              QuietHead(label="Watching", n=goals.watching.length, id="goals-head-watching")
+              for w in (allWatches ? goals.watching : goals.watching.slice(0, 3)) key=w.id
+                WatchRow(watch=w, now=now, offset=offset, selected=(beside == `watch:${w.id}`), press=openWatch(w.id))
+              if goals.watching.length > 3
+                ShowMore(n=goals.watching.length - 3, shown=allWatches, pad="8px 10px 10px", id="goals-more-watching", press=toggleWatches)
+              Rule(inset=false)
+            if groups.length > 0
+              QuietHead(label="Projects", n=groups.length, id="goals-head-projects")
+              for p in (allGroups ? groups : groups.slice(0, 6)) key=p.name
+                ProjectRow(group=p, biggest=biggest, width=colW, open=open.includes(p.name), id=`goals-project-${p.name}`, toggle=toggle(p.name))
+                if open.includes(p.name)
+                  column padding-left=24 testId=`goals-project-${p.name}-goals`
+                    for x in goals.goals.filter(g => g.group == p.name and g.state != "dropped") key=x.id
+                      GoalRow(goal=x, project="", lines=1, quiet=true, selected=(beside == `goal:${x.id}`), press=openGoal(x.id))
+              if groups.length > 6
+                ShowMore(n=groups.length - 6, shown=allGroups, pad="8px 10px 10px", id="goals-more-projects", press=toggleGroups)
+          if wide
+            column flex=1 min-width=0 margin-left=4 testId="goals-right"
+              NeedsSection(needs=(allNeeds ? needs : needs.slice(0, firstRows)), n=needs.length, all=allNeeds, wide=wide, beside=beside, openGoal=openGoal, more=toggleNeeds)
+              WorkSection(working=(allWork ? working : working.slice(0, firstRows)), n=working.length, all=allWork, lines=1, wide=wide, reached=reached, open=showReached, now=now, offset=offset, beside=beside, openGoal=openGoal, more=toggleWork, toggleReached=toggleReached)
+  action toggleNeeds
+    allNeeds = not allNeeds
+  action toggleWork
+    allWork = not allWork
   action toggleWatches
     allWatches = not allWatches
   action toggleGroups
     allGroups = not allGroups
+  action toggleReached
+    showReached = not showReached
+
+component Rule
+  props
+    inset: bool
+  view
+    box height=0 margin=(inset ? "5px -6px 5px 42px" : "5px -6px") border-top="0.5px solid -exact-separator" aria-hidden=true
+
+// "Goals" and how many, then every goal as a cell in its state's ink, a block per state, and what
+// each ink means with its count.
+component GoalsSummary
+  props
+    // Per goalStates().
+    counts: number[]
+    total: number
+    width: number
+  derive shown = range(6).filter(i => numAt(counts, i) > 0)
+  derive nonzero = counts.filter(n => n > 0)
+  derive rows = rowsOf(nonzero, width)
+  derive pitch = pitchOf(nonzero, width, rows)
+  derive cell = min(8, pitch - 2)
+  view
+    column padding="0 10px" testId="goals-summary"
+      row align-items="baseline" justify-content="space-between" role="heading" aria-level=1 aria-label=`Goals, ${total}`
+        text "Goals" font="-exact-title1" font-weight=600 color="-exact-label"
+        text `${total}` font="-exact-body" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+      row gap=4 margin-top=12 align-items="flex-start" aria-label=shown.map(i => `${numAt(counts, i)} ${stateWords(stateAt(i))}`).join(", ") testId="goals-grid"
+        for i in shown key=i
+          GoalBlock(n=numAt(counts, i), state=stateAt(i), rows=rows, cell=cell, gap=(pitch - cell))
+      row flex-wrap="wrap" column-gap=14 row-gap=2 margin-top=8 aria-hidden=true testId="goals-legend"
+        for i in shown key=i
+          row align-items="center" white-space="nowrap"
+            box width=8 height=8 border-radius=2 box-sizing="border-box" margin-right=6 background-color=cellInk(stateAt(i)) border=(stateAt(i) == "unstarted" ? "1.25px solid -exact-tertiary-label" : "none")
+            text `${numAt(counts, i)}` font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="-exact-label" margin-right=3
+            text stateWords(stateAt(i)) font="-exact-footnote" color="-exact-secondary-label"
+
+// One state's goals as cells, filling each column top to bottom.
+component GoalBlock
+  props
+    n: number
+    state: string
+    rows: number
+    cell: number
+    gap: number
+  view
+    row gap=gap aria-hidden=true
+      for c in range(ceil(n / rows)) key=c
+        column gap=gap
+          for k in range(min(rows, n - c * rows)) key=k
+            box width=cell height=cell border-radius=2 box-sizing="border-box" background-color=cellInk(state) border=(state == "unstarted" ? "1.25px solid -exact-tertiary-label" : "none")
+
+// A quiet head over what has no state of its own: a grey dot, its name, how many.
+component QuietHead
+  props
+    label: string
+    n: number
+    id: string
+  view
+    row gap=10 align-items="center" padding="9px 10px" role="heading" aria-level=2 aria-label=`${label}, ${n}` testId=id
+      box width=22 height=22 border-radius=11 background-color="-exact-quaternary-fill" display="flex" align-items="center" justify-content="center" flex-shrink=0
+        box width=8 height=8 border-radius=4 background-color="-exact-tertiary-label"
+      text label font="-exact-headline" color="-exact-label" flex=1
+      text `${n}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+component NeedsSection
+  props
+    needs: Goal[]
+    n: number
+    all: bool
+    wide: bool
+    beside: string
+    openGoal: action
+    more: action
+  view
+    if n > 0
+      column testId="goals-needs"
+        StageHead(state="asks", label="Needs you", n=n, known=true, pad="9px 10px", id="goals-head-needs")
+        for g in needs key=g.id
+          GoalRow(goal=g, project=(wide ? "" : g.group), lines=1, quiet=false, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
+        if n > (wide ? 2 : 3)
+          ShowMore(n=(n - needs.length), shown=all, pad="8px 10px 10px", id="goals-more-needs", press=more)
+        Rule(inset=true)
+
+component WorkSection
+  inject
+    haptics: bool
+    still: bool
+  props
+    working: Goal[]
+    n: number
+    all: bool
+    lines: number
+    wide: bool
+    reached: Goal[]
+    open: bool
+    now: number
+    offset: number
+    beside: string
+    openGoal: action
+    more: action
+    toggleReached: action
+  derive week = weekOf(reached.map(g => g.at), now, offset)
+  derive most = max(1, match sortBy(week, x => x, "desc").at(0) { case some(x) => x, case none => 1 })
+  view
+    if n > 0 or reached.length > 0
+      column testId="goals-working"
+        if n > 0
+          StageHead(state="working", label="Working on", n=n, known=true, pad="9px 10px", id="goals-head-working")
+          for g in working key=g.id
+            GoalRow(goal=g, project=(wide ? "" : g.group), lines=lines, quiet=false, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
+          if n > (wide ? 2 : 3)
+            ShowMore(n=(n - working.length), shown=all, pad="8px 10px 10px", id="goals-more-working", press=more)
+        if reached.length > 0
+          button press=toggleReached class=RowTap align-items="center" gap=10 aria-expanded=open aria-label=`Reached ${reached.length} this week` -exact-press-haptic=(haptics ? "selection" : "none") testId="goals-reached"
+            Mark(state="done", size=22)
+            text font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+              text "Reached"
+              text ` ${reached.length}${wide ? "" : " this week"}` font-weight=400 color="-exact-secondary-label"
+            row gap=3 align-items="flex-end" height=22 flex-shrink=0 aria-hidden=true testId="goals-reached-week"
+              for x, i in week key=i
+                if x > 0
+                  box width=5 height=max(3, round(x / most * 22)) border-radius=2 background-color="hex.accent"
+                else
+                  box width=3 height=3 margin="0 1px" border-radius=1.5 background-color="hex.accent" opacity=0.3
+            image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" margin-left=4 rotate=(open ? "90deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
+          if open
+            column padding-left=24 testId="goals-reached-list"
+              for g in reached key=g.id
+                GoalRow(goal=g, project=(wide ? "" : g.group), lines=1, quiet=true, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
+        Rule(inset=true)
+
+// A goal: its mark, what it is in up to two lines, its project where the room has it, then where
+// it stands. A question's line is in full-strength type, as Bassim has to read it.
+component GoalRow
+  inject
+    haptics: bool
+  props
+    goal: Goal
+    project: string
+    lines: number
+    // In a project or what was reached, where the line repeats what the mark says.
+    quiet: bool
+    selected: bool
+    press: action
+  view
+    button press=press class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${goal.title}${goal.line != "" ? `: ${goal.line}` : ""}` testId=`goals-goal-${goal.id}`
+      box padding-top=1 flex-shrink=0
+        Mark(state=markOfGoal(goal.state), size=22)
+      column flex=1 min-width=0 gap=1
+        row gap=8 align-items="baseline"
+          text goal.title font="-exact-headline" color="-exact-label" line-clamp=(quiet ? 1 : 2) flex=1 min-width=0
+          if project != ""
+            text project font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" max-width=92 flex-shrink=0
+        if goal.line != "" and not quiet
+          text goal.line font="-exact-subheadline" color=(goal.state == "needs" ? "-exact-label" : "-exact-secondary-label") line-clamp=lines
+
+// A watch: the clock, what it checks, how often, and its last week of runs, a mint bar a day it ran.
+component WatchRow
+  inject
+    haptics: bool
+  props
+    watch: Watch
+    now: number
+    offset: number
+    selected: bool
+    press: action
+  derive ran = weekOf(watch.runs.map(r => r.at), now, offset)
+  view
+    button press=press class=RowTap gap=10 align-items="center" border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Watching ${watch.title}, ${watch.stopped ? "stopped" : watch.every}, ran ${ran.filter(x => x > 0).length} of the last 7 days` testId=`goals-watch-${watch.id}`
+      box align-self="flex-start" padding-top=1 flex-shrink=0
+        Mark(state=(watch.stopped ? "stopped" : "watch"), size=22)
+      column flex=1 min-width=0 gap=1
+        text watch.title font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+        text (watch.stopped ? "Stopped" : capitalOf(watch.every)) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      row gap=3 flex-shrink=0 aria-hidden=true
+        for x, i in ran key=i
+          box width=5 height=14 border-radius=2.5 background-color=(x > 0 ? "hex.accent" : "-exact-tertiary-fill")
+
+// A project: a chevron that turns as it opens in place, its name, its goals as one bar as long as
+// the project is big against the biggest, split by where they stand, and how many.
+component ProjectRow
+  inject
+    haptics: bool
+    still: bool
+  props
+    group: GoalGroup
+    biggest: number
+    width: number
+    open: bool
+    id: string
+    toggle: action
+  derive barW = round(width * 0.4)
+  view
+    button press=toggle class=RowTap align-items="center" gap=10 min-height=40 padding="0 10px" aria-expanded=open aria-label=`${group.name}, ${group.states.length} goals, ${countIn(group.states, "done")} reached, ${open ? "open" : "shut"}` -exact-press-haptic=(haptics ? "selection" : "none") testId=id
+      box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+        image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" rotate=(open ? "90deg" : "0deg") transition=springOf(still, "rotate")
+      text group.name font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      box width=barW flex-shrink=0 aria-hidden=true
+        row gap=1.5 width=max(4, round(barW * group.states.length / biggest)) height=8 border-radius=3 overflow="hidden"
+          for s in goalStates().filter(s => countIn(group.states, s) > 0) key=s
+            box flex=countIn(group.states, s) min-width=1.5 height=8 background-color=(s == "unstarted" ? "-exact-tertiary-fill" : cellInk(s))
+      text `${group.states.length}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" min-width=28 text-align="right" flex-shrink=0

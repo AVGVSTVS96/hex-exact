@@ -27,7 +27,6 @@ use Ideas, IdeaOne, IdeaDone from "./ideas.contract"
 use IdeaScreen, IdeaPane, IdeaAct, ideaActOf, ideaActLine, undoOf, weekdayNumber from "./idea.contract"
 use Goals from "./shapes.contract"
 use GoalPage, GoalBody from "./goal.contract"
-use groupsOf from "./goals.contract"
 use WatchPage, WatchBody from "./watch.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
@@ -230,7 +229,9 @@ component App
   derive firstPage = match stageTopics(entriesOf(tasks, asks, now), shownTab).at(0) { case some(t) => homeOf(pageOf(t), tasks.tasks), case none => "" }
   // Home beside a page: two columns with no call on, the first thing that needs Bassim until he
   // picks one.
-  derive homeBeside = room.columns == 2 and top(nav).name == "home" and call.status == "idle" and activity.call == "" ? (beside != "" ? beside : firstNeed(tasks, asks, saids, now)) : ""
+  // On Goals the page beside it starts on what needs Bassim first, in the order Goals lists it.
+  derive firstGoal = match sortBy(sortBy(goals.goals.filter(g => g.state == "needs"), g => g.asked, "desc"), g => (asks.asks.map(a => a.id).includes(g.ask) ? asks.asks.map(a => a.id).indexOf(g.ask) : 100000)).at(0) { case some(g) => `goal:${g.id}`, case none => "" }
+  derive homeBeside = room.columns == 2 and top(nav).name == "home" and call.status == "idle" and activity.call == "" ? (beside != "" ? beside : hexPage == "goals" and firstGoal != "" ? firstGoal : firstNeed(tasks, asks, saids, now)) : ""
   derive needsOpen = split and top(nav).name == "needs"
   derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : needsOpen ? (needsBeside == "check" ? "" : needsBeside != "" ? needsBeside : firstNeed(tasks, asks, saids, now)) : homeBeside
   derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => besideId }
@@ -438,10 +439,9 @@ component App
     tapsSeen = pose.taps
 
   // Goals
-  derive firstProject = match groupsOf(goals).at(0) { case some(n) => n, case none => "" }
   derive openGoalId = top(nav).name == "goal" or top(nav).name == "watch" ? top(nav).params.id : besideId.startsWith("goal:") ? besideId.slice(5) : besideId.startsWith("watch:") ? besideId.slice(6) : ""
   action toggleProject(name: string)
-    goalsOpen = goalsChosen ? (goalsOpen.includes(name) ? goalsOpen.filter(n => n != name) : goalsOpen.concat([name])) : (firstProject == name ? [""].slice(0, 0) : [firstProject, name].filter(n => n != ""))
+    goalsOpen = goalsChosen ? (goalsOpen.includes(name) ? goalsOpen.filter(n => n != name) : goalsOpen.concat([name])) : [name]
     goalsChosen = true
   action openGoal(id: string)
     if room.columns == 2
@@ -800,11 +800,11 @@ component App
             if besideId.startsWith("idea:")
               IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, inset=max(0, homeRoom.clear.x + homeRoom.clear.width - 20 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), end=(homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? 8 : homeRoom.foot + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
             else if besideId.startsWith("goal:")
-              GoalBody(foot=homeRoom.foot, end=max(0, homeRoom.clear.x + homeRoom.clear.width - 16 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), footRight=max(12, homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), id=besideId.slice(5), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+              GoalBody(foot=(viewport.keyboardHeight > 0 ? 0 : homeRoom.foot), end=max(0, homeRoom.clear.x + homeRoom.clear.width - 16 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), footRight=max(12, homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), wide=(homeRoom.across < homeRoom.height), id=besideId.slice(5), goals=goalsShown, asks=asks, said=saids, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, answer=answer, unanswer=undo, again=again, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
             else if besideId.startsWith("decided:")
               DecidedPane(id=besideId.slice(8), asks=asks, tasks=tasks, loading=(not current(liveAsks)), failed=failed(liveAsks), inset=max(0, homeRoom.clear.x + homeRoom.clear.width - 20 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), foot=homeRoom.foot, undo=undo, openTask=openTask)
             else if besideId.startsWith("watch:")
-              WatchBody(foot=homeRoom.foot, end=max(0, homeRoom.clear.x + homeRoom.clear.width - 16 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), id=besideId.slice(6), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask)
+              WatchBody(foot=(viewport.keyboardHeight > 0 ? 0 : homeRoom.foot), end=max(0, homeRoom.clear.x + homeRoom.clear.width - 16 - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), footRight=max(12, homeRoom.clear.x + homeRoom.clear.width - homeRoom.footEnd), wide=(homeRoom.across < homeRoom.height), id=besideId.slice(6), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask)
             else if besideId != ""
               TaskBody(id=besideId, pane=true, room=homeRoom, clearTop=0, end=max(0, homeRoom.clear.x + homeRoom.clear.width - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), foot=homeRoom.foot, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "idea"
@@ -818,9 +818,9 @@ component App
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "goal"
-          GoalPage(entry=e, room=room, id=e.params.id, goals=goalsShown, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open, openTasks=openTasks, back=back)
+          GoalPage(entry=e, room=room, foot=(viewport.keyboardHeight > 0 ? 0 : callOn ? room.foot + 76 : room.foot), id=e.params.id, goals=goalsShown, asks=asks, said=saids, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, answer=answer, unanswer=undo, again=again, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "watch"
-          WatchPage(entry=e, room=room, id=e.params.id, goals=goalsShown, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=goalsLoading, changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask, open=open, openTasks=openTasks, back=back)
+          WatchPage(entry=e, room=room, foot=(viewport.keyboardHeight > 0 ? 0 : callOn ? room.foot + 76 : room.foot), id=e.params.id, goals=goalsShown, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"
           CallsList(entry=e, room=room, now=now, offset=clock.utcOffset, calls=callsShown, counts=counts, loading=(not current(liveCalls)), failed=failed(liveCalls), docked=callOn, selected=paneCall, select=pickCall, open=open, openTasks=openTasks, remove=removeCall, undoRemove=undoRemove, undoable=undoable, removing=removing, removeError=removeError, back=back)
           if callsPane and paneCall != ""

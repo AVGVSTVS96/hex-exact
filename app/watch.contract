@@ -1,22 +1,32 @@
-// Something hex keeps watch on for Bassim: what he asked, when it checks next, what it last found
-// and when, its earlier checks opening in place, and "Stop watching" with Undo. A page over Home,
-// or with two columns the page beside it.
-use Watch, Goals, WatchRun from "./shapes.contract"
-use Mark, Note, Tap, whenOf, springOf from "./parts.contract"
+// Something hex keeps watch on for Bassim: what it checks and how often, when it runs next, its last
+// seven days at a glance (a mint check and the time on each day it ran), then what each run found on
+// a line that ties them together, what hex does, his own words, and "Stop watching" with Undo.
+// "Change this watch" floats in glass at the foot and goes to its topic. Wider than tall, what it
+// found stands to the right. A page over Home, or with two columns the page beside it.
+use Watch, Goals, WatchRun, Media from "./shapes.contract"
+use Mark, Note, Tap, dayOf, whenOf, springOf, plainOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
-use Confirmed from "./ask.contract"
-use GoalAnswer, changeOf, partOf from "./goal.contract"
-use nextWords, plainOf from "./goals.contract"
+use Confirmed, ChipFace, ChipTap from "./ask.contract"
+use GoalAnswer, TopicComposer, Bubble, changeOf, partOf, draftOf from "./goal.contract"
+use capitalOf from "./goals.contract"
 
 fn watchOf(goals: Goals, id: string): Watch = match goals.watching.filter(w => w.id == id).at(0) { case some(w) => w, case none => Watch(id="", stopped=false, title="", topic="", run="", every="", next=0, asked=[], does="", runs=[]) }
 fn foundOf(w: Watch): WatchRun[] = w.runs.filter(r => r.said != "")
-fn foundWhen(at: number, now: number, offset: number): string = whenOf(at, now, offset) == formatTime(at, offset, "short") ? `today, ${formatTime(at, offset, "short")}` : `${whenOf(at, now, offset)}, ${formatTime(at, offset, "short")}`
-fn capital(s: string): string = s == "" ? "" : `${s.slice(0, 1).toUpperCase()}${s.slice(1)}`
+// What a run found, in its first part: hex's runs tack details on after " - **".
+fn gistOf(said: string): string = plainOf(match said.split(" - **").at(0) { case some(s) => s, case none => said })
+// "3h 50m", "12m", "2d": how long until it runs.
+fn untilOf(next: number, now: number): string = round((next - now) / 60000) < 60 ? `${max(0, round((next - now) / 60000))}m` : round((next - now) / 60000) < 1440 ? `${floor(round((next - now) / 60000) / 60)}h ${round((next - now) / 60000) % 60}m` : `${round((next - now) / 86400000)}d`
+fn letterOf(day: number): string = match ["T", "F", "S", "S", "M", "T", "W"].at(day % 7) { case some(d) => d, case none => "" }
+fn shortTime(at: number, offset: number): string = formatTime(at, offset, "short").replaceAll(":00", "")
+fn dayWords(at: number, now: number, offset: number): string = dayOf(at, offset) == dayOf(now, offset) ? "Today" : whenOf(at, now, offset)
 
 component WatchPage
   props
     entry: Entry
     room: Room
+    // How far its foot stands off the window's bottom: the home indicator, a call docked there, or
+    // none over the keyboard.
+    foot: number
     id: string
     goals: Goals
     now: number
@@ -25,8 +35,16 @@ component WatchPage
     working: number
     loading: bool
     changes: string[]
+    drafts: string[]
+    attached: Media[]
+    attachedTo: string
+    addError: string
     change: action
     undo: action
+    message: action
+    keepDraft: action
+    attach: action
+    detach: action
     openTask: action
     open: action
     openTasks: action
@@ -35,7 +53,7 @@ component WatchPage
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="watch"
       Chrome(room=room, on="watch", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        WatchBody(foot=room.foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), head=0, id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, change=change, undo=undo, openTask=openTask)
+        WatchBody(foot=foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), head=0, footRight=max(12, room.clear.x + room.clear.width - room.footEnd), wide=(room.clear.width > room.clear.height), id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask)
 
 component WatchBody
   inject
@@ -48,64 +66,171 @@ component WatchBody
     // shares the chrome row, in the smaller title drawn for it.
     end: number
     head: number
+    footRight: number
+    wide: bool
     id: string
     goals: Goals
     now: number
     offset: number
     loading: bool
     changes: string[]
+    drafts: string[]
+    attached: Media[]
+    attachedTo: string
+    addError: string
     change: action
     undo: action
+    message: action
+    keepDraft: action
+    attach: action
+    detach: action
     openTask: action
   state earlier = false
+  state allDoes = false
   derive w = watchOf(goals, id)
   derive found = foundOf(w)
   derive did = changeOf(changes, id)
   derive stopped = partOf(did, 1) == "stop" or w.stopped
+  derive today = dayOf(now, offset)
+  derive ranDays = range(7).filter(i => w.runs.filter(r => dayOf(r.at, offset) == today - 6 + i).length > 0).length
+  derive first = wide ? 3 : 2
   view
-    scroll flex=1 min-height=0 padding=`0 16px ${foot + 16}px` testId=`watch-${id}`
-      if w.id == ""
-        Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading" : "hex isn't watching this any more."), pad="24px 0", id="watch-missing")
-      else
-        column gap=4 padding="0 0 16px" padding-right=end min-height=head box-sizing="border-box"
-          text w.title font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 line-clamp=2 role="heading" aria-level=1 user-select="text"
-          text `Watching · ${w.topic}${w.every != "" ? ` · ${w.every}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
-        if w.asked.length > 0
-          column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="watch-asked"
-            text "You asked" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-            for a, i in w.asked key=i
-              text a font="-exact-body" color="-exact-label" user-select="text"
-        column gap=10 margin-bottom=22 testId="watch-next"
-          text "Next" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-          row gap=14 align-items="center"
-            Mark(state=(stopped ? "stopped" : "watch"), size=26)
-            text (stopped ? "Not any more: you stopped it." : w.next == 0 ? "It isn't set to run again." : `${capital(nextWords(w.next, now, offset))}${nextWords(w.next, now, offset).startsWith("today") ? "" : `, ${formatTime(w.next, offset, "short")}`}.`) font="-exact-body" color="-exact-label" flex=1
-        match found.at(0)
-          case some(r)
-            column gap=8 testId="watch-found"
-              row gap=8 align-items="center" min-height=24
-                text `Found ${foundWhen(r.at, now, offset)}` font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-                if found.length > 1
-                  button press=toggleEarlier class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-expanded=earlier -exact-press-haptic=(haptics ? "selection" : "none") testId="watch-earlier"
-                    text (found.length == 2 ? "1 earlier check" : `${found.length - 1} earlier checks`) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
-                    image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" rotate=(earlier ? "90deg" : "0deg") transition=springOf(still, "rotate")
-              text plainOf(r.said) font="-exact-body" color="-exact-label" line-clamp=6 user-select="text"
-              if earlier
-                column gap=14 padding="8px 0 0 14px" border-left="3px solid -exact-separator" testId="watch-earlier-list"
-                  for e in found.slice(1) key=e.at
-                    column gap=2
-                      text foundWhen(e.at, now, offset) font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
-                      text plainOf(e.said) font="-exact-subheadline" color="-exact-label" line-clamp=3 user-select="text"
-          case none
-            Note(kind="empty", text="Nothing found yet: it hasn't run since you asked.", pad="0", id="watch-not-yet")
-        if w.run != ""
-          button press=openTask(w.run) class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 margin-top=6 aria-label=`Topic, ${w.topic}` testId="watch-topic"
-            text "Topic" font="-exact-body" font-weight=600 color="-exact-label"
-            image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
-        column margin-top=12 border-top="0.5px solid -exact-separator" testId="watch-answers"
-          if stopped
-            Confirmed(label="Stopped watching", detail="hex won’t check this again", failed=(partOf(did, 2) == "failed" ? `Not sent · ${partOf(did, 3)}` : ""), status=(partOf(did, 2) == "sending" ? "Sending…" : "Stopped"), missed=0, id="watch-stopped", undo=undo(id, "stop"), again=change(id, "stop"))
-          else
-            GoalAnswer(label="Stop watching", detail="hex won’t check this again", dashed=true, id="watch-stop", press=change(id, "stop"))
+    column flex=1 min-height=0 position="relative" testId=`watch-${id}`
+      scroll flex=1 min-height=0 padding=`0 16px ${w.run != "" ? foot + 80 : foot + 16}px` testId="watch-page"
+        if w.id == ""
+          Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading" : "hex isn't watching this any more."), pad="24px 0", id="watch-missing")
+        else
+          row align-items="flex-start" flex-direction=(wide ? "row" : "column") gap=(wide ? 24 : 0)
+            column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%")
+              column padding-right=end min-height=head box-sizing="border-box" testId="watch-head"
+                row gap=8 align-items="center" min-height=24
+                  Mark(state=(stopped ? "stopped" : "watch"), size=22)
+                  text w.topic font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                  if stopped
+                    text "Stopped" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+                  else if w.next > now
+                    text `Next in ${untilOf(w.next, now)}` font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="hex.progress" white-space="nowrap" testId="watch-next"
+                text w.title font=(head > 0 ? "-exact-title3" : "-exact-title2") font-weight=600 color="-exact-label" line-clamp=2 margin-top=6 role="heading" aria-level=1 user-select="text"
+                text `${capitalOf(w.every)}${w.every != "" ? " · " : ""}ran ${ranDays} of 7 days` font="-exact-subheadline" color="-exact-secondary-label" margin-top=2
+              row padding="16px 0 6px" margin="0 -4px" aria-label=`The last 7 days: ran on ${ranDays}` testId="watch-week"
+                for i in range(7) key=i
+                  WatchDay(day=(today - 6 + i), today=today, runs=w.runs, next=(stopped ? 0 : w.next), offset=offset)
+              if not wide
+                WatchFound(found=(earlier ? found : found.slice(0, first)), n=found.length, earlier=earlier, now=now, offset=offset, more=toggleEarlier)
+              if w.does != ""
+                column margin-top=14 testId="watch-does"
+                  text "What hex does" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" padding-bottom=6
+                  text plainOf(w.does) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=(allDoes ? 0 : 3) user-select="text"
+                  button press=toggleDoes class=Tap align-self="flex-start" display="flex" flex-direction="row" gap=6 align-items="center" min-height=36 aria-expanded=allDoes -exact-press-haptic=(haptics ? "selection" : "none") testId="watch-does-all"
+                    image "symbol:sf/chevron.down" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" rotate=(allDoes ? "180deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
+                    text (allDoes ? "Less" : "Read all") font="-exact-subheadline" color="-exact-tertiary-label"
+              if w.asked.length > 0 or w.run != ""
+                column margin-top=10 testId="watch-asked"
+                  row gap=8 align-items="center"
+                    text (w.asked.length > 0 ? "You said" : "") font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" flex=1
+                    if w.run != ""
+                      button press=openTask(w.run) class=ChipTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Topic, ${w.topic}` testId="watch-topic"
+                        box class=ChipFace
+                          text w.topic font="-exact-footnote" font-weight=600 color="-exact-label" line-clamp=1
+                          image "symbol:sf/chevron.right" width=9 height=9 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                  column gap=6 align-items="flex-end" padding-left=32
+                    for a, i in w.asked key=i
+                      Bubble(text=a, id=`watch-said-${i}`)
+              if not wide
+                WatchEnd(id=id, stopped=stopped, did=did, change=change, undo=undo)
+            if wide
+              column flex=1 min-width=0
+                WatchFound(found=(earlier ? found : found.slice(0, first)), n=found.length, earlier=earlier, now=now, offset=offset, more=toggleEarlier)
+                WatchEnd(id=id, stopped=stopped, did=did, change=change, undo=undo)
+      if w.run != ""
+        TopicComposer(key=`thread:${w.run}`, run=w.run, hint="Change this watch", label=`Change ${w.title}`, draft=draftOf(drafts, `thread:${w.run}`), keep=keepDraft, message=message, attached=(attachedTo == `thread:${w.run}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${w.run}` ? addError : ""), attach=attach, detach=detach, left=(wide ? "calc(50% + 12px)" : "12px"), right=footRight, foot=foot, id="watch")
   action toggleEarlier
     earlier = not earlier
+  action toggleDoes
+    allDoes = not allDoes
+
+// One day of the week: its letter, a mint check if it ran (the time under it), today's next run
+// in a blue ring, else an empty cell.
+component WatchDay
+  props
+    day: number
+    today: number
+    runs: WatchRun[]
+    next: number
+    offset: number
+  derive run = runs.filter(r => dayOf(r.at, offset) == day).at(0)
+  derive ranAt = match run { case some(r) => r.at, case none => 0 }
+  derive upNext = ranAt == 0 and day == today and next > 0 and dayOf(next, offset) == today
+  view
+    column flex=1 align-items="center" gap=5 aria-hidden=true
+      text letterOf(day) font-size=12 line-height="16px" font-weight=(day == today ? 600 : 400) color=(day == today ? "-exact-label" : "-exact-tertiary-label")
+      box width=34 height=34 border-radius=11 box-sizing="border-box" display="flex" align-items="center" justify-content="center" background-color=(ranAt > 0 ? "hex.accent.wash" : upNext ? "transparent" : "-exact-quaternary-fill") border=(upNext ? "1.5px solid hex.progress" : "none")
+        if ranAt > 0
+          image "symbol:checkmark" width=13 height=13 object-fit="contain" color="hex.accent"
+        else if upNext
+          image "symbol:sf/clock" width=14 height=14 object-fit="contain" color="hex.progress"
+      text (ranAt > 0 ? shortTime(ranAt, offset) : upNext ? shortTime(next, offset) : " ") font-size=12 line-height="16px" font-weight=(upNext ? 600 : 400) font-variant-numeric="tabular-nums" color=(upNext ? "hex.progress" : "-exact-tertiary-label") white-space="nowrap"
+
+// What each run found, newest first, on a line that ties them together; a tap shows a run in full.
+component WatchFound
+  inject
+    haptics: bool
+  props
+    found: WatchRun[]
+    n: number
+    earlier: bool
+    now: number
+    offset: number
+    more: action
+  view
+    column margin-top=8 testId="watch-found"
+      text "What it found" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" padding-bottom=6
+      if n == 0
+        Note(kind="empty", text="Nothing found yet: it hasn't run since you asked.", pad="0", id="watch-not-yet")
+      for r, i in found key=r.at
+        FoundRun(run=r, last=(i == found.length - 1), now=now, offset=offset, id=`watch-run-${i}`)
+      if n > 2
+        button press=more class=Tap display="flex" flex-direction="row" gap=10 align-items="center" min-height=40 aria-expanded=earlier -exact-press-haptic=(haptics ? "selection" : "none") testId="watch-earlier"
+          column width=22 gap=3 align-items="center" flex-shrink=0 aria-hidden=true
+            for k in [0, 1] key=k
+              row gap=3
+                for c in [0, 1, 2] key=c
+                  box width=3 height=3 border-radius=1.5 background-color="-exact-tertiary-label"
+          text (earlier ? "Show fewer" : `Show ${n - found.length} earlier`) font="-exact-subheadline" color="-exact-tertiary-label"
+
+component FoundRun
+  props
+    run: WatchRun
+    last: bool
+    now: number
+    offset: number
+    id: string
+  state full = false
+  action flip
+    full = not full
+  view
+    button press=flip class=Tap display="flex" flex-direction="row" gap=10 align-items="stretch" text-align="left" aria-expanded=full testId=id
+      column width=22 align-items="center" flex-shrink=0 aria-hidden=true
+        box width=9 height=9 border-radius=4.5 background-color="hex.accent" margin-top=6 flex-shrink=0
+        if not last
+          box width=1.5 flex=1 margin-top=4 background-color="-exact-separator"
+      column flex=1 min-width=0 padding-bottom=12
+        row gap=8 align-items="baseline"
+          text dayWords(run.at, now, offset) font="-exact-subheadline" font-weight=600 color="-exact-label" flex=1
+          text formatTime(run.at, offset, "short") font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+        text (full ? plainOf(run.said) : gistOf(run.said)) font="-exact-subheadline" color="-exact-label" line-clamp=(full ? 0 : 3) user-select="text"
+
+component WatchEnd
+  props
+    id: string
+    stopped: bool
+    did: string
+    change: action
+    undo: action
+  view
+    column margin-top=16 border-top="0.5px solid -exact-separator" testId="watch-answers"
+      if stopped
+        column padding-top=12
+          Confirmed(label="Stopped watching", detail="hex won’t check this again", failed=(partOf(did, 2) == "failed" ? `Not sent · ${partOf(did, 3)}` : ""), status=(partOf(did, 2) == "sending" ? "Sending…" : "Stopped"), missed=0, id="watch-stopped", undo=undo(id, "stop"), again=change(id, "stop"))
+      else
+        GoalAnswer(label="Stop watching", detail="hex won’t check this again", dashed=true, id="watch-stop", press=change(id, "stop"))

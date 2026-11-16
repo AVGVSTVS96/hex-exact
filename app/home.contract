@@ -124,7 +124,7 @@ component HexHome
           else if p == "ideas"
             IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
           else if p == "goals"
-            GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
+            GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
       // The page fades out under hex at the top and at the foot, so no row shows cut in half.
       box position="absolute" top=0 left=0 right=0 height=(top + 68) background-color="-exact-background" mask-image="linear-gradient(to bottom, #000 0, transparent 100%)" pointer-events="none" aria-hidden=true
       box position="absolute" bottom=0 left=0 right=0 height=60 background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 92%)" pointer-events="none" aria-hidden=true

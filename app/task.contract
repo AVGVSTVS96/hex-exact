@@ -290,7 +290,7 @@ component TaskBody
               if row.state == "working"
                 Happened(mark="working", text=(row.line != "" ? row.line : "Working"), stamp=lengthOf((now - row.since) / 1000), failed=false)
               for t in working key=t.id
-                Row(mark="working", title=t.place, line=t.line, lines=2, failed=false, stamp=whenOf(t.at, now, offset), n=0, selected=false, href="", label=`${t.place}, working: ${t.line}`, id=`working-${t.id}`, press=openTask(t.id))
+                Row(mark="working", title=t.place, line=t.line, lines=2, failed=false, stamp=whenOf(t.at, now, offset), n=0, pips=0, selected=false, href="", label=`${t.place}, working: ${t.line}`, id=`working-${t.id}`, press=openTask(t.id))
             if kind == "task" and entry.name != "steps" and (task.steps.length > 0 or task.agents.length > 0)
               Further(label="Steps", line=(task.agents.length > 0 ? `${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : match sortBy(task.steps, s => s.at, "desc").at(0) { case some(s) => `${kindWord(s.kind)}: ${s.text}`, case none => "" }), id="task-steps", press=toSteps)
             if kind == "task"

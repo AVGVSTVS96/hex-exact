@@ -2,8 +2,8 @@
 // then the list of the page under it. Now is the few things that need Bassim, what hex is working
 // on and what it decided for him; Feed, Ideas and Goals join it as tabs at the foot of hex's column.
 // Home shows it whenever no call is on; Tasks has the rest.
-use Tasks, Asks, TaskRow, Goals from "./shapes.contract"
-use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap, springOf from "./parts.contract"
+use Tasks, Ask, Asks, TaskRow, Goals from "./shapes.contract"
+use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, dayOf, Tap, springOf from "./parts.contract"
 use Said from "./said.contract"
 use FeedList, FeedView from "./feed.contract"
 use IdeasList, Ideas, Idea from "./ideas.contract"
@@ -39,12 +39,6 @@ fn lineOf(t: TaskRow): string = t.line != "" ? t.line : match t.agents.filter(a 
 // A row's mark, as Tasks draws its topic's.
 fn markOf(e: Item): string = e.stage == "needs" ? (e.kind == "task" ? "needs" : e.mark) : problemOf(e.title) != "" ? "failed" : e.mark
 fn lineFor(e: Item): string = problemOf(e.title) != "" ? problemOf(e.title) : e.title
-
-// How many rows of Now fit in `height` without scrolling, once the list's top (12pt), its two heads
-// (74), two "Show N more" (60), what hex decided (54) and a little of the fade above the tabs (16)
-// have their room: a row is two lines, about 58pt (measured on the Duo simulator). Folded upright
-// that is the drawing's three: two that need him and one working. Never fewer than one of each.
-fn rowsFit(height: number): number = max(floor((height - 216) / 58), 2)
 
 keyframes liveDot
   50% opacity=0.25
@@ -151,7 +145,7 @@ component HexHome
         scroll position="absolute" top=(p == "now" ? f.height : 0) left=0 right=0 bottom=0 padding="0 6px 34px" box-sizing="border-box" scroll=moved(p) opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) mask-image=`linear-gradient(to bottom, ${p == "now" ? "transparent 0, #000 12px" : "#000 0"}, #000 ${p == "now" ? fade : wholeFade}%, transparent 100%)` testId=`home-list-${p}`
           if p == "now"
             children
-            NowList(height=listHeight, now=now, offset=offset, tasks=tasks, needs=needs, working=working, needing=needing, workingOn=workingOn, decided=asks.decided.length, known=known, failed=failed, liveId=liveId, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
+            NowList(wide=(width > height), now=now, offset=offset, tasks=tasks, needs=needs, working=working, decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
           else
             HexFace(f=f, face=true, inset=headRight, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
             if p == "feed"
@@ -222,42 +216,38 @@ component LiveLine
             box width=4 height=4 border-radius=2 background-color="hex.progress" animation=(still ? "none" : `liveDot 1.2s ease-in-out ${i * 0.2}s infinite`)
       text line font="-exact-subheadline" color=(id == "" ? "-exact-tertiary-label" : "-exact-secondary-label") text-align=(center ? "center" : "left") line-clamp=lines min-width=0 flex-shrink=1
 
-// Now: the few things that need Bassim (as many as fit without scrolling, then "Show N more"), what
-// hex is working on, then "hex decided N".
+// Now: the first three things that need Bassim, then what hex decided for him this week, a bar a
+// day; then the first three hex is working on, each with a pip per agent in it. Each head and "Show
+// N more" opens its whole list. A room wider than tall holds the two side by side.
+fn shownRows(): number = 3
+fn agentsIn(e: Item, tasks: TaskRow[]): number = match tasks.filter(t => t.id == e.id).at(0) { case some(t) => t.agents.filter(a => a.state == "working").length, case none => 0 }
+// The last seven days, oldest first: how many hex decided on each.
+fn decidedWeek(decided: Ask[], now: number, offset: number): number[] = range(7).map(i => decided.filter(d => dayOf(d.decided, offset) == dayOf(now, offset) - 6 + i).length)
+
 component NowList
   inject
     haptics: bool
   props
-    height: number
+    wide: bool
     now: number
     offset: number
     tasks: Tasks
     needs: Item[]
     working: Item[]
-    // hex's own counts of the two (Counts), for how many rows each takes.
-    needing: number
-    workingOn: number
-    decided: number
+    decided: Ask[]
     known: bool
     failed: bool
-    liveId: string
     split: bool
     beside: string
     select: action
     openTask: action
     openTasks: action
     open: action
-  // What's working, newest first; the one on the live line isn't listed twice.
-  derive listed = working.filter(e => e.id != liveId)
-  derive fit = rowsFit(height)
-  // Too short for two rows and both "Show N more" (folded on its side): Working on drops its own, as
-  // its head already counts them, so hex decided stays in view above the tabs.
-  derive tight = height < 216 + 2 * 58
-  // Needs you takes the rows that fit but one, which Working on keeps; Working on takes what Needs
-  // you leaves. Each counts the other from hex's summary (`needing`, `workingOn`), so neither list
-  // walks the other's.
-  derive shownNeeds = needs.slice(0, max(1, fit - (workingOn > 0 ? 1 : 0)))
-  derive shownWork = listed.slice(0, max(1, fit - min(needing, max(1, fit - 1))))
+  derive shownNeeds = needs.slice(0, shownRows())
+  derive shownWork = working.slice(0, shownRows())
+  derive week = decidedWeek(decided, now, offset)
+  derive most = match sortBy(week, n => n, "desc").at(0) { case some(n) => max(1, n), case none => 1 }
+  derive thisWeek = sum(week)
   // Questions of one topic open the same page beside; only one of its rows is marked: the one
   // tapped, else the first.
   state tapped = ""
@@ -274,23 +264,32 @@ component NowList
     column testId="home-now"
       if failed and not known
         Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
-      StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="8px 10px 4px", id="home-head-asks")
-      for e in shownNeeds key=e.id
-        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
-      if known and needs.length == 0
-        Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 44px", id="home-empty-needs")
-      if needs.length > shownNeeds.length
-        ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="6px 10px", id="home-more-needs", press=openTasks("needs"))
-      StageHead(state="working", label="Working on", n=working.length, known=known, pad="14px 10px 4px", id="home-head-working")
-      for e in shownWork key=e.id
-        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
-      if known and working.length == 0
-        Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 44px", id="home-empty-working")
-      if listed.length > shownWork.length and not tight
-        ShowMore(n=listed.length - shownWork.length, shown=false, pad="6px 10px", id="home-more-working", press=openTasks("working"))
-      if decided > 0
-        box height=0 margin="10px 10px 4px" border-top="0.5px solid -exact-separator"
-        button press=open(path("decided")) class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided} this week` testId="home-decided"
-          Mark(state="decided", size=22)
-          text `hex decided ${decided} this week` font="-exact-headline" flex=1 text-align="left"
-          image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+      row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch")
+        column flex=(wide ? 1 : 0) min-width=0 testId="home-needs"
+          StageHead(state="asks", label="Needs you", n=needs.length, known=known, opens=true, pad="9px 10px", id="home-head-asks", press=openTasks("needs"))
+          for e in shownNeeds key=e.id
+            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, pips=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+          if known and needs.length == 0
+            Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 42px", id="home-empty-needs")
+          if needs.length > shownNeeds.length
+            ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=openTasks("needs"))
+          if decided.length > 0
+            button press=open(path("decided")) class=RowTap align-items="center" gap=10 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${thisWeek} this week` testId="home-decided"
+              Mark(state="decided", size=22)
+              text font="-exact-headline" color="-exact-label" flex=1 min-width=0 text-align="left" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                text "hex decided"
+                text ` ${thisWeek} this week` font-weight=400 color="-exact-secondary-label"
+              row gap=3 align-items="flex-end" height=22 flex-shrink=0 aria-hidden=true testId="home-decided-week"
+                for n, i in week key=i
+                  box width=5 height=max(2, round(n / most * 22)) border-radius=2 background-color="hex.accent" opacity=(i == 6 ? 1 : 0.55)
+              image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" margin-left=4 aria-hidden=true
+        if not wide
+          box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
+        column flex=(wide ? 1 : 0) min-width=0 border-left=(wide ? "0.5px solid -exact-separator" : "none") testId="home-working"
+          StageHead(state="working", label="Working on", n=working.length, known=known, opens=true, pad="9px 10px", id="home-head-working", press=openTasks("working"))
+          for e in shownWork key=e.id
+            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, pips=agentsIn(e, tasks.tasks), selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+          if known and working.length == 0
+            Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 42px", id="home-empty-working")
+          if working.length > shownWork.length
+            ShowMore(n=working.length - shownWork.length, shown=false, pad="8px 10px 10px", id="home-more-working", press=openTasks("working"))

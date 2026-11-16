@@ -112,74 +112,99 @@ fn badEnding(kind: string): bool = kind == "dropped" or kind == "no-connect" or 
 keyframes markSpin
   to rotate="360deg"
 
-// A state's mark, the stable app's (§9.10), in a square of `size`. Feed, Ideas and Goals add theirs:
-// something hex found (a lens, in Feed and Ideas alike), something it watches (a clock), an idea (a
-// bulb) and a goal not started (a dashed box). Otherwise: needs a mint dot on its wash; a
-// question amber with ?; hex's pick mint with ✦, and what hex decided a mint ✦ on its wash; working
-// a turning blue arc; done a checked square; read a dot; failed red with !; paused, stopped,
-// pending (dashed) and idle (a ring) in grey.
+// A state's mark, in a square of `size`, as the drawings have them: a question an amber disc with
+// ?; something only Bassim can do an empty box; hex's pick mint with ✦, and what hex decided a mint ✦
+// on its wash; working a turning blue half ring; done a mint-checked box; failed red with a warning
+// triangle. Feed, Ideas and Goals add theirs: something hex found (a lens), something it watches (a
+// clock), an idea (a bulb) and a goal not started (a dashed box). Otherwise read a dot; paused,
+// stopped, pending (dashed) and idle (a ring) in grey.
 component Mark
   inject
     still: bool
   props
     state: string
     size: number
-  derive disc = round(size * 0.9)
+  derive square = size - 2
   derive dot = round(size * 0.4)
-  derive glyph = round(size * 0.5)
+  derive glyph = round(size * 0.55)
   view
     box width=size height=size flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-hidden=true
       if state == "working" or state == "running"
-        svg width=disc height=disc viewBox="0 0 20 20" animation=(still ? "none" : "markSpin 1.1s linear infinite")
-          circle cx=10 cy=10 r=8 fill="none" stroke="hex.progress.wash" stroke-width=2.25
-          circle cx=10 cy=10 r=8 fill="none" stroke="hex.progress" stroke-width=2.25 stroke-linecap="round" stroke-dasharray="14 40"
+        svg width=square height=square viewBox="0 0 20 20" animation=(still ? "none" : "markSpin 1.1s linear infinite")
+          circle cx=10 cy=10 r=8.75 fill="none" stroke="hex.progress.wash" stroke-width=2.5
+          circle cx=10 cy=10 r=8.75 fill="none" stroke="hex.progress" stroke-width=2.5 stroke-dasharray="27.5 55"
       else if state == "needs"
-        box width=disc height=disc border-radius=(disc / 2) background-color="hex.ask.wash" display="flex" align-items="center" justify-content="center"
-          box width=dot height=dot border-radius=(dot / 2) background-color="hex.ask"
-      else if state == "decided"
-        box width=disc height=disc border-radius=(disc / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
-          image "symbol:icon.pick" width=glyph height=glyph object-fit="contain" color="hex.accent"
-      else if state == "asks" or state == "pick"
-        box width=disc height=disc border-radius=(disc / 2) background-color=tintOf(state) display="flex" align-items="center" justify-content="center"
-          image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-background"
-      else if state == "failed" or state == "paused"
-        box width=disc height=disc border-radius=(disc / 2) background-color=washOf(state) display="flex" align-items="center" justify-content="center"
-          image symbolOf(state) width=glyph height=glyph object-fit="contain" color=(state == "failed" ? "hex.danger" : "-exact-secondary-label")
+        box width=square height=square border-radius=round(square * 0.3) border="1.75px solid -exact-tertiary-label" box-sizing="border-box"
       else if state == "done"
-        box width=disc height=disc border-radius=round(disc * 0.3) border="1.5px solid -exact-tertiary-label" display="flex" align-items="center" justify-content="center"
-          image "symbol:icon.done" width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
+        box width=square height=square border-radius=round(square * 0.3) border="1.75px solid hex.accent" background-color="hex.accent.wash" box-sizing="border-box" display="flex" align-items="center" justify-content="center"
+          image "symbol:icon.done" width=round(size * 0.5) height=round(size * 0.5) object-fit="contain" color="hex.accent"
+      else if state == "decided"
+        box width=size height=size border-radius=(size / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
+          image "symbol:icon.pick" width=round(size * 0.6) height=round(size * 0.6) object-fit="contain" color="hex.accent"
+      else if state == "asks"
+        box width=size height=size border-radius=(size / 2) background-color="hex.ask.fill" display="flex" align-items="center" justify-content="center"
+          image "symbol:icon.ask" width=glyph height=glyph object-fit="contain" color="hex.ask.ink"
+      else if state == "pick"
+        box width=size height=size border-radius=(size / 2) background-color=tintOf(state) display="flex" align-items="center" justify-content="center"
+          image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-background"
+      else if state == "failed"
+        box width=size height=size border-radius=(size / 2) background-color="hex.danger.wash" display="flex" align-items="center" justify-content="center"
+          image "symbol:icon.stuck" width=glyph height=glyph object-fit="contain" color="hex.danger"
+      else if state == "paused"
+        box width=size height=size border-radius=(size / 2) background-color=washOf(state) display="flex" align-items="center" justify-content="center"
+          image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
       else if state == "found" or state == "watch" or state == "idea"
-        box width=disc height=disc border-radius=(disc / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
+        box width=size height=size border-radius=(size / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
           image (state == "found" ? "symbol:icon.found" : state == "watch" ? "symbol:icon.watch" : "symbol:icon.ideas") width=glyph height=glyph object-fit="contain" color="-exact-label"
       else if state == "read"
         box width=dot height=dot border-radius=(dot / 2) background-color="-exact-tertiary-label"
       else if state == "stopped"
         box width=dot height=dot border-radius=2 background-color="-exact-tertiary-label"
       else if state == "pending"
-        box width=(disc - 4) height=(disc - 4) border-radius=(disc / 2) border="1.5px dashed -exact-tertiary-label"
+        box width=(square - 2) height=(square - 2) border-radius=(square / 2) border="1.5px dashed -exact-tertiary-label"
       else if state == "unstarted"
-        box width=disc height=disc border-radius=round(disc * 0.3) border="1.5px dashed -exact-tertiary-label"
+        box width=square height=square border-radius=round(square * 0.3) border="1.5px dashed -exact-tertiary-label"
       else
         box width=dot height=dot border-radius=(dot / 2) border="1.5px solid -exact-tertiary-label"
 
 // A section of a list by state: its colour's dot on its wash, its name in that colour, how many
-// ("–" until hex has answered).
+// ("–" until hex has answered), and, where it opens the whole list (`opens`), a chevron and `press`.
 component StageHead
+  inject
+    haptics: bool
   props
     state: string
     label: string
     n: number
     known: bool
+    opens: bool
     pad: string
     id: string
+    press: action
   view
-    row gap=12 align-items="center" padding=pad role="heading" aria-level=2 aria-label=`${label}, ${n}` testId=id
-      box width=22 height=22 border-radius=11 background-color=washOf(state) display="flex" align-items="center" justify-content="center" flex-shrink=0
-        box width=8 height=8 border-radius=4 background-color=tintOf(state)
-      text label font="-exact-headline" color=tintOf(state) flex=1
-      text (known ? `${n}` : "–") font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+    if opens
+      button press=press class=RowTap align-items="center" gap=10 padding=pad aria-label=`${label}, ${n}, show all` -exact-press-haptic=(haptics ? "selection" : "none") testId=id
+        StageLine(state=state, label=label, n=n, known=known, opens=true)
+    else
+      row gap=10 align-items="center" padding=pad role="heading" aria-level=2 aria-label=`${label}, ${n}` testId=id
+        StageLine(state=state, label=label, n=n, known=known, opens=false)
 
-// "Show N more" under the first few of a list: the rows' own mark column holds the ellipsis.
+component StageLine
+  props
+    state: string
+    label: string
+    n: number
+    known: bool
+    opens: bool
+  view
+    box width=22 height=22 border-radius=11 background-color=washOf(state) display="flex" align-items="center" justify-content="center" flex-shrink=0
+      box width=8 height=8 border-radius=4 background-color=tintOf(state)
+    text label font="-exact-headline" color=tintOf(state) flex=1
+    text (known ? `${n}` : "–") font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+    if opens
+      image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+
+// "Show N more" under the first few of a list: the rows' mark column holds a grid of six dots.
 component ShowMore
   inject
     haptics: bool
@@ -190,16 +215,20 @@ component ShowMore
     id: string
     press: action
   view
-    button press=press class=RowTap align-items="center" padding=pad aria-expanded=shown -exact-press-haptic=(haptics ? "selection" : "none") testId=id
-      box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
-        image "symbol:ellipsis" width=14 height=14 object-fit="contain" color="-exact-tertiary-label"
-      text (shown ? "Show fewer" : `Show ${n} more`) font="-exact-subheadline" color="-exact-secondary-label" flex=1
+    button press=press class=RowTap align-items="center" gap=10 padding=pad aria-expanded=shown -exact-press-haptic=(haptics ? "selection" : "none") testId=id
+      column width=22 gap=3 align-items="center" flex-shrink=0 aria-hidden=true
+        for r in [0, 1] key=r
+          row gap=3
+            for c in [0, 1, 2] key=c
+              box width=3 height=3 border-radius=1.5 background-color="-exact-tertiary-label"
+      text (shown ? "Show fewer" : `Show ${n} more`) font="-exact-subheadline" color="-exact-tertiary-label" flex=1
 
 // The one row every list draws (Home, Tasks, what hex decided): its mark, a title in full-strength
 // type, a count when there's more than one, when, and a grey line under it (red when it's a
 // failure). It opens with `href` (a pushed page, a native list's row and its press) or, with no
 // href, `press` (a page beside, a sheet).
-// selected marks the row whose page is open beside the list.
+// A question's line is in full-strength type, as Bassim has to read it. `pips` is a blue pip per
+// agent working in it. selected marks the row whose page is open beside the list, in a soft fill.
 component Row
   inject
     haptics: bool
@@ -211,6 +240,7 @@ component Row
     failed: bool
     stamp: string
     n: number
+    pips: number
     selected: bool
     href: string
     label: string
@@ -218,11 +248,11 @@ component Row
     press: action
   view
     if href != ""
-      link href=href class=RowTap background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
-        RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)
+      link href=href class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
+        RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n, pips=pips)
     else
-      button press=press class=RowTap background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
-        RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)
+      button press=press class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
+        RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n, pips=pips)
 
 component RowLines
   props
@@ -233,6 +263,7 @@ component RowLines
     failed: bool
     stamp: string
     n: number
+    pips: number
   view
     box padding-top=1 flex-shrink=0
       Mark(state=mark, size=22)
@@ -241,10 +272,16 @@ component RowLines
         text title font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
         if n > 1
           Chip(n=n, state=mark, loading=false)
+        if pips > 0
+          row gap=3 align-self="center" flex-shrink=0 aria-label=`${pips} ${pips == 1 ? "agent" : "agents"}`
+            for i in range(min(pips, 4)) key=i
+              box width=5 height=5 border-radius=2.5 background-color="hex.progress"
+            if pips > 4
+              text `${pips}` font-size=12 line-height="16px" font-weight=600 font-variant-numeric="tabular-nums" color="hex.progress" margin-left=2
         box flex=1
-        text stamp font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+        text stamp font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
       if line != "" and line != title
-        text line font="-exact-subheadline" color=(failed ? "hex.danger" : "-exact-secondary-label") line-clamp=lines
+        text line font="-exact-subheadline" color=(failed ? "hex.danger" : mark == "asks" ? "-exact-label" : "-exact-secondary-label") line-clamp=lines
 
 // What a list says when it has nothing to show: empty, still loading, or can't reach hex. Every
 // screen says it the same way, in the rows' column.

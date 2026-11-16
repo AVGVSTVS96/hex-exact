@@ -13,6 +13,9 @@ theme
   hex.accent.solid = #1F8A6D  scheme=fixed
   hex.ask = light-dark(#A35F00, #F2C58A)
   hex.ask.wash = light-dark(#F7E6CF, #3A2E1E)
+  // A question's disc, and the ? on it.
+  hex.ask.fill = light-dark(#F6B655, #F2C58A)
+  hex.ask.ink = light-dark(#3A2400, #2A1B00)
   hex.progress = light-dark(#0A66D2, #8DB8FF)
   hex.progress.wash = light-dark(#CFE0F7, #1F3354)
   hex.danger = light-dark(#D93A42, #F0A5A8)
@@ -39,6 +42,7 @@ icons
   icon.pick = icon(sf "sparkle", svg "icons/sparkle.svg")
   icon.done = icon(sf "checkmark", svg "icons/check.svg")
   icon.failed = icon(sf "exclamationmark", svg "icons/exclaim.svg")
+  icon.stuck = icon(sf "exclamationmark.triangle", svg "icons/warning.svg")
   icon.paused = icon(sf "pause.fill", svg "icons/pause.svg")
   icon.offline = icon(sf "wifi.exclamationmark", svg "icons/wifi-off.svg")
   icon.found = icon(sf "magnifyingglass", svg "icons/lens.svg")

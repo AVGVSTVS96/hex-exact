@@ -134,8 +134,14 @@ before a build; builds share it with other work. Commit to main, signed, small.
 
 ## Where Exact can't (yet)
 
-- Over the air, Exact sends screens (Contract and assets), not `app.ts` or the shell: a data or
-  Swift change needs `scripts/ship`.
+Checked line by line against Exact's main (`ac889988`, Nov 15) and the pin (`7722882`). None is
+lifted by main, so the pin stays: moving costs the `app.tamber` → `app.forma` rename,
+`answerOpenURL` → `openURLAnswer` in `App.swift`, Rust 1.99 and a new install for everyone.
+
+- Over the air, Exact sends screens (Contract and assets), and Exact's docs say it sends a signed
+  TypeScript bundle too when its grants match the installed build; untried here, so a data change
+  still goes by `scripts/ship` until an `app.ts`-only `scripts/publish` is seen on the Duo. Swift
+  always needs `scripts/ship`.
 - A long poll's mapper can't touch storage, so it notes each answer and a second read keyed on the
   poll's version (`keep`, data/kept.ts) writes it to app storage; a launch that can't reach hex
   shows the kept Tasks, questions, counts and Calls until it can.
@@ -150,6 +156,8 @@ before a build; builds share it with other work. Commit to main, signed, small.
   front; a dropped stream comes back the next time the app does.
 - An `image` can't carry hex's token, so hex's photos and videos are the module's `hex-media`
   view (media.contract `Thumb`, `Album`): it fetches with the token and opens Quick Look on a tap.
+  Exact could instead `fetch(…, { exactBodyTo: "app:/…" })` with the token and show the file
+  (`image src="app:/…"`); Quick Look would stay the module's.
 - The orb is the stable app's six Rive personas, drawn by RiveRuntime in the module
   (`hex-orb persona= tint= palette= reaction=`); a plain `exact ios` build has no Rive and draws
   hex's own sphere instead.
@@ -161,6 +169,9 @@ before a build; builds share it with other work. Commit to main, signed, small.
   the second segment; its thread, Steps and picks still push over both.
 - Root `state` holds only strings, numbers and bools, so what was answered, put away or sent from
   here, hex's picks as left, and drafts are lines of tab-separated fields (`said.contract`).
+  Exact's grammar documents `state` holding lists and records, at the pin too; only `persist` keeps
+  to scalars and lists of them. Unchecked in a build here.
 - A phone's Tasks is a sheet that stops at half height during a call, but the call under it
   stays dimmed and untouchable: Exact's sheets have no undimmed detent (the stable app's
-  `largestUndimmedDetent` at medium).
+  `largestUndimmedDetent` at medium). Exact main (after the pin) lets a `dialog` sheet's backdrop
+  be transparent, but it still takes the touches.

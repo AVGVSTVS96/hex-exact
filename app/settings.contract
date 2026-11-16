@@ -1,10 +1,15 @@
-// Voice and appearance (§10, first page): how hex looks, how much it reacts, its voice, and the
-// call's sounds and haptics, each saying what it does. A page like Calls, under the chrome; with two
-// columns hex's face and its colours on the first and the settings on the second.
-use Settings, Counts from "./shapes.contract"
-use Option, personas, paletteColor, Tap, PillTap, Head from "./parts.contract"
-use Room, Chrome from "./room.contract"
-use PageTitle from "./calls.contract"
+// Settings (§10): hex's own page. Its face large with its name and what it's doing, the faces and
+// colours to pick, then how it reacts, its voice, the call's sounds and haptics, and the build this
+// phone runs. Voice and Your words open from it. With two columns a list and the page it opens sit
+// side by side (Settings beside Voice, Voice beside Your words); a room wider than tall flows each
+// into two columns of its own.
+use Settings, Counts, Tasks, Asks, Choice from "./shapes.contract"
+use Option, personas, paletteColor, Tap, PillTap from "./parts.contract"
+use Room, Chrome, stacked, homeRoomOf from "./room.contract"
+use VoiceBody, Seg, voiceName from "./voice.contract"
+use WordsBody from "./words.contract"
+use liveOf from "./home.contract"
+use entriesOf from "./inbox.contract"
 
 shape Swatch
   id: string
@@ -13,16 +18,32 @@ shape Swatch
 
 fn colors(): Swatch[] = [Swatch(id="#FFFFFF", label="White", color="#FFFFFF"), Swatch(id="#FFB3C7", label="Rose", color="#FFB3C7"), Swatch(id="#FFCDA8", label="Peach", color="#FFCDA8"), Swatch(id="#FFEDA6", label="Lemon", color="#FFEDA6"), Swatch(id="#D5F2B6", label="Lime", color="#D5F2B6"), Swatch(id="#C4F3E5", label="Mint", color="#C4F3E5"), Swatch(id="#A9CCFF", label="Sky", color="#A9CCFF"), Swatch(id="#CDB8FF", label="Lilac", color="#CDB8FF")]
 fn palettes(): Swatch[] = ["original", "2", "3", "4", "5", "6", "7", "8", "9"].map(p => Swatch(id=p, label=(p == "original" ? "Original" : p == "2" ? "Red" : p == "3" ? "Orange" : p == "4" ? "Yellow" : p == "5" ? "Green" : p == "6" ? "Teal" : p == "7" ? "Blue" : p == "8" ? "Purple" : "Pink"), color=paletteColor(p)))
-fn voiceName(id: string): string = id == "" ? "Marin" : `${id.slice(0, 1).toUpperCase()}${id.slice(1)}`
+fn reactions(): Choice[] = [Choice(id="off", label="Off"), Choice(id="subtle", label="Subtle"), Choice(id="lively", label="Lively")]
 
-component SettingsScreen
+// Where one page of Settings sits in the window, and which it is.
+shape Pane
+  page: string
+  x: number
+  top: number
+  width: number
+  height: number
+  // How far its end stands off the pane's foot, clear of the home indicator or a docked call.
+  pad: number
+
+component SettingsPages
   inject
     haptics: bool
   props
     entry: Entry
+    // settings | voice | words: the route that's open.
+    at: string
     room: Room
+    keyboard: number
     settings: Settings
     counts: Counts
+    tasks: Tasks
+    asks: Asks
+    now: number
     voice: string
     persona: string
     personaColor: string
@@ -31,6 +52,65 @@ component SettingsScreen
     sounds: bool
     still: bool
     docked: bool
+    inCall: bool
+    loading: bool
+    failed: bool
+    unsaved: bool
+    // The build this phone runs, 0 off the phone.
+    build: number
+    setPersona: action
+    setPersonaColor: action
+    setOpalPalette: action
+    setReaction: action
+    setSounds: action
+    setHaptics: action
+    set: action
+    preview: action
+    open: action
+    openTasks: action
+    back: action
+  derive two = room.columns == 2
+  derive lay = homeRoomOf(room)
+  // Open like a laptop, the list is the window above the hinge and the page the window below.
+  derive firstHeight = stacked(room) ? room.across - lay.below : room.height - lay.below
+  derive endPad = room.foot + (docked ? 88 : 24)
+  derive panes = two ? [Pane(page=(at == "words" ? "voice" : "settings"), x=lay.first.x, top=lay.below, width=lay.first.width, height=firstHeight, pad=(stacked(room) ? 12 : endPad)), Pane(page=(at == "words" ? "words" : "voice"), x=lay.second.x, top=lay.secondBelow, width=lay.second.width, height=room.height - lay.secondBelow, pad=endPad)] : [Pane(page=at, x=room.clear.x, top=room.below, width=room.clear.width, height=room.height - room.below, pad=endPad)]
+  derive tint = personaColor == "" ? "#FFFFFF" : personaColor
+  derive palette = opalPalette == "original" ? "" : opalPalette
+  // What hex is doing right now, as Home's pill says it.
+  derive working = entriesOf(tasks, asks, now).filter(e => e.stage == "working").length
+  derive live = match liveOf(tasks) { case some(t) => working > 1 ? `Working on ${t.name} +${working - 1}` : `Working on ${t.name}`, case none => "" }
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId=at
+      Chrome(room=room, on="settings", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
+      for p in panes key=p.page
+        column position="absolute" left=p.x top=p.top width=p.width height=p.height testId=`pane-${p.page}`
+          if p.page == "settings"
+            SettingsBody(settings=settings, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, still=still, live=live, build=build, width=p.width, wide=(p.width > p.height), pad=p.pad, voiceBeside=two, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, preview=preview)
+          else if p.page == "voice"
+            VoiceBody(settings=settings, voice=voice, persona=persona, tint=tint, palette=palette, inCall=inCall, loading=loading, failed=failed, unsaved=unsaved, wide=(p.width > p.height), pad=p.pad, sel=(two and at == "words" ? "words" : ""), besideWords=(two and at == "words"), preview=preview, set=set, open=open)
+          else
+            WordsBody(words=settings.words, pad=(keyboard > 0 ? 72 : p.pad + 56), bottom=(keyboard > 0 ? 8 : p.pad - 20), set=set, back=back)
+
+component SettingsBody
+  inject
+    haptics: bool
+  props
+    settings: Settings
+    voice: string
+    persona: string
+    personaColor: string
+    opalPalette: string
+    reaction: string
+    sounds: bool
+    still: bool
+    live: string
+    build: number
+    width: number
+    wide: bool
+    pad: number
+    // Voice is open beside it: its row is marked, and opens nothing more.
+    voiceBeside: bool
     setPersona: action
     setPersonaColor: action
     setOpalPalette: action
@@ -38,17 +118,11 @@ component SettingsScreen
     setSounds: action
     setHaptics: action
     preview: action
-    open: action
-    openTasks: action
-    back: action
-  derive two = room.columns == 2
-  derive faceWidth = two ? room.first.width : room.clear.width
-  derive rowsLeft = two ? room.second.x : room.clear.x
-  derive rowsWidth = two ? room.second.width : room.clear.width
-  derive pagerWidth = min(faceWidth - 40, 420)
-  derive voiceLine = `${voiceName(voice)}${match settings.personalities.filter(p => p.id == settings.personality and p.id != "default").at(0) { case some(p) => ` · ${p.label}`, case none => "" }}`
   derive chosenColor = personaColor == "" ? "#FFFFFF" : personaColor
-  derive faces = personas().map(o => Option(o, detail=`${o.detail} · swipe for other faces`))
+  derive voiceLine = `${voiceName(voice)}${match settings.personalities.filter(p => p.id == settings.personality and p.id != "default").at(0) { case some(p) => ` · ${p.label}`, case none => "" }}`
+  derive rowsWidth = wide ? width / 2 : width
+  // Each pick plays a short phrase on the orb, so its amount shows.
+  state spoken = 0
   action pickPersona(p: string)
     if haptics
       haptic("selection")
@@ -60,54 +134,26 @@ component SettingsScreen
       setOpalPalette(id)
     else
       setPersonaColor(id)
-  // Each pick plays a short phrase on the orb, so its amount shows.
-  state spoken = 0
   action pickReaction(r: string)
-    if haptics
-      haptic("selection")
     setReaction(r)
     spoken = spoken + 1
   view
-    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="settings"
-      Chrome(room=room, on="settings", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
-      if two
-        // Its own scroll, so folded on its side (a short window) the colours are never cut off.
-        scroll position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width overflow-y="auto" testId="settings-persona-pane"
-          column min-height="100%"
-            PageTitle(text="Voice and appearance", room=room, left=20, id="settings-title")
-            column flex=1 align-items="center" justify-content="center" gap=18 padding-top=12 padding-bottom=(room.foot + 24)
-              Face(persona=persona, tint=chosenColor, palette=opalPalette, reaction=reaction, still=still, spoken=spoken, size=min(200, max(120, room.height - 380)))
-              Pager(options=faces, value=persona, pick=pickPersona, replay=pickPersona, width=pagerWidth, locked=false, note="", label="Persona", testKey="persona")
-              Swatches(persona=persona, colors=colors(), palettes=palettes(), chosen=(persona == "opal" ? opalPalette : chosenColor), pick=pickSwatch)
-      scroll id="settings" position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=rowsLeft width=rowsWidth padding-bottom=(room.foot + (docked ? 88 : 24)) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="settings-scroll"
-        if not two
-          PageTitle(text="Voice and appearance", room=room, left=20, id="settings-title")
-          column align-items="center" gap=14 padding="16px 0 8px" testId="settings-persona"
-            Face(persona=persona, tint=chosenColor, palette=opalPalette, reaction=reaction, still=still, spoken=spoken, size=150)
-            Pager(options=faces, value=persona, pick=pickPersona, replay=pickPersona, width=pagerWidth, locked=false, note="", label="Persona", testKey="persona")
-            Swatches(persona=persona, colors=colors(), palettes=palettes(), chosen=(persona == "opal" ? opalPalette : chosenColor), pick=pickSwatch)
-        column padding="8px 20px 0"
-          Setting(icon="symbol:microphone", title="Reacts to you", line="How much hex’s face moves when you talk", stack=(rowsWidth < 460), last=false, id="setting-reaction")
-            row role="radiogroup" aria-label="How much the orb reacts to your voice" width=208 flex-shrink=0 testId="reaction"
-              for r in [Option(id="off", label="Off", detail=""), Option(id="subtle", label="Subtle", detail=""), Option(id="lively", label="Lively", detail="")] key=r.id
-                button role="radio" aria-checked=(reaction == r.id) press=pickReaction(r.id) flex=1 min-height=36 testId=`reaction-${r.id}`
-                  text r.label
-          row gap=4 align-items="center" min-height=64 testId="setting-voice"
-            link href=path("voice") class=Tap flex=1 min-width=0 display="flex" flex-direction="row" gap=14 align-items="center" padding="10px 0" aria-label=`Voice, ${voiceLine}. Change the voice and how it talks` testId="open-voice"
-              SettingLines(icon="symbol:waveform", title="Voice", line=`${voiceLine} · tap ▶ to hear it`)
-            button press=preview(voice) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Hear ${voiceName(voice)}` testId="hear-voice"
-              box width=40 height=40 border-radius=20 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
-                image "symbol:sf/play.fill" width=14 height=14 object-fit="contain" color="-exact-label"
-            link href=path("voice") class=Tap width=32 height=44 display="flex" align-items="center" justify-content="flex-end" aria-label="Change the voice" testId="open-voice-chevron"
-              image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
-          Head(label="Calls", n=-1, pad="24px 0 4px", id="settings-calls-head")
-          Setting(icon="symbol:speaker", title="Call sounds", line="A tone when a call starts and ends", stack=false, last=false, id="setting-sounds")
-            input type="checkbox" role="switch" accent-color="ink.switch" checked=sounds change=setSounds aria-label="Call sounds" testId="sounds"
-          Setting(icon="symbol:sf/hand.tap", title="Haptics", line="A light tap when you pick something", stack=false, last=true, id="setting-haptics")
-            input type="checkbox" role="switch" accent-color="ink.switch" checked=haptics change=setHaptics aria-label="Haptics" testId="haptics"
+    column position="absolute" inset=0 testId="settings-body"
+      if wide
+        row position="absolute" inset=0 gap=4
+          scroll flex=1 min-width=0 height="100%" padding-top=6 padding-bottom=pad box-sizing="border-box" testId="settings-persona-pane"
+            Look(persona=persona, tint=chosenColor, palette=opalPalette, reaction=reaction, still=still, spoken=spoken, live=live, disc=(width / 2 < 320 ? 76 : 92), small=true, pickPersona=pickPersona, pickSwatch=pickSwatch)
+          scroll flex=1 min-width=0 height="100%" padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="settings-scroll"
+            SettingRows(voiceLine=voiceLine, voice=voice, reaction=reaction, sounds=sounds, build=build, width=rowsWidth, voiceBeside=voiceBeside, pickReaction=pickReaction, setSounds=setSounds, setHaptics=setHaptics, preview=preview)
+      else
+        scroll position="absolute" inset=0 padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="settings-scroll"
+          Look(persona=persona, tint=chosenColor, palette=opalPalette, reaction=reaction, still=still, spoken=spoken, live=live, disc=(width > 420 ? 96 : 84), small=false, pickPersona=pickPersona, pickSwatch=pickSwatch)
+          box height=12
+          SettingRows(voiceLine=voiceLine, voice=voice, reaction=reaction, sounds=sounds, build=build, width=rowsWidth, voiceBeside=voiceBeside, pickReaction=pickReaction, setSounds=setSounds, setHaptics=setHaptics, preview=preview)
 
-// hex's face as it will look on Home, changing the moment a persona or colour is picked.
-component Face
+// hex as it will look: its face large with its name and what it's doing, then the faces and the
+// colours to pick, the chosen face named under them.
+component Look
   props
     persona: string
     tint: string
@@ -115,104 +161,142 @@ component Face
     reaction: string
     still: bool
     spoken: number
-    size: number
+    live: string
+    // The face's disc; the persona draws it in two thirds of its frame.
+    disc: number
+    small: bool
+    pickPersona: action
+    pickSwatch: action
+  derive chosen = match personas().filter(o => o.id == persona).at(0) { case some(o) => o, case none => Option(id=persona, label="", detail="") }
   view
-    // The orb draws its disc about two thirds of its frame, leaving room for its glow; the frame
-    // overlaps what's around it so the disc sits as close to its name as drawn.
-    box margin=`${-0.16 * size}px 0 ${-0.19 * size}px`
-      hex-orb state="idle" silenced="false" persona=persona tint=tint palette=(palette == "original" ? "" : palette) reaction=reaction still=(still ? "true" : "false") speak=`${spoken}` width=size height=size role="img" aria-label=`hex as ${persona}` testId="settings-orb"
-
-// One setting: its icon, its name, what it does in a grey line, and its control (children) on the
-// right, or under the words where the column is narrow.
-component Setting
-  props
-    icon: string
-    title: string
-    line: string
-    stack: bool
-    last: bool
-    id: string
-  slot
-  view
-    column border-bottom=(last ? "none" : "0.5px solid -exact-separator") testId=id
-      row gap=14 align-items="center" min-height=64 padding="10px 0" flex-wrap="nowrap"
-        SettingLines(icon=icon, title=title, line=line)
-        if not stack
-          children
-      if stack
-        row padding="0 0 12px 42px"
-          children
-
-component SettingLines
-  props
-    icon: string
-    title: string
-    line: string
-  view
-    image icon width=22 height=22 object-fit="contain" color="-exact-secondary-label" flex-shrink=0 aria-hidden=true
-    column flex=1 min-width=0 gap=2
-      text title font="-exact-body" color="-exact-label"
-      text line font="-exact-subheadline" color="-exact-secondary-label"
+    column align-items="center" testId="settings-persona"
+      box width=disc height=disc position="relative"
+        hex-orb state="idle" silenced="false" persona=persona tint=tint palette=(palette == "original" ? "" : palette) reaction=reaction still=(still ? "true" : "false") speak=`${spoken}` position="absolute" left=(-disc / 4) top=(-disc / 4) width=(disc * 1.5) height=(disc * 1.5) role="img" aria-label=`hex as ${chosen.label}` testId="settings-orb"
+      text "hex" font="-exact-title2" font-weight=600 color="-exact-label" margin-top=12
+      row gap=7 align-items="center" margin-top=2 max-width="90%" testId="settings-live"
+        if live != ""
+          row gap=3 flex-shrink=0 aria-hidden=true
+            for i in [0, 1, 2] key=i
+              box width=4 height=4 border-radius=2 background-color="hex.progress" opacity=(i == 0 ? 0.35 : i == 1 ? 0.65 : 1)
+        text (live != "" ? live : "Here when you need it") font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+      row role="radiogroup" aria-label="Persona" gap=(small ? 2 : 6) justify-content="center" margin-top=16
+        for o in personas() key=o.id
+          button role="radio" aria-checked=(o.id == persona) press=pickPersona(o.id) class=Tap width=(small ? 44 : 46) height=(small ? 44 : 46) border-radius=23 box-sizing="border-box" border=(o.id == persona ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" aria-label=`${o.label}, ${o.detail}` testId=`persona-${o.id}`
+            hex-orb state="idle" silenced="false" persona=o.id tint=tint palette=(palette == "original" ? "" : palette) reaction="off" still="true" speak="0" width=40 height=40 pointer-events="none" aria-hidden=true
+      row gap=6 justify-content="center" margin-top=6 aria-live="polite"
+        text chosen.label font="-exact-subheadline" font-weight=600 color="-exact-label"
+        text chosen.detail font="-exact-subheadline" color="-exact-secondary-label"
+      box height=12
+      Swatches(persona=persona, chosen=(persona == "opal" ? palette : tint), small=small, pick=pickSwatch)
 
 // The colours the orb can take: Opal's palettes, or the colour the other faces take. Mana keeps its own.
 component Swatches
   props
     persona: string
-    colors: Swatch[]
-    palettes: Swatch[]
     chosen: string
+    small: bool
     pick: action
-  derive set = persona == "opal" ? palettes : colors
-  derive custom = persona != "opal" and chosen != "" and colors.filter(c => c.id == chosen).length == 0
+  derive set = persona == "opal" ? palettes() : colors()
+  derive custom = persona != "opal" and chosen != "" and colors().filter(c => c.id == chosen).length == 0
+  derive ring = small ? 29 : 36
+  derive dot = small ? 21 : 26
   view
     column gap=8 align-items="center" testId="swatches"
-      row role="radiogroup" appearance="none" aria-label=(persona == "opal" ? "Opal colors" : persona == "mana" ? "Mana keeps its own color" : "Persona color") gap=6 justify-content="center" flex-wrap="wrap" opacity=(persona == "mana" ? 0.35 : 1)
+      row role="radiogroup" aria-label=(persona == "opal" ? "Opal colors" : persona == "mana" ? "Mana keeps its own color" : "Persona color") gap=(small ? 1 : 2) justify-content="center" flex-wrap="wrap" padding=(small ? "0" : "0 8px") opacity=(persona == "mana" ? 0.35 : 1)
         for s in set key=s.id
-          button role="radio" aria-checked=(chosen == s.id) press=pick(s.id) disabled=(persona == "mana") class=Tap width=36 height=36 border-radius=18 border=(chosen == s.id and persona != "mana" ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" aria-label=s.label testId=`swatch-${s.label}`
-            box width=26 height=26 border-radius=13 background-color=(persona == "mana" ? "-exact-tertiary-fill" : s.color == "" ? "transparent" : s.color) background-image=(persona != "mana" and s.color == "" ? "linear-gradient(135deg, #2FB5AD, #9B4DD6 50%, #F07B3F)" : "none") border="0.5px solid -exact-separator"
+          button role="radio" aria-checked=(chosen == s.id) press=pick(s.id) disabled=(persona == "mana") class=Tap width=ring height=ring border-radius=(ring / 2) box-sizing="border-box" border=(chosen == s.id and persona != "mana" ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" aria-label=s.label testId=`swatch-${s.label}`
+            box width=dot height=dot border-radius=(dot / 2) background-color=(persona == "mana" ? "-exact-tertiary-fill" : s.color == "" ? "transparent" : s.color) background-image=(persona != "mana" and s.color == "" ? "linear-gradient(135deg, #2FB5AD, #9B4DD6 50%, #F07B3F)" : "none") border="0.5px solid -exact-separator"
         // The persona's own colour, past the presets (not Opal's palettes; Mana keeps its own).
         if persona != "opal" and persona != "mana"
-          box width=36 height=36 border-radius=18 border=(custom ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" testId="swatch-custom"
-            hex-color hue=chosen custom=(custom ? "true" : "false") change=pick width=28 height=28 aria-label=(custom ? "Custom color, selected" : "Custom color") testId="custom-color"
+          box width=ring height=ring border-radius=(ring / 2) box-sizing="border-box" border=(custom ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" testId="swatch-custom"
+            hex-color hue=chosen custom=(custom ? "true" : "false") change=pick width=(dot + 2) height=(dot + 2) aria-label=(custom ? "Custom color, selected" : "Custom color") testId="custom-color"
       if persona == "mana"
         text "Mana keeps its own color" font="-exact-footnote" color="-exact-secondary-label" testId="mana-note"
 
-// Swipe between a few things, one a page, each named with a line under it; tap one to hear it again.
-// The dots say where you are.
-component Pager
+// Voice, how hex reacts, then the call's sounds and haptics, and the build at the foot.
+component SettingRows
+  inject
+    haptics: bool
   props
-    options: Option[]
-    value: string
-    pick: action
-    replay: action
+    voiceLine: string
+    voice: string
+    reaction: string
+    sounds: bool
+    build: number
     width: number
-    locked: bool
-    note: string
-    label: string
-    testKey: string
-  state x = 0
-  derive index = max(0, options.map(o => o.id).indexOf(value))
-  action moved(left: number, top: number)
-    x = left
-  action settled
-    match options.at(round(x / width))
-      case some(o)
-        if o.id != value
-          pick(o.id)
-      case none
-        x = x
+    voiceBeside: bool
+    pickReaction: action
+    setSounds: action
+    setHaptics: action
+    preview: action
   view
-    column align-items="center" gap=10 width=width aria-label=label testId=`pager-${testKey}`
-      if locked
-        column width=width align-items="center" gap=2 padding="6px 0" testId=`pager-${testKey}-locked`
-          text (match options.at(index) { case some(o) => o.label, case none => "" }) font="-exact-title2" font-weight=600
-          text note font="-exact-subheadline" color="-exact-secondary-label" text-align="center"
+    column
+      row gap=12 align-items="center" min-height=52 padding=(voiceBeside ? "0 10px" : "0 16px") margin=(voiceBeside ? "0 6px" : "0") border-radius=14 background-color=(voiceBeside ? "-exact-tertiary-fill" : "transparent") testId="setting-voice"
+        if voiceBeside
+          row flex=1 min-width=0 gap=12 align-items="center" min-height=52 aria-current=true testId="open-voice"
+            Icon(symbol="symbol:waveform")
+            text "Voice" font="-exact-body" color="-exact-label" flex=1
+            text voiceLine font="-exact-body" color="-exact-secondary-label" line-clamp=1
+        else
+          link href=path("voice") class=Tap flex=1 min-width=0 display="flex" flex-direction="row" gap=12 align-items="center" min-height=52 aria-label=`Voice, ${voiceLine}. Change the voice and how it talks` testId="open-voice"
+            Icon(symbol="symbol:waveform")
+            text "Voice" font="-exact-body" color="-exact-label" flex=1
+            text voiceLine font="-exact-body" color="-exact-secondary-label" line-clamp=1
+        button press=preview(voice) class=PillTap margin="0 -6px" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Hear ${voiceName(voice)}` testId="hear-voice"
+          box width=32 height=32 border-radius=16 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
+            image "symbol:sf/play.fill" width=13 height=13 object-fit="contain" color="-exact-label"
+        if not voiceBeside
+          image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+      Hair()
+      if width < 360
+        Line(symbol="symbol:microphone", title="Reacts to you", line="How much hex’s face moves when you talk", id="setting-reaction")
+        box padding="0 16px 10px 50px" margin-top=-6
+          Seg(options=reactions(), value=reaction, pick=pickReaction, label="How much the orb reacts to your voice", testKey="reaction")
+      else if width < 460
+        row gap=12 align-items="center" min-height=52 padding="10px 16px 6px" testId="setting-reaction"
+          Icon(symbol="symbol:microphone")
+          text "Reacts to you" font="-exact-body" color="-exact-label" flex=1 min-width=0
+          box width=172 flex-shrink=0
+            Seg(options=reactions(), value=reaction, pick=pickReaction, label="How much the orb reacts to your voice", testKey="reaction")
+        text "How much hex’s face moves when you talk" font="-exact-footnote" color="-exact-secondary-label" padding="0 16px 10px 50px" margin-top=-6
       else
-        scroll display="flex" flex-direction="row" width=width overflow-x="scroll" overflow-y="hidden" scroll-snap-type="x mandatory" scrollbar-width="none" scrollLeft=(index * width) scroll=moved scrollend=settled testId=`pager-${testKey}-scroll`
-          for o in options key=o.id
-            button press=replay(o.id) class=Tap width=width flex-shrink=0 scroll-snap-align="center" display="flex" flex-direction="column" align-items="center" gap=2 padding="6px 0" aria-label=`${o.label}, ${o.detail}` aria-current=(o.id == value) testId=`${testKey}-${o.id}`
-              text o.label font="-exact-title2" font-weight=600 color="-exact-label"
-              text o.detail font="-exact-subheadline" color="-exact-secondary-label" text-align="center" white-space="nowrap"
-        row gap=6 justify-content="center" aria-hidden=true
-          for o in options key=o.id
-            box width=6 height=6 border-radius=3 background-color="-exact-label" opacity=(o.id == value ? 0.9 : 0.2)
+        Line(symbol="symbol:microphone", title="Reacts to you", line="How much hex’s face moves when you talk", id="setting-reaction")
+          box width=204 flex-shrink=0
+            Seg(options=reactions(), value=reaction, pick=pickReaction, label="How much the orb reacts to your voice", testKey="reaction")
+      box height=10
+      row height=32 align-items="flex-end" padding="0 16px 6px"
+        text "Calls" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label"
+      Line(symbol="symbol:speaker", title="Call sounds", line="A tone when a call starts and ends", id="setting-sounds")
+        input type="checkbox" role="switch" accent-color="ink.switch" checked=sounds change=setSounds aria-label="Call sounds" testId="sounds"
+      Hair()
+      Line(symbol="symbol:sf/hand.tap", title="Haptics", line="A light tap when you pick something", id="setting-haptics")
+        input type="checkbox" role="switch" accent-color="ink.switch" checked=haptics change=setHaptics aria-label="Haptics" testId="haptics"
+      text (build > 0 ? `hex Exact · build ${build}` : "hex Exact") font="-exact-footnote" color="-exact-tertiary-label" padding="18px 16px 0 50px" font-variant-numeric="tabular-nums" testId="settings-build"
+
+// One setting: its icon, its name, what it does in a grey line, and its control (children) at the end.
+component Line
+  props
+    symbol: string
+    title: string
+    line: string
+    id: string
+  slot
+  view
+    row gap=12 align-items="center" min-height=52 padding="10px 16px" testId=id
+      Icon(symbol=symbol)
+      column flex=1 min-width=0
+        text title font="-exact-body" color="-exact-label"
+        text line font="-exact-footnote" color="-exact-secondary-label"
+      children
+
+component Icon
+  props
+    symbol: string
+  view
+    box width=22 display="flex" justify-content="center" flex-shrink=0
+      image symbol width=20 height=20 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+
+// A hairline between rows, from where their words start.
+component Hair
+  view
+    box height=0.5 margin="5px 0 5px 48px" background-color="-exact-separator"

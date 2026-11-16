@@ -1,22 +1,21 @@
 // Your words (§10): a short note on how hex should talk, for every call. Saved with Done, and when
 // the field lets go. A page like Voice, not a sheet: a sheet grows under the Duo's status icons
 // when the keyboard is up, and its Done went under the battery.
-use Counts from "./shapes.contract"
-use Room, Chrome from "./room.contract"
-use PageTitle from "./calls.contract"
+use Primary from "./parts.contract"
 
-component YourWords
+fn wordsMax(): number = 600
+
+component WordsBody
   props
-    entry: Entry
-    room: Room
-    counts: Counts
     words: string
+    // How far the page's end and Done stand off the pane's foot.
+    pad: number
+    bottom: number
     set: action
-    open: action
-    openTasks: action
     back: action
   state draft = ""
   state touched = false
+  derive shown = touched ? draft : words
   action edit(v: string)
     draft = v
     touched = true
@@ -28,10 +27,16 @@ component YourWords
       save(draft)
     back()
   view
-    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="words"
-      Chrome(room=room, on="settings", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=done)
-      scroll position="absolute" top=(room.columns == 2 ? room.secondBelow : room.below) bottom=0 left=(room.columns == 2 ? room.second.x : room.clear.x) width=(room.columns == 2 ? room.second.width : room.clear.width) padding-bottom=(room.foot + 24) box-sizing="border-box"
-        column min-height=(room.columns == 2 ? 0 : max(0, room.headBottom - room.below))
-          PageTitle(text="Your words", room=room, left=20, id="words-title")
-        text "How hex talks to you, on every call. Back keeps it." font="-exact-subheadline" color="-exact-secondary-label" padding="2px 20px 0"
-        textarea value=(touched ? draft : words) input=edit change=save maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="12px 20px 0" width="calc(100% - 40px)" box-sizing="border-box" min-height=160 padding="12px 14px" border-radius=16 background-color="-exact-tertiary-fill" font="-exact-body" aria-label="Your words" testId="words-field"
+    column position="absolute" inset=0
+      scroll position="absolute" inset=0 padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="words-body"
+        text "Your words" role="heading" aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label" padding="0 16px" testId="words-title"
+        text "How hex talks on every call, phone calls too." font="-exact-subheadline" color="-exact-secondary-label" padding="2px 16px 0"
+        textarea value=shown input=edit change=save maxlength=wordsMax() placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="14px 12px 0" box-sizing="border-box" min-height=120 field-sizing="content" padding="14px 16px 16px" border-radius=20 background-color="-exact-quaternary-fill" font="-exact-body" color="-exact-label" aria-label="Your words" testId="words-field"
+        row gap=10 align-items="center" padding="10px 16px 0" aria-hidden=true
+          box flex=1 height=4 border-radius=2 background-color="-exact-quaternary-fill" overflow="hidden"
+            box height=4 border-radius=2 width=`${min(100, shown.length / wordsMax() * 100)}%` background-color="-exact-tertiary-label"
+          text `${shown.length} / ${wordsMax()}` font="-exact-footnote" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+      // Done, floating at the foot's trailing corner: saves and goes back.
+      button press=done class=Primary position="absolute" right=12 bottom=bottom z-index=5 padding="0 18px" testId="words-done"
+        image "symbol:checkmark" width=15 height=15 object-fit="contain" color="-exact-background" aria-hidden=true
+        text "Done" font="-exact-body" font-weight=600 color="-exact-background"

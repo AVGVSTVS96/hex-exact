@@ -1,101 +1,182 @@
-// Voice (§10, second page): which of hex's voices answers (swipe to hear each), its personality and
-// pace, and Bassim's own words on how it should talk. Kept on hex, so every call hears them, phone
-// calls too. The voice can't change mid-call.
-use Settings, Counts from "./shapes.contract"
-use Option, Tap from "./parts.contract"
-use Pager, Setting from "./settings.contract"
-use Room, Chrome from "./room.contract"
-use PageTitle from "./calls.contract"
+// Voice (§10, second page): which of hex's voices answers, how it comes across, its pace, and
+// Bassim's own words on how it should talk. Kept on hex, so every call hears them, phone calls too.
+// The voice can't change mid-call. Wider than tall, the voice and how it talks on the left and the
+// voices on the right.
+use Settings, Choice from "./shapes.contract"
+use Option, Tap, PillTap from "./parts.contract"
 
 // The Live API's voices, Marin first, each with its accent where it has one.
-fn voices(): Option[] = [Option(id="marin", label="Marin", detail=""), Option(id="alloy", label="Alloy", detail=""), Option(id="ash", label="Ash", detail=""), Option(id="ballad", label="Ballad", detail=""), Option(id="beacon", label="Beacon", detail="Filipino English"), Option(id="bossa", label="Bossa", detail="Brazilian Portuguese"), Option(id="cedar", label="Cedar", detail=""), Option(id="cinder", label="Cinder", detail="Southern U.S. English"), Option(id="coral", label="Coral", detail=""), Option(id="delta", label="Delta", detail="Southern U.S. English"), Option(id="echo", label="Echo", detail=""), Option(id="gleam", label="Gleam", detail="North American English"), Option(id="meridian", label="Meridian", detail="North American English"), Option(id="quartz", label="Quartz", detail="Australian English"), Option(id="ripple", label="Ripple", detail="Australian English"), Option(id="sage", label="Sage", detail=""), Option(id="shimmer", label="Shimmer", detail=""), Option(id="stone", label="Stone", detail="Irish English"), Option(id="tempo", label="Tempo", detail="Brazilian Portuguese"), Option(id="verse", label="Verse", detail=""), Option(id="vesper", label="Vesper", detail="British English"), Option(id="willow", label="Willow", detail="Irish English")].map(v => Option(v, detail=(v.detail == "" ? "Swipe to hear each voice" : v.detail)))
+fn voices(): Option[] = [Option(id="marin", label="Marin", detail=""), Option(id="alloy", label="Alloy", detail=""), Option(id="ash", label="Ash", detail=""), Option(id="ballad", label="Ballad", detail=""), Option(id="beacon", label="Beacon", detail="Filipino English"), Option(id="bossa", label="Bossa", detail="Brazilian Portuguese"), Option(id="cedar", label="Cedar", detail=""), Option(id="cinder", label="Cinder", detail="Southern U.S. English"), Option(id="coral", label="Coral", detail=""), Option(id="delta", label="Delta", detail="Southern U.S. English"), Option(id="echo", label="Echo", detail=""), Option(id="gleam", label="Gleam", detail="North American English"), Option(id="meridian", label="Meridian", detail="North American English"), Option(id="quartz", label="Quartz", detail="Australian English"), Option(id="ripple", label="Ripple", detail="Australian English"), Option(id="sage", label="Sage", detail=""), Option(id="shimmer", label="Shimmer", detail=""), Option(id="stone", label="Stone", detail="Irish English"), Option(id="tempo", label="Tempo", detail="Brazilian Portuguese"), Option(id="verse", label="Verse", detail=""), Option(id="vesper", label="Vesper", detail="British English"), Option(id="willow", label="Willow", detail="Irish English")]
+fn accents(): string[] = voices().map(v => v.detail).filter((a, i) => a != "" and voices().map(v => v.detail).indexOf(a) == i)
+fn voiceName(id: string): string = id == "" ? "Marin" : `${id.slice(0, 1).toUpperCase()}${id.slice(1)}`
+fn labelOf(list: Choice[], id: string): string = match list.filter(c => c.id == id).at(0) { case some(c) => c.label, case none => "" }
 
-component VoicePage
+// A few choices side by side in one well, the chosen one lifted.
+component Seg
   inject
     haptics: bool
   props
-    entry: Entry
-    room: Room
+    options: Choice[]
+    value: string
+    pick: action
+    label: string
+    testKey: string
+  view
+    row role="radiogroup" aria-label=label padding=2 border-radius=10 background-color="-exact-quaternary-fill" testId=testKey
+      for o in options key=o.id
+        button role="radio" aria-checked=(value == o.id) press=pick(o.id) class=Tap flex=1 min-width=0 height=32 border-radius=8 display="flex" align-items="center" justify-content="center" background-color=(value == o.id ? "light-dark(#FFFFFF, rgba(120,120,128,0.5))" : "transparent") box-shadow=(value == o.id ? "0 1px 4px light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0))" : "none") -exact-press-haptic=(haptics ? "selection" : "none") testId=`${testKey}-${o.id}`
+          text o.label font="-exact-subheadline" font-weight=(value == o.id ? 600 : 400) color=(value == o.id ? "-exact-label" : "-exact-secondary-label") white-space="nowrap"
+
+// A voice to pick: the chosen one in ink with a waveform.
+component VoiceChip
+  props
+    v: Option
+    on: bool
+    locked: bool
+    press: action
+  view
+    button press=press disabled=locked class=Tap height=34 border-radius=17 padding="0 13px" display="flex" flex-direction="row" align-items="center" gap=5 flex-shrink=0 background-color=(on ? "-exact-label" : "-exact-quaternary-fill") opacity=(locked and not on ? 0.4 : 1) role="radio" aria-checked=on aria-label=(v.detail == "" ? v.label : `${v.label}, ${v.detail}`) testId=`voice-${v.id}`
+      if on
+        image "symbol:waveform" width=14 height=14 object-fit="contain" color="-exact-background" aria-hidden=true
+      text v.label font="-exact-subheadline" font-weight=(on ? 600 : 500) color=(on ? "-exact-background" : "-exact-label")
+
+component VoiceBody
+  inject
+    haptics: bool
+  props
     settings: Settings
-    counts: Counts
     voice: string
+    persona: string
+    tint: string
+    palette: string
     inCall: bool
-    docked: bool
     loading: bool
     failed: bool
     unsaved: bool
-    // Plays a voice's sample (the shell's, so the silent switch doesn't hush it).
+    wide: bool
+    // How far the page's end stands off the pane's foot.
+    pad: number
+    // Its rows opened beside it: "words" marks Your words.
+    sel: string
+    // Opened beside it, Your words is already there.
+    besideWords: bool
     preview: action
     set: action
     open: action
-    openTasks: action
-    back: action
-  derive two = room.columns == 2
-  derive rowsLeft = two ? room.second.x : room.clear.x
-  derive rowsWidth = two ? room.second.width : room.clear.width
-  derive pagerWidth = min((two ? room.first.width : room.clear.width) - 40, 420)
-  derive chosen = voice
   derive locked = inCall or (loading and not failed and settings.voice == "")
   // hex keeps personality and pace; until it answers they have nothing to show.
   derive known = settings.paces.length > 0
-  derive note = inCall ? "End the call to change voices." : "Loading your voice…"
   // What Bassim just picked shows at once; hex's answer follows.
   state pickedPace = ""
   state pickedPersonality = ""
   derive personality = pickedPersonality != "" ? pickedPersonality : settings.personality != "" ? settings.personality : "default"
   derive pace = pickedPace != "" ? pickedPace : settings.pace != "" ? settings.pace : "normal"
+  derive how = known ? `${labelOf(settings.personalities, personality)} · ${labelOf(settings.paces, pace)} pace` : failed ? "Can't reach hex" : "Asking hex…"
+  derive plainVoices = voices().filter(v => v.detail == "")
   action choose(id: string)
-    if haptics
-      haptic("selection")
-    set("voice", id)
-    preview(id)
-  action hear(id: string)
-    if id == chosen
+    if id == voice
       preview(id)
     else
-      choose(id)
+      if haptics
+        haptic("selection")
+      set("voice", id)
+      preview(id)
+  action goWords
+    if not besideWords
+      open(path("words"))
   action pickPace(p: string)
-    if haptics
-      haptic("selection")
     pickedPace = p
     set("pace", p)
   action pickPersonality(p: string)
-    if haptics
-      haptic("selection")
     pickedPersonality = p
     set("personality", p)
   view
-    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="voice"
-      Chrome(room=room, on="settings", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
-      if two
-        column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="voice-pane"
-          PageTitle(text="Voice", room=room, left=20, id="voice-title")
-          column flex=1 align-items="center" justify-content="center" gap=18 padding-bottom=(room.foot + 24)
-            image "symbol:waveform" width=56 height=56 object-fit="contain" color="-exact-label" aria-hidden=true
-            Pager(options=voices(), value=chosen, pick=choose, replay=hear, width=pagerWidth, locked=locked, note=note, label="Voice", testKey="voice")
-      scroll id="voice" position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=rowsLeft width=rowsWidth padding-bottom=(room.foot + (docked ? 88 : 24)) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="voice-scroll"
-        if not two
-          PageTitle(text="Voice", room=room, left=20, id="voice-title")
-          column align-items="center" gap=12 padding="20px 0 12px" testId="voice-carousel"
-            image "symbol:waveform" width=34 height=34 object-fit="contain" color="-exact-label" aria-hidden=true
-            Pager(options=voices(), value=chosen, pick=choose, replay=hear, width=pagerWidth, locked=locked, note=note, label="Voice", testKey="voice")
-        column padding="8px 20px 0"
-          Setting(icon="symbol:sf/person.wave.2", title="Personality", line=(known ? "How hex comes across" : failed ? "Can't reach hex to read it" : "Asking hex…"), stack=false, last=false, id="setting-personality")
-            if known
-              select value=personality change=pickPersonality disabled=(settings.personalities.length == 0) aria-label="How hex comes across on calls" testId="personality"
-                for p in settings.personalities key=p.id
-                  option value=p.id
-                    text p.label
-          Setting(icon="symbol:sf/speedometer", title="Pace", line=(known ? "How fast hex talks" : failed ? "Can't reach hex to read it" : "Asking hex…"), stack=(rowsWidth < 460), last=false, id="setting-pace")
-            if known
-              row role="radiogroup" aria-label="How fast hex talks on calls" width=224 flex-shrink=0 testId="pace"
-                for p in settings.paces key=p.id
-                  button role="radio" aria-checked=(pace == p.id) press=pickPace(p.id) flex=1 min-height=36 testId=`pace-${p.id}`
-                    text p.label
-          link href=path("words") class=Tap display="flex" flex-direction="row" gap=14 align-items="center" min-height=64 padding="10px 0" aria-label=(settings.words == "" ? "Your words: tell hex how to talk" : `Your words: ${settings.words}`) testId="open-words"
-            image "symbol:sf/text.quote" width=22 height=22 object-fit="contain" color="-exact-secondary-label" flex-shrink=0 aria-hidden=true
-            column flex=1 min-width=0 gap=2
-              text "Your words" font="-exact-body" color="-exact-label"
-              text (settings.words == "" ? "Tell hex how to talk, in your own words" : settings.words) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
-            image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" flex-shrink=0 aria-hidden=true
-          text (failed ? "Can't reach hex right now." : unsaved ? "hex didn't save that. Try again." : "For every call, phone calls too.") font="-exact-footnote" color=(failed or unsaved ? "hex.danger" : "-exact-secondary-label") padding="12px 0" testId="voice-note"
+    column position="absolute" inset=0 testId="voice-body"
+      if wide
+        row position="absolute" inset=0 gap=4
+          scroll flex=1 min-width=0 height="100%" padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="voice-scroll"
+            VoiceTop(settings=settings, voice=voice, persona=persona, tint=tint, palette=palette, inCall=inCall, failed=failed, unsaved=unsaved, known=known, how=how, personality=personality, pace=pace, sel=sel, wide=wide, preview=preview, pickPersonality=pickPersonality, pickPace=pickPace, goWords=goWords)
+          scroll flex=1 min-width=0 height="100%" padding-top=4 padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="voices-scroll"
+            Voices(plain=plainVoices, voice=voice, locked=locked, inCall=inCall, choose=choose)
+      else
+        scroll position="absolute" inset=0 padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="voice-scroll"
+          VoiceTop(settings=settings, voice=voice, persona=persona, tint=tint, palette=palette, inCall=inCall, failed=failed, unsaved=unsaved, known=known, how=how, personality=personality, pace=pace, sel=sel, wide=wide, preview=preview, pickPersonality=pickPersonality, pickPace=pickPace, goWords=goWords)
+          Voices(plain=plainVoices, voice=voice, locked=locked, inCall=inCall, choose=choose)
+
+// The voice, how it talks, and his words, with what's become of the last change.
+component VoiceTop
+  inject
+    haptics: bool
+  props
+    settings: Settings
+    voice: string
+    persona: string
+    tint: string
+    palette: string
+    inCall: bool
+    failed: bool
+    unsaved: bool
+    known: bool
+    how: string
+    personality: string
+    pace: string
+    sel: string
+    wide: bool
+    preview: action
+    pickPersonality: action
+    pickPace: action
+    goWords: action
+  view
+    column
+      text "Voice" role="heading" aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label" padding="0 16px" testId="voice-title"
+      row gap=14 align-items="center" padding=(wide ? "12px 16px 6px" : "14px 16px 6px") testId="voice-hero"
+        // The persona draws its disc in two thirds of its frame.
+        box width=56 height=56 position="relative" flex-shrink=0
+          hex-orb state="idle" silenced="false" persona=persona tint=tint palette=palette reaction="off" still="true" speak="0" position="absolute" left=-14 top=-14 width=84 height=84 aria-hidden=true
+        column flex=1 min-width=0
+          text voiceName(voice) font="-exact-title2" font-weight=600 color="-exact-label"
+          text how font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
+        button press=preview(voice) disabled=inCall class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Hear ${voiceName(voice)}` testId="hear-voice"
+          box width=44 height=44 border-radius=22 background-color="-exact-label" display="flex" align-items="center" justify-content="center" opacity=(inCall ? 0.4 : 1)
+            image "symbol:sf/play.fill" width=17 height=17 object-fit="contain" color="-exact-background"
+      if known
+        column gap=6 padding="6px 16px 8px"
+          text "Personality" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+          Seg(options=settings.personalities, value=personality, pick=pickPersonality, label="How hex comes across on calls", testKey="personality")
+        column gap=6 padding="6px 16px 8px"
+          text "Pace" font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+          Seg(options=settings.paces, value=pace, pick=pickPace, label="How fast hex talks on calls", testKey="pace")
+      button press=goWords class=Tap display="flex" flex-direction="row" gap=12 align-items="flex-start" text-align="left" padding="10px" margin="4px 6px 0" border-radius=14 background-color=(sel == "words" ? "-exact-tertiary-fill" : "transparent") aria-current=(sel == "words") aria-label=(settings.words == "" ? "Your words: tell hex how to talk" : `Your words: ${settings.words}`) testId="open-words"
+        box width=22 display="flex" justify-content="center" padding-top=2 flex-shrink=0
+          image "symbol:sf/quote.opening" width=18 height=18 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+        column flex=1 min-width=0
+          text "Your words" font="-exact-body" color="-exact-label"
+          text (settings.words == "" ? "Tell hex how to talk, in your own words" : `“${settings.words}”`) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=3
+        image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" align-self="center" flex-shrink=0 aria-hidden=true
+      text (failed ? "Can't reach hex right now." : unsaved ? "hex didn't save that. Try again." : "For every call, phone calls too.") font="-exact-footnote" color=(failed or unsaved ? "hex.danger" : "-exact-tertiary-label") padding="0 16px 6px 50px" testId="voice-note"
+
+// Every voice as a chip: those without an accent together, then a row per accent.
+component Voices
+  props
+    plain: Option[]
+    voice: string
+    locked: bool
+    inCall: bool
+    choose: action
+  view
+    column role="radiogroup" aria-label="Voice" testId="voices"
+      row height=32 align-items="flex-end" padding="0 16px 6px"
+        text "Voices" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" flex=1
+        text `${voices().length}` font="-exact-footnote" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+      if locked
+        text (inCall ? "End the call to change voices." : "Loading your voice…") font="-exact-footnote" color="-exact-secondary-label" padding="0 16px 6px" testId="voice-locked"
+      row flex-wrap="wrap" gap=6 padding="0 16px"
+        for v in plain key=v.id
+          VoiceChip(v=v, on=(v.id == voice), locked=locked, press=choose(v.id))
+      column margin-top=8 padding="0 16px"
+        for a in accents() key=a
+          row gap=10 align-items="center" min-height=40
+            text a font="-exact-footnote" color="-exact-secondary-label" width=118 flex-shrink=0
+            row gap=6
+              for v in voices().filter(x => x.detail == a) key=v.id
+                VoiceChip(v=v, on=(v.id == voice), locked=locked, press=choose(v.id))

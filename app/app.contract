@@ -14,9 +14,7 @@ use Picks from "./picks.contract"
 use Pick from "./pick.contract"
 use LastCheck, CheckBody from "./last-check.contract"
 use NeedsPage from "./needs.contract"
-use SettingsScreen from "./settings.contract"
-use VoicePage from "./voice.contract"
-use YourWords from "./words.contract"
+use SettingsPages from "./settings.contract"
 use UpdateToast, noticeOf from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
@@ -883,12 +881,8 @@ component App
           Pick(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, openTasks=openTasks, now=now, offset=clock.utcOffset, asks=asks, picked=picked, words=words, wordsAsk=wordsId, showWords=showWords, pick=pick, open=open, back=back)
         if e.name == "check"
           LastCheck(entry=e, viewport=viewport, room=homeRoom, needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
-        if e.name == "settings"
-          SettingsScreen(entry=e, room=room, settings=settings, counts=counts, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, still=still, docked=callOn, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, preview=previewVoice, open=open, openTasks=openTasks, back=back)
-        if e.name == "voice"
-          VoicePage(entry=e, room=room, settings=settings, counts=counts, voice=voice, inCall=(call.status != "idle"), docked=callOn, loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), set=setSetting, preview=previewVoice, open=open, openTasks=openTasks, back=back)
-        if e.name == "words"
-          YourWords(entry=e, room=room, counts=counts, words=settings.words, set=setSetting, open=open, openTasks=openTasks, back=back)
+        if e.name == "settings" or e.name == "voice" or e.name == "words"
+          SettingsPages(entry=e, at=e.name, room=room, keyboard=viewport.keyboardHeight, settings=settings, counts=counts, tasks=tasks, asks=asks, now=now, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, still=still, docked=callOn, inCall=(call.status != "idle"), loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), build=build.running, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, set=setSetting, preview=previewVoice, open=open, openTasks=openTasks, back=back)
       input id="opened" display="none" change=heardOpen
       // A page scrolled under the clock, battery or cameras goes under the page's background there,
       // fading out at its foot, as iOS does under its status bar.

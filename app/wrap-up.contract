@@ -28,13 +28,6 @@ fn secondsOf(r: CallRecord): number = r.call.seconds > 0 ? r.call.seconds : r.ca
 fn lastOf(tasks: CallTask[], id: string): CallTask = match tasks.filter(t => t.id == id).at(-1) { case some(t) => t, case none => CallTask(id="", state="", at=0, text="", to="") }
 fn sentOf(r: CallRecord): Sent[] = sortBy(sortBy(r.moments.filter(m => m.kind == "answered").map(m => Sent(at=m.at, to=m.topic, text=m.text, done=true)).concat(r.tasks.filter((t, i) => r.tasks.map(x => x.id).indexOf(t.id) == i).map(t => Sent(at=t.at, to=(lastOf(r.tasks, t.id).to != "" ? lastOf(r.tasks, t.id).to : t.to), text=t.text, done=(lastOf(r.tasks, t.id).state == "done")))), s => s.at), s => (s.done ? 1 : 0))
 
-// hex's lane takes the orb's colours along the call: green, then violet, then magenta.
-fn mixOf(a: number, b: number, t: number): number = round(a + (b - a) * t)
-fn rgbOf(r0: number, g0: number, b0: number, r1: number, g1: number, b1: number, t: number): string = `rgb(${mixOf(r0, r1, t)}, ${mixOf(g0, g1, t)}, ${mixOf(b0, b1, t)})`
-fn darkInk(t: number): string = t < 0.5 ? rgbOf(78, 168, 92, 168, 92, 176, t * 2) : rgbOf(168, 92, 176, 190, 60, 128, t * 2 - 1)
-fn lightInk(t: number): string = t < 0.5 ? rgbOf(232, 140, 92, 176, 132, 224, t * 2) : rgbOf(176, 132, 224, 120, 112, 230, t * 2 - 1)
-fn hexInk(t: number): string = `light-dark(${lightInk(t)}, ${darkInk(t)})`
-
 component WrapUp
   inject
     haptics: bool
@@ -76,9 +69,9 @@ component WrapBody
   derive sent = sentOf(record)
   derive shown = rows <= 0 ? sent : sent.slice(0, rows)
   view
-    row gap=8 align-items="center" padding="0 16px" min-height=24
-      text (c.live ? "Live now" : `${endWord(c.ending) != "" ? endWord(c.ending) : "Ended"}${bad and c.reason != "" ? ` · ${whyOf(c.reason)}` : ""}`) font="-exact-subheadline" font-weight=600 color=(c.live ? "hex.progress" : bad ? "hex.danger" : "-exact-secondary-label") flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" testId="wrap-up-ending"
-      text `${dayName(c.started, now, offset)} · ${formatTime(c.started, offset, "short")}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" flex-shrink=0
+    row column-gap=8 flex-wrap="wrap" align-items="center" padding="0 16px" min-height=24
+      text (c.live ? "Live now" : `${endWord(c.ending) != "" ? endWord(c.ending) : "Ended"}${bad and c.reason != "" ? ` · ${whyOf(c.reason)}` : ""}`) font="-exact-subheadline" font-weight=600 color=(c.live ? "hex.progress" : bad ? "hex.danger" : "-exact-secondary-label") testId="wrap-up-ending"
+      text `${dayName(c.started, now, offset)} · ${formatTime(c.started, offset, "short")}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" margin-left="auto"
     row gap=8 align-items="flex-start" padding="2px 16px 0"
       text callName(c) role=(heading ? "heading" : "none") aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label" line-clamp=2 flex=1 min-width=0 user-select=(heading ? "text" : "none") testId="wrap-up-title"
       children
@@ -99,7 +92,7 @@ component WrapBody
       StageHead(state="decided", label="Sent from the call", n=sent.length, known=true, pad="9px 16px", id="wrap-up-sent")
       for s, i in shown key=`${i}`
         row gap=10 align-items="flex-start" padding="9px 16px" testId=`wrap-up-sent-${i}`
-          RowLines(mark=(s.done ? "done" : "working"), title=(s.to != "" ? s.to : "hex"), line=s.text, lines=2, failed=false, stamp=clockOf(s.at), n=0, agents=0)
+          RowLines(mark=(s.done ? "done" : "working"), title=(s.to != "" ? s.to : "hex"), line=s.text, lines=2, failed=false, stamp=(s.at <= ms ? clockOf(s.at) : ""), n=0, agents=0)
       if shown.length < sent.length
         row gap=10 align-items="center" padding="8px 16px 10px" testId="wrap-up-more"
           column width=22 gap=3 align-items="center" flex-shrink=0 aria-hidden=true
@@ -128,7 +121,7 @@ component Strip
           box position="absolute" left=0 right=0 top=7 height=1 background-color="-exact-separator"
           box position="absolute" left=0 right=0 top=22 height=1 background-color="-exact-separator"
           for t, i in record.turns key=`${i}`
-            box position="absolute" top=(t.who == "you" ? 3.5 : 18.5) left=`${min(t.at, span) / span * 100}%` width=`${min(t.text.split(" ").length / 2.5 * 1000, span - min(t.at, span)) / span * 100}%` min-width=2 height=8 border-radius=4 background-color=(t.who == "you" ? "-exact-label" : hexInk(min(t.at, span) / span))
+            box position="absolute" top=(t.who == "you" ? 3.5 : 18.5) left=`${min(t.at, span) / span * 100}%` width=`${min(t.text.split(" ").length / 2.5 * 1000, span - min(t.at, span)) / span * 100}%` min-width=2 height=8 border-radius=4 background-color=(t.who == "you" ? "-exact-label" : "hex.progress")
           for m, i in answered key=`a${i}`
             box position="absolute" top=0 bottom=0 left=`${min(m.at, span) / span * 100}%` width=2 margin-left=-1 border-radius=1 background-color="hex.accent"
           if bad

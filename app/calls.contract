@@ -86,7 +86,7 @@ component CallsList
         scroll id="calls-list" flex=1 min-width=0 padding-bottom=pad box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="calls-scroll"
           if not wide
             Week(calls=calls.calls, now=now, offset=offset, end=titleEnd)
-            box height=10
+            box height=4
           column padding="0 6px"
             if shown.length == 0
               Note(kind=(failed ? "failed" : loading ? "loading" : "empty"), text=(failed ? "Can't reach hex. Check that Tailscale is on." : loading ? "Loading your calls" : "No calls yet. When a call ends, it lands here with what was said."), pad="24px 10px", id=(failed ? "calls-offline" : loading ? "calls-loading" : "calls-empty"))
@@ -115,23 +115,24 @@ component Week
   derive bad = week.filter(c => badEnd(c.ending)).length
   view
     column testId="calls-head"
-      text "Calls" role="heading" aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label" padding=`0 ${end}px 0 16px` testId="calls-title"
-      row gap=8 align-items="baseline" padding="2px 16px 0" white-space="nowrap" testId="calls-stats"
-        text spanOf(sum(week.map(c => c.seconds))) font="-exact-title3" font-weight=600 font-variant-numeric="tabular-nums" color="-exact-label"
-        text `${week.length} ${week.length == 1 ? "call" : "calls"}` font="-exact-subheadline" color="-exact-secondary-label" flex=1
-        if bad > 0
-          text `${bad} failed` font="-exact-subheadline" font-weight=600 color="hex.danger"
-      column gap=5 padding="12px 16px 0" role="img" aria-label=`This week: ${week.length} calls, ${spanOf(sum(week.map(c => c.seconds)))}${bad > 0 ? `, ${bad} failed` : ""}` testId="calls-week"
+      row gap=8 align-items="baseline" padding=`0 ${end}px 0 16px` white-space="nowrap"
+        text "Calls" role="heading" aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label" flex=1 testId="calls-title"
+        text font="-exact-subheadline" color="-exact-secondary-label" testId="calls-stats"
+          text spanOf(sum(week.map(c => c.seconds))) font-weight=600 font-variant-numeric="tabular-nums" color="-exact-label"
+          text ` · ${week.length} ${week.length == 1 ? "call" : "calls"}`
+          if bad > 0
+            text ` · ${bad} failed` font-weight=600 color="hex.danger"
+      column gap=2 padding="8px 16px 0" role="img" aria-label=`This week: ${week.length} calls, ${spanOf(sum(week.map(c => c.seconds)))}${bad > 0 ? `, ${bad} failed` : ""}` testId="calls-week"
         for n in [6, 5, 4, 3, 2, 1, 0] key=n
           row align-items="center"
-            text (n == 0 ? "Today" : weekdayOf(now - n * 86400000, offset)) width=34 flex-shrink=0 font-size=12 line-height="16px" font-weight=(n == 0 ? 600 : 400) color=(n == 0 ? "-exact-label" : "-exact-tertiary-label")
-            box flex=1 min-width=0 height=10 border-radius=5 background-color="-exact-quaternary-fill" position="relative" overflow="hidden"
+            text (n == 0 ? "Today" : weekdayOf(now - n * 86400000, offset)) width=34 flex-shrink=0 font-size=11 line-height="13px" font-weight=(n == 0 ? 600 : 400) color=(n == 0 ? "-exact-label" : "-exact-tertiary-label")
+            box flex=1 min-width=0 height=6 border-radius=3 background-color="-exact-quaternary-fill" position="relative" overflow="hidden"
               for c in week.filter(x => daysBack(x.started, now, offset) == n) key=c.id
-                box position="absolute" top=0 bottom=0 left=`${minuteOf(c.started, offset) / 1440 * 100}%` width=`${c.seconds / 86400 * 100}%` min-width=3 border-radius=3 background-color=(badEnd(c.ending) ? "hex.danger" : "-exact-label")
-            text spanOf(sum(week.filter(x => daysBack(x.started, now, offset) == n).map(x => x.seconds))) opacity=(week.filter(x => daysBack(x.started, now, offset) == n).length > 0 ? 1 : 0) width=52 flex-shrink=0 text-align="right" font-size=12 line-height="16px" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
-        row padding="0 52px 0 34px" margin-top=-2 aria-hidden=true
+                box position="absolute" top=0 bottom=0 left=`${minuteOf(c.started, offset) / 1440 * 100}%` width=`${c.seconds / 86400 * 100}%` min-width=3 border-radius=2 background-color=(badEnd(c.ending) ? "hex.danger" : "-exact-label")
+            text spanOf(sum(week.filter(x => daysBack(x.started, now, offset) == n).map(x => x.seconds))) opacity=(week.filter(x => daysBack(x.started, now, offset) == n).length > 0 ? 1 : 0) width=48 flex-shrink=0 text-align="right" font-size=11 line-height="13px" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+        row padding="0 48px 0 34px" aria-hidden=true
           for h in ["12a", "6a", "12p", "6p"] key=h
-            text h flex=1 font-size=12 line-height="16px" color="-exact-tertiary-label"
+            text h flex=1 font-size=11 line-height="13px" color="-exact-tertiary-label"
 
 // One call: a disc with how it came in, its name and when, what it was, and what came of it.
 // Swiped from the right, Delete.
@@ -149,6 +150,8 @@ component CallRowView
     removeError: string
   derive bad = badEnd(c.ending)
   derive meta = metaOf(c, now)
+  // How it ended, unless its name already says so.
+  derive ending = callName(c).toLowerCase().includes(endWord(c.ending).toLowerCase()) ? "" : endWord(c.ending)
   view
     scroll swipeContent=`${c.id}-row` swipeTrailing=(c.live ? "" : `${c.id}-delete`) display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`call-${c.id}`
       button id=`${c.id}-row` press=select(c.id) class=RowTap flex-shrink=0 scroll-snap-align="start" gap=10 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected aria-label=`${callName(c)}, ${c.live ? "live now" : `${formatTime(c.started, offset, "short")}${meta.length > 0 ? `, ${meta.join(", ")}` : ""}${c.waiting.length > 0 ? `, ${c.waiting.length} waiting on you` : ""}${endWord(c.ending) != "" ? `, ${endWord(c.ending)}` : ""}`}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`call-open-${c.id}`
@@ -159,16 +162,16 @@ component CallRowView
             text callName(c) font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex=1 min-width=0 testId=`call-name-${c.id}`
             text formatTime(c.started, offset, "short") font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
           if c.summary != ""
-            text c.summary font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+            text c.summary font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
           if c.live
             text "Live now" font="-exact-footnote" font-weight=600 color="hex.progress"
-          else if meta.length > 0 or c.waiting.length > 0 or endWord(c.ending) != ""
+          else if meta.length > 0 or c.waiting.length > 0 or ending != ""
             text font="-exact-footnote" color="-exact-tertiary-label" margin-top=2
               text meta.join(" · ")
               if c.waiting.length > 0
                 text `${meta.length > 0 ? " · " : ""}${c.waiting.length} waiting` color="hex.ask"
-              if endWord(c.ending) != ""
-                text `${meta.length > 0 or c.waiting.length > 0 ? " · " : ""}${endWord(c.ending)}` color=(bad ? "hex.danger" : "-exact-tertiary-label")
+              if ending != ""
+                text `${meta.length > 0 or c.waiting.length > 0 ? " · " : ""}${ending}` color=(bad ? "hex.danger" : "-exact-tertiary-label")
           if c.id == removing and removeError != ""
             text `Not deleted · ${removeError}` font="-exact-footnote" color="hex.danger" testId=`call-error-${c.id}`
       if not c.live

@@ -190,7 +190,8 @@ component Said
               column flex=1 min-width=0
                 row gap=8 align-items="baseline"
                   text (l.kind == "sent" ? `Sent to ${l.note}` : l.note != "" ? l.note : "hex took it on") font="-exact-subheadline" font-weight=600 color=(l.state == "failed" ? "hex.danger" : l.state == "done" ? "-exact-label" : "hex.progress") flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-                  text clockOf(l.at) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+                  if l.at <= secondsOf(record) * 1000
+                    text clockOf(l.at) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
                 text (l.kind == "sent" ? `“${l.text}”` : l.text) font="-exact-footnote" color="-exact-secondary-label" line-clamp=2 user-select="text"
           else if l.kind == "media"
             column align-self="flex-end" align-items="flex-end" gap=4

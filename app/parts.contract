@@ -14,6 +14,15 @@ style Glass
 style Pill
   padding="7px 14px" border-radius=999 background-color="-exact-tertiary-fill"
 
+// Where Bassim writes (a thread's message, his own answer to a question): one filled capsule with
+// the field and its send inside, the same in both, visible in light mode without a border.
+style Composer
+  flex-direction="row" align-items="flex-end" gap=4 padding="0 4px 0 14px" min-height=44 border-radius=22 background-color="-exact-tertiary-fill"
+
+// The field inside a Composer.
+style ComposerField
+  border="none" background-color="transparent" padding="11px 0" flex=1 min-width=0 font="-exact-body" color="-exact-label"
+
 // Every control of ours shows a press the moment it's touched. A row's whole width greys under the
 // finger; a capsule button (Undo, Send again, an inline answer, Discuss) dims and gives a little.
 // Every target is at least 44pt each way: a capsule is drawn smaller (PillFace) inside its 44pt

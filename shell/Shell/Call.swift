@@ -1,4 +1,5 @@
 import AVFoundation
+import CallKit
 import Foundation
 import UIKit
 import WebRTC
@@ -56,6 +57,10 @@ final class Call: NSObject {
   private var shift: Double = 0
   private var active = true
   private var scripted: [Task<Void, Never>] = []
+  /// A start tapped while the last call was still closing, run the moment it has.
+  private var queued: (voice: String?, about: String)?
+  /// Phone and FaceTime calls, so a pause ends when the call that caused it does.
+  private let phoneCalls = CXCallObserver()
 
   private static let closeUnconfirmed = "Audio stopped, but the server could not confirm session closure. Check your network before starting another call."
   private static let carriesOn: Set<String> = ["expired", "connection_lost", "remote_hangup"]
@@ -71,6 +76,7 @@ final class Call: NSObject {
     RTCAudioSessionConfiguration.setWebRTC(audio)
     factory = RTCPeerConnectionFactory()
     super.init()
+    phoneCalls.setDelegate(self, queue: .main)
     let center = NotificationCenter.default
     center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { note in
       guard let info = note.userInfo, let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
@@ -80,8 +86,16 @@ final class Call: NSObject {
       if type == .began, reason == .appWasSuspended { return }
       MainActor.assumeIsolated { Call.shared.interrupt(type == .began) }
     }
+    // The audio system restarted under the call (rare, but it takes WebRTC's audio with it): the
+    // call carries on in a new session, as after a drop.
+    center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { _ in
+      MainActor.assumeIsolated { Call.shared.lose("The phone's audio restarted.") }
+    }
     center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-      MainActor.assumeIsolated { Call.shared.setActive(true) }
+      MainActor.assumeIsolated {
+        Call.shared.setActive(true)
+        Call.shared.resumeIfFree()
+      }
     }
     center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
       MainActor.assumeIsolated { Call.shared.setActive(false) }
@@ -93,7 +107,8 @@ final class Call: NSObject {
   /// `about` is a task id, or `asks` to go through what waits on Bassim. Without a `voice` (Siri),
   /// hex speaks in the one it keeps for every call.
   func start(voice: String? = nil, about: String = "") {
-    guard status == .idle, !closing else { return }
+    if closing || status == .ending { return queued = (voice, about) }
+    guard status == .idle else { return }
     begin(demo: false)
     self.voice = voice
     let generation = generation
@@ -102,6 +117,7 @@ final class Call: NSObject {
         let link = try Link(factory: factory, call: self)
         guard generation == self.generation else { return link.close() }
         self.link = link
+        link.microphone(on: !muted)
         let offer = try await link.offer()
         guard generation == self.generation else { return }
         let opened = try await hex.open(sdp: offer, voice: voice, about: about)
@@ -158,8 +174,10 @@ final class Call: NSObject {
 
   // MARK: Mute and interruptions
 
+  /// Answers the tap at once, live or not yet: before hex has the call (connecting, reconnecting)
+  /// only the mic changes, and the session hex opens is told when it starts.
   func toggleMute() {
-    guard status == .live else { return }
+    guard status == .live || status == .connecting || status == .reconnecting else { return }
     if interrupted {
       interrupt(false)
       if !muted { return }
@@ -168,7 +186,11 @@ final class Call: NSObject {
     if muted { link?.microphone(on: false) }
     hear(input: 0)
     changed()
-    sendMute(muted)
+    if status == .live {
+      sendMute(muted)
+    } else if !muted, !interrupted {
+      link?.microphone(on: true)
+    }
   }
 
   /// The mic stays as he set it until hex confirms, and an unconfirmed change goes out again rather
@@ -189,6 +211,13 @@ final class Call: NSObject {
     muteRetry?.cancel()
     muteCommand = nil
     if !command.muted, !muted, !interrupted { link?.microphone(on: true) }
+  }
+
+  /// iOS doesn't promise the end of a pause (Siri often sends none), so coming back to the app, or
+  /// the phone call ending, ends it too, unless a phone or FaceTime call is still going.
+  fileprivate func resumeIfFree() {
+    guard interrupted, !phoneCalls.calls.contains(where: { !$0.hasEnded }) else { return }
+    interrupt(false)
   }
 
   func interrupt(_ began: Bool) {
@@ -235,6 +264,7 @@ final class Call: NSObject {
       captions.started = started
       set(.live)
       startMeter()
+      if muted { sendMute(true) }
       Feedback.went(live: true)
     case "session.input_transcript.delta":
       caption("you", event)
@@ -285,7 +315,8 @@ final class Call: NSObject {
 
   /// Only a hang-up ends a call. A connection that fails, or a session OpenAI ends on its own, has
   /// the call carry on in a new session hex opens for the same call, with the call so far.
-  private func lose(_ failure: String, reason: String? = nil) {
+  fileprivate func lose(_ failure: String, reason: String? = nil) {
+    guard status != .idle, status != .ending else { return }
     if status == .reconnecting { return retry() }
     guard status == .live, id != nil, !demo else {
       if let reason { serverEnding = Self.ending(reason) }
@@ -403,6 +434,10 @@ final class Call: NSObject {
       demo = false
       set(.idle)
       if wasLive { Feedback.went(live: false) }
+      if let next = queued {
+        queued = nil
+        start(voice: next.voice, about: next.about)
+      }
     }
   }
 
@@ -780,8 +815,9 @@ struct HexServer: Sendable {
     Task { try? await closeNow(sessionId) }
   }
 
+  /// Bounded, so a hang-up with hex out of reach leaves the call ended within seconds.
   func closeNow(_ sessionId: String) async throws {
-    let (data, status) = try await request("DELETE", "/session", json: ["sessionId": sessionId])
+    let (data, status) = try await request("DELETE", "/session", json: ["sessionId": sessionId], timeout: 6)
     try check(status, data)
   }
 
@@ -813,8 +849,8 @@ struct HexServer: Sendable {
     throw Refusal(String((message ?? (text.isEmpty ? "hex refused (\(status))" : text)).prefix(300)))
   }
 
-  private func request(_ method: String, _ path: String, json: Any) async throws -> (Data, Int) {
-    try await request(method, path, body: try JSONSerialization.data(withJSONObject: json), type: "application/json")
+  private func request(_ method: String, _ path: String, json: Any, timeout: TimeInterval = 60) async throws -> (Data, Int) {
+    try await request(method, path, body: try JSONSerialization.data(withJSONObject: json), type: "application/json", timeout: timeout)
   }
 
   private func request(_ method: String, _ path: String, body: Data, type: String, timeout: TimeInterval = 60) async throws -> (Data, Int) {
@@ -830,5 +866,12 @@ struct HexServer: Sendable {
     } catch {
       throw Refusal("Cannot reach hex. Check that Tailscale is on, then try again.")
     }
+  }
+}
+
+extension Call: CXCallObserverDelegate {
+  nonisolated func callObserver(_ observer: CXCallObserver, callChanged call: CXCall) {
+    guard call.hasEnded else { return }
+    MainActor.assumeIsolated { Call.shared.resumeIfFree() }
   }
 }

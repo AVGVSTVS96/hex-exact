@@ -1,7 +1,7 @@
 // Steps (§9.5): how hex is going about a task. Who did what when, as a lane for hex and one for each
-// agent it started, a tick a step; its plan; the agents, each with its model, what it's on and how
-// long; then hex's own steps, newest first, in turns headed by what hex said at the end of each. A tap
-// opens a step's detail and result, or an agent's result and its own steps, in place.
+// agent it started, a tick a step; hex's own steps, newest first, in turns headed by what hex said at
+// the end of each; then its plan and the agents, each with its model, what it's on and how long. A tap
+// opens a step's result, or an agent's result and its own steps, in place. A step's command stays out.
 use Viewport, Counts, TaskPage, Step, Agent from "./shapes.contract"
 use Mark, Note, ShowMore, RowTap, whenOf, lengthOf, Tap, Prose, springOf from "./parts.contract"
 use Room, Chrome, stacked, homeRoomOf from "./room.contract"
@@ -107,27 +107,9 @@ component Steps
               Note(kind="failed", text="These steps aren't there any more.", pad="24px 10px", id="steps-gone")
             if task.id != "" and task.steps.length == 0 and task.agents.length == 0
               Note(kind="empty", text=(task.running ? "Steps show while it works" : "No steps yet"), pad="24px 10px", id="steps-empty")
+            if task.steps.length > 0
+              Lanes(task=task, agents=agents, now=now, offset=offset)
             row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 4 : 0)
-              column flex=(wide ? 1 : 0) min-width=0
-                if task.steps.length > 0
-                  Lanes(task=task, agents=agents, now=now, offset=offset)
-                if task.plan.length > 0
-                  Section(tone="quiet", label="Plan", n=-1, id="head-plan")
-                  for p, i in task.plan key=`${i}${p.text}`
-                    row gap=10 align-items="flex-start" padding="7px 10px" testId=`plan-${i}`
-                      box padding-top=1 flex-shrink=0
-                        Mark(state=(p.state == "done" ? "done" : p.state == "working" or p.state == "in_progress" ? "working" : "unstarted"), size=22)
-                      text p.text flex=1 font="-exact-callout" color=(p.state == "done" ? "-exact-secondary-label" : "-exact-label")
-                  text `${done} of ${task.plan.length} done` font="-exact-footnote" color="-exact-tertiary-label" padding="2px 10px 4px 42px"
-                if task.agents.length > 0
-                  Section(tone="working", label="Agents", n=agents.length, id="head-agents")
-                  for a in agents key=a.id
-                    AgentRow(agent=a, now=now, offset=offset, open=opened.includes(a.id), flip=flip)
-                  if tries.length > 0
-                    ShowMore(n=tries.length, shown=showTries, pad="2px 10px", id="agent-tries", press=flipTries)
-                    if showTries
-                      for a in tries key=a.id
-                        AgentRow(agent=a, now=now, offset=offset, open=opened.includes(a.id), flip=flip)
               column flex=(wide ? 1 : 0) min-width=0
                 if task.steps.length > 0
                   Section(tone="working", label="hex", n=task.steps.length, id="head-hex")
@@ -151,6 +133,24 @@ component Steps
                       ShowMore(n=(t.steps.length - few), shown=opened.includes(`all${t.n}`), pad="2px 10px", id=`more-steps-${t.n}`, press=flip(`all${t.n}`))
                   if turns.length > 1
                     ShowMore(n=(turns.length - 1), shown=(turnsShown >= turns.length), pad="6px 10px", id="more-turns", press=moreTurns)
+              column flex=(wide ? 1 : 0) min-width=0
+                if task.plan.length > 0
+                  Section(tone="quiet", label="Plan", n=-1, id="head-plan")
+                  for p, i in task.plan key=`${i}${p.text}`
+                    row gap=10 align-items="flex-start" padding="7px 10px" testId=`plan-${i}`
+                      box padding-top=1 flex-shrink=0
+                        Mark(state=(p.state == "done" ? "done" : p.state == "working" or p.state == "in_progress" ? "working" : "unstarted"), size=22)
+                      text p.text flex=1 font="-exact-callout" color=(p.state == "done" ? "-exact-secondary-label" : "-exact-label")
+                  text `${done} of ${task.plan.length} done` font="-exact-footnote" color="-exact-tertiary-label" padding="2px 10px 4px 42px"
+                if task.agents.length > 0
+                  Section(tone="working", label="Agents", n=agents.length, id="head-agents")
+                  for a in agents key=a.id
+                    AgentRow(agent=a, now=now, offset=offset, open=opened.includes(a.id), flip=flip)
+                  if tries.length > 0
+                    ShowMore(n=tries.length, shown=showTries, pad="2px 10px", id="agent-tries", press=flipTries)
+                    if showTries
+                      for a in tries key=a.id
+                        AgentRow(agent=a, now=now, offset=offset, open=opened.includes(a.id), flip=flip)
 
 // Who did what, when: a lane for hex and one for each agent, from when it started to when it ended
 // (now while it works), a tick a step, a dot where hex said something, a blue dot where a step runs;
@@ -213,23 +213,20 @@ component StepRow
     offset: number
     open: bool
     flip: action
-  derive more = step.detail != "" or step.result != "" or step.text.length > 60
+  derive more = step.result != "" or step.text.length > 80
   view
     column gap=4 testId=`step-${step.id}`
-      button press=flip(step.id) disabled=(not more) class=RowTap gap=10 align-items="center" min-height=32 padding="4px 10px" aria-expanded=(more ? open : false) -exact-press-haptic=(haptics and more ? "selection" : "none") testId=`step-open-${step.id}`
-        box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+      button press=flip(step.id) disabled=(not more) class=RowTap gap=10 align-items="flex-start" min-height=32 padding="4px 10px" aria-expanded=(more ? open : false) -exact-press-haptic=(haptics and more ? "selection" : "none") testId=`step-open-${step.id}`
+        box width=22 display="flex" justify-content="center" flex-shrink=0 padding-top=(step.kind == "agent" ? 1 : 4) aria-hidden=true
           if step.kind == "agent"
             AgentTile(state=agent, size=18)
           else
             box width=7 height=7 border-radius=4 border="3px solid -exact-background" box-sizing="content-box" background-color=(step.state == "failed" ? "hex.danger" : step.state == "running" ? "hex.progress" : "-exact-tertiary-label")
-        text step.text font="-exact-subheadline" font-weight=(step.kind == "agent" ? 600 : 400) line-clamp=(open ? 0 : 1) flex=1 min-width=0 color=(step.state == "failed" ? "hex.danger" : step.kind == "agent" or open ? "-exact-label" : "-exact-secondary-label")
-        text stepTime(step, now, offset) font="-exact-footnote" color=(step.state == "running" ? "hex.progress" : "-exact-tertiary-label") white-space="nowrap" font-variant-numeric="tabular-nums"
-      if open and (step.detail != "" or step.result != "")
-        column gap=6 margin="0 10px 6px 42px" padding="10px 12px" border-radius=14 background-color="-exact-secondary-background"
-          if step.detail != ""
-            text step.detail font-family="ui-monospace" font="-exact-caption1" color="-exact-secondary-label" user-select="text"
-          if step.result != ""
-            Prose(text=step.result, font="-exact-subheadline", color=(step.state == "failed" ? "hex.danger" : "-exact-label"))
+        text step.text font="-exact-subheadline" font-weight=(step.kind == "agent" ? 600 : 400) line-clamp=(open ? 0 : 2) flex=1 min-width=0 color=(step.state == "failed" ? "hex.danger" : step.kind == "agent" or open ? "-exact-label" : "-exact-secondary-label")
+        text stepTime(step, now, offset) font="-exact-footnote" color=(step.state == "running" ? "hex.progress" : "-exact-tertiary-label") white-space="nowrap" font-variant-numeric="tabular-nums" padding-top=2
+      if open and step.result != ""
+        box margin="0 10px 6px 42px" padding="10px 12px" border-radius=14 background-color="-exact-secondary-background"
+          Prose(text=step.result, font="-exact-subheadline", color=(step.state == "failed" ? "hex.danger" : "-exact-label"))
 
 // An agent hex started: its tile in the colour of how it stands, its name and model, what it's on,
 // its steps and how long; a tap opens its result and its own steps in place.

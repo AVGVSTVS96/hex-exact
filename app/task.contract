@@ -568,8 +568,8 @@ component TaskBody
                       Mark(state="decided", size=22)
                       text `hex has a pick for ${picksOpen.length == openAsks.length and openAsks.length > 1 ? `all ${picksOpen.length}` : `${picksOpen.length}`}` font="-exact-subheadline" color="-exact-secondary-label" flex=1 min-width=0 line-clamp=1
                       button press=takePicks class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Take hex’s ${picksOpen.length == 1 ? "pick" : "picks"}` testId="task-take-all"
-                        box class=PillFace height=32 padding="0 12px" box-sizing="border-box"
-                          text `Take ${picksOpen.length}` font="-exact-subheadline" font-weight=600 color="-exact-label"
+                        box class=PillFace height=32 padding="0 12px" box-sizing="border-box" background-color="hex.accent.wash"
+                          text (picksOpen.length > 1 ? "Take all" : "Take it") font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap"
                 else if kind == "task" and task.needs != ""
                   Section(tone="asks", label="Needs you", n=-1, id="head-needs")
                   Happened(mark="needs", text=task.needs, stamp=whenOf(row.since, now, offset), failed=false)
@@ -629,7 +629,7 @@ component TaskBody
           ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=(viewport.keyboardHeight > 0 ? 0 : foot), answered=settled.includes(a.id), left=(wide ? width / 2 : 12), end=rightEnd)
       else if docked
         // What scrolls under the composer fades out behind it.
-        box position="absolute" left=0 right=0 bottom=0 height=(foot + 8 + 48 + 28) background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 44px)" pointer-events="none" aria-hidden=true
+        box position="absolute" left=0 right=0 bottom=0 height=(foot + 8 + 48 + 24) background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 24px)" pointer-events="none" aria-hidden=true
         button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=12 right=rightEnd bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
           row backgroundMaterial="glass" border-radius=24 height=48 flex=1 padding="0 6px" gap=8 align-items="center" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
             box width=36 height=36 border-radius=18 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-hidden=true

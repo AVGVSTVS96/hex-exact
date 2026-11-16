@@ -40,10 +40,11 @@ fn lineOf(t: TaskRow): string = t.line != "" ? t.line : match t.agents.filter(a 
 fn markOf(e: Item): string = e.stage == "needs" ? (e.kind == "task" ? "needs" : e.mark) : problemOf(e.title) != "" ? "failed" : e.mark
 fn lineFor(e: Item): string = problemOf(e.title) != "" ? problemOf(e.title) : e.title
 
-// How many rows of Now fit in `height` without scrolling, once its two heads (about 106pt), two
-// "Show N more" (84), what hex decided (60) and the list's foot above the tabs (34) have their room:
-// a row is two lines, about 58pt (measured on the Duo simulator). Never fewer than one of each.
-fn rowsFit(height: number): number = max(floor((height - 284) / 58), 2)
+// How many rows of Now fit in `height` without scrolling, once the list's top (12pt), its two heads
+// (74), two "Show N more" (60), what hex decided (54) and a little of the fade above the tabs (16)
+// have their room: a row is two lines, about 58pt (measured on the Duo simulator). Folded upright
+// that is the drawing's three: two that need him and one working. Never fewer than one of each.
+fn rowsFit(height: number): number = max(floor((height - 216) / 58), 2)
 
 keyframes liveDot
   50% opacity=0.25
@@ -261,14 +262,14 @@ component NowList
     column testId="home-now"
       if failed and not known
         Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
-      StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="20px 10px 4px", id="home-head-asks")
+      StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="8px 10px 4px", id="home-head-asks")
       for e in shownNeeds key=e.id
         Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
       if known and needs.length == 0
         Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 44px", id="home-empty-needs")
       if needs.length > shownNeeds.length
         ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="6px 10px", id="home-more-needs", press=openTasks("needs"))
-      StageHead(state="working", label="Working on", n=working.length, known=known, pad="20px 10px 4px", id="home-head-working")
+      StageHead(state="working", label="Working on", n=working.length, known=known, pad="14px 10px 4px", id="home-head-working")
       for e in shownWork key=e.id
         Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
       if known and working.length == 0
@@ -276,7 +277,7 @@ component NowList
       if listed.length > shownWork.length
         ShowMore(n=listed.length - shownWork.length, shown=false, pad="6px 10px", id="home-more-working", press=openTasks("working"))
       if decided > 0
-        box height=0 margin="14px 10px 4px" border-top="0.5px solid -exact-separator"
+        box height=0 margin="10px 10px 4px" border-top="0.5px solid -exact-separator"
         button press=open(path("decided")) class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided} this week` testId="home-decided"
           Mark(state="decided", size=22)
           text `hex decided ${decided} this week` font="-exact-headline" flex=1 text-align="left"

@@ -98,21 +98,35 @@ A row on any of the four opens over Home when folded and beside it when there's 
 columns, as a row on Now does. Back returns to the tab you left. Calls, Tasks and Settings
 stay where they are.
 
+- With two columns, the page beside hex's column changes only when you tap a row. Changing
+  tab leaves it where it is.
+- On Feed, Ideas and Goals the list is the page. As it scrolls, hex's face shrinks into one
+  row with its name and live line, and the list takes the room; back at the top the face
+  returns. It follows the finger.
+- Tasks lists topics, the conversations work happens in. Goals lists what you asked for inside
+  them, each with its "done when".
+
 | | Folded | Open like a book |
 |---|---|---|
 | Feed | ![](plan/feed-cover-up-dark.png) | ![](plan/feed-open-up-dark.png) |
 | Ideas | ![](plan/ideas-cover-up-dark.png) | ![](plan/ideas-open-up-dark.png) |
 | Goals | ![](plan/goals-cover-up-dark.png) | ![](plan/goals-open-up-dark.png) |
 
-| An idea | A goal | Something hex watches |
+| Feed, scrolled | An idea | Something hex watches |
 |---|---|---|
-| ![](plan/idea-cover-up-dark.png) | ![](plan/goal-cover-up-dark.png) | ![](plan/watch-cover-up-dark.png) |
+| ![](plan/feed-scrolled-cover-up-dark.png) | ![](plan/idea-cover-up-dark.png) | ![](plan/watch-cover-up-dark.png) |
+
+| A goal hex is working on | A goal reached | |
+|---|---|---|
+| ![](plan/goal-cover-up-dark.png) | ![](plan/goal-reached-cover-up-dark.png) | |
 
 | Feed, folded on its side |
 |---|
 | ![](plan/feed-cover-side-dark.png) |
 
-Feed, Ideas and Goals in light are in `docs/plan/`.
+Feed, Ideas and Goals in light are in `docs/plan/`. Ideas and Goals folded on its side, and
+all three open like a laptop, follow Home's frames in those poses: the same column, the same
+foot.
 
 Nothing on these pages is made up by the app. Each reads what hex already keeps:
 
@@ -209,7 +223,12 @@ On the Duo, in all four poses:
   with Call beside them. A tap changes the list under hex's face at once; its face and live
   line don't move. The tab you're on is marked, and Feed shows a dot when something is new.
 - The tabs and Call keep a clear spot at the foot of hex's column, together, in every pose. A
-  list scrolls to its last row above them and fades out behind them; no row rests under them.
+  list scrolls to its last row above them and fades out just behind them; no row rests under
+  them, and no row above them looks dimmed.
+- On Feed, Ideas and Goals, scrolling the list shrinks hex's face into one row, with the
+  finger, and gives the list the room. On Now the face stays.
+- With two columns, the page beside hex's column changes only on a tap on a row. A page's
+  title sits in the same place whichever tab is beside it.
 - The tabs belong to hex's column. A page over Home has none; Back returns to the tab you left.
   During a call Mute, End and Camera take their place, and the tabs come back when it ends.
 - The same window size gives the same layout, folded or not. Two columns appear only when both
@@ -235,8 +254,10 @@ On the Duo:
 - Every control shows a press at once. Things that move share one spring, and stay still with
   Reduce Motion on.
 - Larger text sizes fit without clipping.
-- hex's tabs, a Feed entry, the mark for something found, the mark for a watch and a project's
-  bar of goals are parts like the rest: one of each, used by every page that shows one.
+- hex's tabs, a Feed entry, its Discuss pill and a project's bar of goals are parts like the
+  rest: one of each, used by every page that shows one. So are four marks: a lens for
+  something hex found, a bulb for an idea, a clock for a watch, a dashed box for not started.
+- A chevron stays in the app: right goes to a page, down opens in place. An arrow leaves it.
 
 ### 4 Call engine
 
@@ -324,19 +345,23 @@ On the Duo:
   in place.
 - Entries sit under the day they happened: This afternoon, This morning, Yesterday, then dates.
 - An entry leads with the news itself in bold, two lines at most, then says it in full-strength
-  reading text. Under that, its pictures where it has any, then the topic and time in grey.
+  reading text. Under that, its pictures where it has any, then its topic and time in grey.
+  The words are hex's, as it wrote them for the result, the finding or the decision; the app
+  writes none of its own.
 - Its mark says what kind it is, with the marks the rest of the app uses: a tick is something
   finished, a lens something found, mint something hex decided for you.
-- What came since you last looked sits above a thin "Earlier" line, and the Feed tab carries a
-  dot until you've seen it. Opening Feed clears the dot; the line stays until you leave.
+- What came since you last opened Feed sits above a thin "Earlier" line, and the Feed tab
+  carries a dot until you open it. The line stays where it is until you leave Feed.
 - A tap on an entry opens what it's about: a finished one its goal, with the proof; a found one
-  its idea or its watch; a decided one its full story. Over Home when folded, beside Feed with
-  two columns.
-- "Discuss" on an entry starts a call that opens on it. A decided entry has Undo in its place.
+  its idea or its watch; a decided one hex decided, at that row, opened. Over Home when folded,
+  beside Feed with two columns.
+- "Discuss" is a pill at the foot of an entry, a target of its own: it calls hex about that
+  entry, and hex opens by saying which. A decided entry has Undo in its place.
 - Only what's worth your eye is here. A check that found nothing new makes no entry, and
   neither does hex's own housekeeping.
 - Scrolling reaches the last entry above the tabs, and older days load as you get to them.
-- Nothing yet today says so in one line. A failure says why, with Try again.
+- With nothing yet: "Nothing new yet. What hex finishes and finds shows here." A failure says
+  why, with Try again.
 
 ### 10 Ideas
 
@@ -344,21 +369,24 @@ What you floated for later, and what hex has found on each since. Muse's Ideas a
 suggestions; these are yours, kept alive.
 
 On the Duo:
-- Tap Ideas: the ones hex found something on since you last looked come first, under "hex found
-  something", each with its finding in full-strength text and a ring on its mark.
-- The rest follow under "Other ideas": the title in bold, hex's last finding or, with none
-  yet, your own words in grey quotes, then the topic and when you floated it or when hex looks
-  next. A few show, then "Show N more".
-- A tap opens the idea: what you said, in your words; what hex found, newest first, each with
-  its date and its links; older checks behind one row with a chevron that says how many.
-- Three answer rows, the same part questions use, each saying what it does: "Start it" makes it
-  a goal hex works on, and it leaves Ideas for Goals. "Stop looking into it", or "Look into it
-  every week" when hex isn't, turns its checks off or on. "Not needed" takes it off the list.
-  Each confirms in place with Undo.
+- Tap Ideas: the ones hex found something on come first, under "hex found something", each
+  with the lens, its finding in full-strength text, and its topic and when hex found it. An
+  idea stays there until you open it.
+- The rest follow under "Other ideas", each with the bulb: the title in bold, hex's last
+  finding or, with none yet, your own words in grey quotes, then its topic and when you
+  floated it. A few show, then "Show N more".
+- A tap opens the idea: what you said, in your words; what hex found last, with its date, its
+  pictures and its links; older checks behind one row that says how many and opens in place.
+- A link opens the site in Safari's sheet over the app, and its arrow says it leaves.
+- Three answer rows, the same part questions use, each saying what a tap does: "Start it"
+  makes it a goal hex works on, and it leaves Ideas for Goals. "Stop looking into it", or
+  "Look into it every week" when hex isn't, turns its checks off or on. "Not needed" takes it
+  off the list. Each confirms in place with Undo.
 - "Add to this idea" is docked at the foot: your words go to the idea's topic, the keyboard
   stays up, the draft is kept if you leave.
 - An idea you say in a call or a topic shows here by itself, with no reload.
-- No ideas yet says how to float one. A failure says why, with Try again.
+- With none yet: "No ideas yet. Say one to hex and it keeps it here." A failure says why, with
+  Try again.
 
 ### 11 Goals
 
@@ -367,24 +395,31 @@ with its Tracking on top.
 
 On the Duo:
 - Tap Goals: "Watching" first, then "Goals", each with its count.
-- Watching lists what hex runs on a timer for you, reminders and checks: its name, what the
-  last run found or what it will do, and when it runs next. hex's own housekeeping isn't
-  listed. A tap opens it: what you asked, when it runs next, what each run found, and "Stop
-  watching", with Undo.
+- Watching lists what hex runs on a timer for you, reminders and checks: its name, then what
+  the last run found and when it runs next, in words. hex's own housekeeping isn't listed. A
+  tap opens it: what you asked, when it runs next, what the last run found, older runs behind
+  one row, and "Stop watching", with Undo.
 - Goals lists what you asked for under its project, or its topic when it has no project. A
-  project's row shows a bar with one segment per goal, coloured by where each stands, and "3 of
-  5" reached. Its chevron opens it in place, and says so.
+  project's row shows a bar, one width for every project, split evenly among its goals and
+  coloured by where each stands, and "3 of 5" reached. A tap on the row opens or shuts it in
+  place, and its chevron says which.
 - A goal's row carries the same marks as Now: blue while hex works on it, amber when it waits
   on you, a dashed box when it hasn't started, a tick when it's reached. Under its name, where
   it stands in one line.
 - Projects with work going on or a question waiting come first and open; the rest stay shut. A
   few show, then "Show N more".
-- A tap on a goal opens it: what you asked, in your words; "Done when"; where it stands now,
-  with Steps one tap away; the question, when one waits; the topic it lives in.
-- A reached goal shows its proof: what was done, the picture or link that shows it, and when.
-  "Not what I asked" sends it back to hex with Undo.
-- "Add to this goal" is docked at the foot and goes to its topic. "Not needed" is the last row.
+- A tap on a goal opens it: what you asked, in your words; "Done when"; where it stands, with
+  its Steps and its topic one tap away. When it waits on you, its question is there as a row
+  that opens it.
+- A reached goal shows its proof under "Done when": what was done, the picture or link that
+  shows it, and when. Its one answer row is "Not what I asked", which sends it back to hex,
+  with Undo.
+- A goal not yet reached ends in "Not needed", which stops hex and takes it off the list, with
+  Undo. To only stop the run, open its topic.
+- "Add to this goal" is docked at the foot of both and goes to its topic.
 - A goal moves by itself as hex works: the mark, the line and the bar change in place.
+- With none yet: "Nothing asked for yet. Ask hex for something and it shows here." A failure
+  says why, with Try again.
 
 ### 12 Last look
 

@@ -111,7 +111,7 @@ component App
   // Where everything sits: the window's size and what covers it, worked out once (room.contract).
   derive room = roomOf(viewport, pose)
   // hex's own pages that are built: Now until Feed, Ideas and Goals join it. With one, no tabs show.
-  derive hexPages = ["now", "feed"]
+  derive hexPages = ["now"]
 
   // Feed (feed.contract): the last Feed hex gave shows until it answers; older stretches load as
   // the list reaches its end. feedSeen is the newest entry Bassim has had Feed open for; feedMark,

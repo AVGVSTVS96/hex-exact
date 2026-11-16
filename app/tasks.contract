@@ -87,7 +87,7 @@ component TasksList
   // The tabs stay right under the title and stop short of the status icons where those stand beside
   // them (folded upright, a column at the trailing edge); the list starts under both.
   derive tabsTop = headTop + titleHeight()
-  derive tabsEnd = tabsTop + tabsHeight() > clearTop ? min(room.bar.end, col.x + col.width) : col.x + col.width
+  derive tabsEnd = tabsTop < clearTop ? min(room.bar.end, col.x + col.width) : col.x + col.width
   derive listTop = max(tabsTop + tabsHeight(), clearTop)
   // The title row's search button ends where the chrome's capsule does, clear of the status icons.
   derive headEnd = two ? col.x + col.width - 16 : min(room.bar.end, col.x + col.width - 16)

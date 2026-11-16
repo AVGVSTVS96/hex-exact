@@ -35,8 +35,9 @@ component AnswerRow
         text label font="-exact-body" color="-exact-label"
         if detail != ""
           text detail font="-exact-subheadline" color="-exact-secondary-label"
-      if pick
-        text "✦ hex’s pick" font="-exact-footnote" font-weight=500 color="hex.accent" white-space="nowrap"
+        // Under its answer, so the answer keeps the row's width.
+        if pick
+          text "✦ hex’s pick" font="-exact-footnote" font-weight=500 color="hex.accent"
 
 component AskCard
   inject

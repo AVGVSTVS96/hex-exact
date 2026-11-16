@@ -1,92 +1,135 @@
-// Calls (§5): every call with hex, newest first, grouped by day. A row opens the call; swiping one
-// away deletes it (not the live one), and a delete hex refuses puts the row back with why.
-use Viewport, Calls, CallRow from "./shapes.contract"
-use lengthOf from "./parts.contract"
+// Calls (§5): every call with hex, newest first, under the day it happened. A row opens the call:
+// over Home in one column, beside the list in two. A swipe deletes one (not the live one) and leaves
+// Undo in its place for a few seconds before hex hears of it; a delete hex refuses comes back with why.
+use Calls, CallRow, Counts from "./shapes.contract"
+use Mark, Note, RowTap, PillTap, PillFace, dayOf from "./parts.contract"
+use Room, Chrome from "./room.contract"
 
-fn dayOf(at: number, now: number, offset: number): string = formatDate(at, offset, "iso") == formatDate(now, offset, "iso") ? "Today" : formatDate(at, offset, "iso") == formatDate(now - 86400000, offset, "iso") ? "Yesterday" : "Earlier"
 fn nameOf(c: CallRow): string = c.title != "" ? c.title : c.preview != "" ? c.preview : "A quiet call"
-// The time of day for today and yesterday (their headers say which), else the weekday or date.
-fn timeOf(c: CallRow, now: number, offset: number): string = c.live ? "Now" : dayOf(c.started, now, offset) == "Earlier" ? formatDay(c.started, now, offset, "list") : formatTime(c.started, offset, "short")
+// Today, Yesterday, then the weekday this week, then the date.
+fn dayHead(at: number, now: number, offset: number): string = dayOf(at, offset) == dayOf(now, offset) ? "Today" : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : formatDay(at, now, offset, "list")
 fn naming(c: CallRow, now: number): bool = c.title == "" and c.ended > 0 and now - c.ended < 600000
-fn detailOf(c: CallRow, now: number): string = `${lengthOf(c.seconds)}${naming(c, now) ? " · naming…" : c.tasks > 0 ? ` · ${c.tasks} ${c.tasks == 1 ? "task" : "tasks"}` : ""}`
+// How long, as a clock: 4:12, 1:02:40.
+fn clockOf(seconds: number): string = seconds >= 3600 ? `${floor(seconds / 3600)}:${floor((seconds % 3600) / 60) < 10 ? "0" : ""}${floor((seconds % 3600) / 60)}:${floor(seconds % 60) < 10 ? "0" : ""}${floor(seconds % 60)}` : `${floor(seconds / 60)}:${floor(seconds % 60) < 10 ? "0" : ""}${floor(seconds % 60)}`
 // How a call ended, short, where it wasn't simply hung up by Bassim.
 fn endShort(kind: string): string = kind == "hex" ? "hex hung up" : kind == "dropped" ? "Dropped" : kind == "expired" ? "Time ran out" : kind == "no-connect" ? "Didn't connect" : kind == "no-answer" ? "No answer" : kind == "busy" ? "Busy" : ""
 fn endBad(kind: string): bool = kind == "dropped" or kind == "no-connect"
-fn sourceSymbol(source: string): string = source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : source == "discord" ? "symbol:sf/headphones" : "symbol:sf/phone"
+fn sourceSymbol(source: string): string = source == "web" ? "symbol:sf/globe" : source == "phone-in" ? "symbol:sf/phone.arrow.down.left" : source == "phone-out" ? "symbol:sf/phone.arrow.up.right" : source == "discord" ? "symbol:sf/headphones" : "symbol:waveform"
+// The grey line under a call's name: when, then what came of it.
+fn detailOf(c: CallRow, now: number, offset: number): string = [formatTime(c.started, offset, "short")].concat(naming(c, now) ? ["naming…"] : []).concat(c.tasks > 0 ? [`${c.tasks} ${c.tasks == 1 ? "task" : "tasks"}`] : []).join(" · ")
+
+// The page's title, under the chrome, kept clear of the status icons on its trailing side.
+component PageTitle
+  props
+    text: string
+    room: Room
+    left: number
+    id: string
+  view
+    text text role="heading" aria-level=1 font="-exact-large-title" font-weight=700 color="-exact-label" line-clamp=2 padding=`0 ${max(room.width - room.bar.end, 20)}px 0 ${left}px` testId=id
 
 component CallsList
+  inject
+    haptics: bool
   props
     entry: Entry
-    viewport: Viewport
+    room: Room
     now: number
     offset: number
     calls: Calls
+    counts: Counts
     loading: bool
     failed: bool
+    // A call is on: its bar sits at the foot, so the list ends above it.
+    docked: bool
+    // With two columns, the call open beside the list.
+    selected: string
+    select: action
     open: action
+    openTasks: action
     remove: action
+    undoRemove: action
+    // The call that can still be taken back, and the one hex is deleting.
+    undoable: string
     removing: string
     removeError: string
     back: action
-  // A deleted call leaves at once; one hex refused comes back with why.
+  derive two = room.columns == 2
   derive shown = calls.calls.filter(c => c.id != removing or removeError != "")
-  derive groups = ["Today", "Yesterday", "Earlier"].filter(d => shown.filter(c => dayOf(c.started, now, offset) == d).length > 0)
+  derive dayOfEach = shown.map(c => dayHead(c.started, now, offset))
+  derive days = dayOfEach.filter((d, i) => dayOfEach.indexOf(d) == i)
+  derive pad = room.clear.x + 20
+  derive listLeft = two ? room.first.x : 0
+  derive listWidth = two ? room.first.width : room.width
   view
-    column navigationKey=`${entry.id}` navigationScroll="calls-list" position="absolute" inset=0 testId="calls"
-      header
-        text "Calls" role="heading" aria-level=1
-      list id="calls-list" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        if shown.length == 0
-          section
-            column gap=6 padding="36px 8px" align-items="center" text-align="center" testId=(failed ? "calls-offline" : loading ? "calls-loading" : "calls-empty")
-              if loading and not failed
-                progress aria-label="Loading your calls"
-              else
-                image (failed ? "symbol:sf/wifi.exclamationmark" : "symbol:sf/phone.bubble") width=34 height=34 object-fit="contain" color="-exact-tertiary-label" margin-bottom=6 aria-hidden=true
-                text (failed ? "Can't reach hex" : "No calls yet") font="-exact-headline"
-                text (failed ? "Check that Tailscale is on, then try again." : "When a call ends, it lands here with what was said and what came of it.") font="-exact-subheadline" color="-exact-secondary-label"
-        else
-          if failed
-            section
-              row gap=8 align-items="center" testId="calls-stale"
-                image "symbol:sf/wifi.exclamationmark" width=16 height=16 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-                text "Can't reach hex. These are the calls it last sent." font="-exact-footnote" color="-exact-secondary-label" flex=1
-          for d in groups key=d
-            if groups.length > 1
-              section
-                header
-                  text d
-                for c in shown.filter(x => dayOf(x.started, now, offset) == d) key=c.id
-                  CallRowView(c=c, now=now, offset=offset, remove=remove, removing=removing, removeError=removeError)
-            else
-              section
-                for c in shown key=c.id
-                  CallRowView(c=c, now=now, offset=offset, remove=remove, removing=removing, removeError=removeError)
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="calls-list" position="absolute" inset=0 background-color="-exact-background" testId="calls"
+      Chrome(room=room, on="calls", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
+      scroll id="calls-list" position="absolute" top=room.below bottom=0 left=listLeft width=listWidth padding-bottom=(room.foot + (docked ? 88 : 24)) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="calls-scroll"
+        PageTitle(text="Calls", room=room, left=(two ? 20 : pad), id="calls-title")
+        column padding=(two ? "8px 8px 0" : `8px ${max(room.width - room.clear.x - room.clear.width, 0) + 8}px 0 ${room.clear.x + 8}px`) gap=2
+          if shown.length == 0
+            Note(kind=(failed ? "failed" : loading ? "loading" : "empty"), text=(failed ? "Can't reach hex. Check that Tailscale is on." : loading ? "Loading your calls" : "No calls yet. When a call ends, it lands here with what was said."), pad="24px 12px", id=(failed ? "calls-offline" : loading ? "calls-loading" : "calls-empty"))
+          else
+            if failed
+              Note(kind="failed", text="Can't reach hex. These are the calls it last sent.", pad="8px 12px", id="calls-stale")
+            for d in days key=d
+              text d role="heading" aria-level=2 font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" padding="18px 12px 6px" testId=`calls-day-${d}`
+              for c in shown.filter(x => dayHead(x.started, now, offset) == d) key=c.id
+                if c.id == undoable
+                  DeletedRow(c=c, undo=undoRemove)
+                else
+                  CallRowView(c=c, now=now, offset=offset, two=two, selected=(two and c.id == selected), select=select, remove=remove, removing=removing, removeError=removeError)
 
-// One call: its name and when, how long and what came of it, or that it's live.
+// One call: a disc with how it came in, its name, when and what came of it, and how long.
+// Swiped from the right, Delete.
 component CallRowView
+  inject
+    haptics: bool
   props
     c: CallRow
     now: number
     offset: number
+    two: bool
+    selected: bool
+    select: action
     remove: action
     removing: string
     removeError: string
   view
-    link href=path("pastCall", c.id) delete=remove(c.id) disabled=c.live aria-label=`${nameOf(c)}, ${c.live ? "live now" : `${timeOf(c, now, offset)}, ${detailOf(c, now)}`}` testId=`call-${c.id}`
-      column flex=1 min-width=0 gap=3 padding="2px 0"
-        row gap=8 align-items="baseline"
-          text nameOf(c) font="-exact-body" font-weight=500 flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" testId=`call-name-${c.id}`
-          text timeOf(c, now, offset) font="-exact-subheadline" font-variant-numeric="tabular-nums" color=(c.live ? "-exact-system-green" : "-exact-secondary-label") flex-shrink=0
-        row gap=6 align-items="center"
-          if c.live
-            box width=7 height=7 border-radius=4 background-color="-exact-system-green" aria-hidden=true
-            text "Live now" font="-exact-subheadline" color="-exact-system-green"
-          else
-            if c.source != "app" and c.source != ""
-              image sourceSymbol(c.source) width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-            text detailOf(c, now) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
-            if endShort(c.ending) != ""
-              text `· ${endShort(c.ending)}` font="-exact-subheadline" color=(endBad(c.ending) ? "-exact-system-red" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
-        if c.id == removing and removeError != ""
-          text `Not deleted · ${removeError}` font="-exact-footnote" color="-exact-system-red" testId=`call-error-${c.id}`
+    scroll swipeContent=`${c.id}-row` swipeTrailing=(c.live ? "" : `${c.id}-delete`) display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`call-${c.id}`
+      link id=`${c.id}-row` href=(two ? "" : path("pastCall", c.id)) press=select(c.id) class=RowTap width="100%" flex-shrink=0 scroll-snap-align="start" gap=14 align-items="center" padding="10px 12px" background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected aria-label=`${nameOf(c)}, ${c.live ? "live now" : `${detailOf(c, now, offset)}, ${clockOf(c.seconds)} long`}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`call-open-${c.id}`
+        box width=40 height=40 border-radius=20 flex-shrink=0 background-color=(c.live ? "hex.progress.wash" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" aria-hidden=true
+          image sourceSymbol(c.source) width=18 height=18 object-fit="contain" color=(c.live ? "hex.progress" : "-exact-label")
+        column flex=1 min-width=0 gap=2
+          text nameOf(c) font="-exact-body" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" testId=`call-name-${c.id}`
+          row gap=4 align-items="baseline" min-width=0
+            if c.live
+              text "Live now" font="-exact-subheadline" color="hex.progress"
+            else
+              text detailOf(c, now, offset) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" flex-shrink=0
+              if endShort(c.ending) != ""
+                text `· ${endShort(c.ending)}` font="-exact-subheadline" color=(endBad(c.ending) ? "hex.danger" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+          if c.id == removing and removeError != ""
+            text `Not deleted · ${removeError}` font="-exact-footnote" color="hex.danger" testId=`call-error-${c.id}`
+        if not c.live
+          text clockOf(c.seconds) font="-exact-body" font-variant-numeric="tabular-nums" color="-exact-secondary-label" flex-shrink=0
+      if not c.live
+        button id=`${c.id}-delete` press=remove(c.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`delete-${c.id}`
+          image "symbol:delete"
+          text "Delete"
+
+// A call just deleted: what it was, and Undo, until hex is told.
+component DeletedRow
+  inject
+    haptics: bool
+  props
+    c: CallRow
+    undo: action
+  view
+    row gap=14 align-items="center" padding="10px 12px" min-height=60 box-sizing="border-box" aria-live="polite" testId=`deleted-${c.id}`
+      box width=40 height=40 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-hidden=true
+        image "symbol:delete" width=18 height=18 object-fit="contain" color="-exact-tertiary-label"
+      text `Deleted “${nameOf(c)}”` font="-exact-subheadline" color="-exact-secondary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      button press=undo class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, keep “${nameOf(c)}”` testId=`undo-delete-${c.id}`
+        box class=PillFace
+          text "Undo" font="-exact-subheadline" font-weight=600 color="-exact-label"

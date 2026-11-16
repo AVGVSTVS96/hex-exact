@@ -75,6 +75,10 @@ component App
   // Unsent words, kept across launches: `${key}\t${text}`, key `thread:<task>` or `ask:<id>`.
   state drafts = [""].slice(0, 0) persist
   state removing = ""
+  // A call just swiped away, still taken back with Undo; hex hears of it a few seconds later.
+  state undoable = ""
+  // With two columns, the call open beside the Calls list; "" for the newest.
+  state callBeside = ""
   // Photos and videos added to one composer (attachedTo: `ask:<id>` or `thread:<id>`), uploaded,
   // waiting to go with its next send.
   state attached = [Media(id="", kind="", aspect=0)].slice(0, 0)
@@ -165,7 +169,10 @@ component App
 
   // What the open screens show; asked only while they are open.
   derive names = stack(nav).map(e => e.name)
-  derive pastId = match stack(nav).filter(e => e.name == "pastCall").at(-1) { case some(e) => e.params.id, case none => "" }
+  // With two columns, Calls has a call open beside its list: the one tapped, else the newest.
+  derive callsPane = room.columns == 2 and top(nav).name == "calls"
+  derive paneCall = callBeside != "" and callsShown.calls.filter(c => c.id == callBeside and c.id != undoable).length > 0 ? callBeside : match callsShown.calls.filter(c => c.id != undoable and c.id != removing).at(0) { case some(c) => c.id, case none => "" }
+  derive pastId = match stack(nav).filter(e => e.name == "pastCall").at(-1) { case some(e) => e.params.id, case none => callsPane ? paneCall : "" }
   derive pastLive = calls.live != "" and pastId == calls.live
   // Tasks beside a page: the Duo opened like a book, or a window wide enough for both.
   derive split = viewport.horizontalViewportSegments == 2 or viewport.width >= 900
@@ -528,10 +535,23 @@ component App
 
   // Calls
   action removeCall(id: string)
-    removing = id
+    if undoable != ""
+      sendRemove(undoable)
+    undoable = id
     if haptics
       haptic("impact-medium")
+  task removeLater when undoable != "" key=undoable
+    after(5000, removeNow)
+  action removeNow
+    sendRemove(undoable)
+    undoable = ""
+  action sendRemove(id: string)
+    removing = id
     send removed = removeCall(id)
+  action undoRemove
+    undoable = ""
+  action pickCall(id: string)
+    callBeside = id
 
   // Settings, on hex (voice, personality, pace, words) and on this phone
   action setSetting(field: string, value: string)
@@ -579,9 +599,11 @@ component App
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"
-          CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=callsShown, loading=(not current(liveCalls)), failed=failed(liveCalls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
+          CallsList(entry=e, room=room, now=now, offset=clock.utcOffset, calls=callsShown, counts=counts, loading=(not current(liveCalls)), failed=failed(liveCalls), docked=callOn, selected=paneCall, select=pickCall, open=open, openTasks=openTasks, remove=removeCall, undoRemove=undoRemove, undoable=undoable, removing=removing, removeError=removeError, back=back)
+          if callsPane and paneCall != ""
+            PastCall(entry=e, room=room, pane=true, id=paneCall, now=now, offset=clock.utcOffset, record=record, counts=counts, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), docked=callOn, openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "pastCall"
-          PastCall(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, record=record, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
+          PastCall(entry=e, room=room, pane=false, id=e.params.id, now=now, offset=clock.utcOffset, record=record, counts=counts, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), docked=callOn, openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
           TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(liveTasks) or not current(liveAsks)), failed=(failed(liveTasks) or failed(liveAsks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
             TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
@@ -598,9 +620,9 @@ component App
         if e.name == "check"
           LastCheck(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
         if e.name == "settings"
-          SettingsScreen(entry=e, viewport=viewport, settings=settings, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, haptics=haptics, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, open=open, back=back)
+          SettingsScreen(entry=e, room=room, settings=settings, counts=counts, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, still=still, docked=callOn, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, preview=previewVoice, open=open, openTasks=openTasks, back=back)
         if e.name == "voice"
-          VoicePage(entry=e, viewport=viewport, settings=settings, voice=voice, inCall=(call.status != "idle"), loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), set=setSetting, preview=previewVoice, open=open, back=back)
+          VoicePage(entry=e, room=room, settings=settings, counts=counts, voice=voice, inCall=(call.status != "idle"), docked=callOn, loading=(not current(settings)), failed=failed(settings), unsaved=(not pending(saved) and (failed(saved) or match saved { case some(r) => not r.ok, case none => false })), set=setSetting, preview=previewVoice, open=open, openTasks=openTasks, back=back)
         if e.name == "words"
           YourWords(entry=e, words=settings.words, set=setSetting, back=back)
       input id="opened" display="none" change=heardOpen

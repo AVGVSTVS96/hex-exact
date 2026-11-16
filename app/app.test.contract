@@ -52,7 +52,7 @@ test "Tasks, Calls and Settings open from Home and go back to it"
   clock settle
   clock +500
   expect tree missing "voice"
-  tap "settings-done"
+  tap "chrome-back"
   clock settle
   clock +500
   expect tree missing "settings"

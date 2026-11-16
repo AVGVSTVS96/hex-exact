@@ -1,6 +1,6 @@
 // The update toast (§11): a new build of hex Exact is out. Install hands it to hangar, which
 // installs it and opens the new build (ending the call first); without hangar, the install link
-// installs it. "Not now" hides it until the build after. It sits in Home's free chrome row, beside
+// installs it. × hides it until the build after. During a call it says Install ends the call. It sits in Home's free chrome row, beside
 // the capsule and on hex's side, never over hex or a control; it waits there while a page is open.
 use Build from "./shapes.contract"
 use Tap from "./parts.contract"
@@ -46,13 +46,14 @@ component UpdateToast
     if shown and place == "home"
       row position="absolute" top=room.bar.top left=room.bar.start width=(spanEnd - room.bar.start) height=44 justify-content="flex-start" z-index=3 pointer-events="none" testId="update-toast"
         row pointer-events="auto" backgroundMaterial="glass" border-radius=22 height=44 max-width="100%" align-items="center"
-          button id="update-install" press=install change=heard class=Tap height=44 min-width=0 padding=(step == "installing" ? "0 14px" : "0 4px 0 14px") display="flex" flex-direction="row" align-items="center" gap=8 aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
+          button id="update-install" press=install change=heard class=Tap height=44 min-width=0 padding=(step == "installing" ? "0 16px" : "0 4px 0 16px") display="flex" flex-direction="row" align-items="center" gap=10 aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
             if step == "installing"
               progress width=16 height=16 aria-label="Installing"
-              text "Installing" font="-exact-subheadline" font-weight=600 color="-exact-label" white-space="nowrap"
+              text "Installing…" font="-exact-subheadline" font-weight=600 color="-exact-label" white-space="nowrap"
             else
-              text (step == "failed" ? "Didn't start" : "Update ready") font="-exact-subheadline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
-              text (step == "failed" ? "Try again" : live ? "End & install" : "Install") font="-exact-subheadline" font-weight=600 color="AccentColor" white-space="nowrap"
+              text (step == "failed" ? "Didn't start" : live ? "Ends the call" : "Update ready") font="-exact-subheadline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+              box padding="7px 14px" border-radius=999 background-color="-exact-label" flex-shrink=0
+                text (step == "failed" ? "Try again" : "Install") font="-exact-subheadline" font-weight=600 color="-exact-background" white-space="nowrap"
           if step != "installing"
-            button press=skip(build.latest) class=Tap width=36 height=44 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-label="Not now" testId="update-dismiss"
-              image "symbol:close" width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+            button press=skip(build.latest) class=Tap width=44 height=44 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-label="Hide until the next build" testId="update-dismiss"
+              image "symbol:close" width=12 height=12 object-fit="contain" color="-exact-secondary-label" aria-hidden=true

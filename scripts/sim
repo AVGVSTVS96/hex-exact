@@ -97,8 +97,13 @@ xcrun simctl boot "$id" 2>/dev/null || true
 xcrun simctl bootstatus "$id" -b >/dev/null
 app=$run/HexExact.app out=$run/shots tests=$HOME/Developer/hex-exact-sim-build/flows-$lane
 rm -rf "$out" && mkdir -p "$out"
-# The stand-in is plain http on this Mac, which App Transport Security lets through as local.
+# The stand-in is plain http on this Mac, which App Transport Security lets through as local
+# (PlistBuddy makes no dictionary on the way to a key, so the dictionary first). Without it the
+# app shows "Can't reach hex" and every picture is of an empty app, so the run stops instead.
+/usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity dict' "$app/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true' "$app/Info.plist" 2>/dev/null || true
+[ "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsLocalNetworking' "$app/Info.plist")" = true ] ||
+  { echo "the simulator's app can't reach the stand-in (no NSAllowsLocalNetworking), so no pictures" >&2; exit 1; }
 # Both simulators' builds reach the one stand-in, kept running between runs and started afresh
 # when its script changes. Writes from both land in one list, so a flow's list can hold the
 # other simulator's when both play at once.
@@ -110,6 +115,8 @@ if ! cmp -s "$kept" $run/scripts/standin.mjs || ! lsof -ti tcp:47391 -sTCP:LISTE
   HEX_URL=$hex_url HEX_TOKEN=$hex_token PORT=47391 WRITES=$writes nohup node "$kept" >/dev/null 2>&1 &
   sleep 1
 fi
+curl -sf -m 10 -o /dev/null http://127.0.0.1:47391/asks ||
+  { echo "the stand-in doesn't reach hex (http://127.0.0.1:47391/asks on the Mac), so no pictures" >&2; exit 1; }
 trap 'xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true' EXIT
 xcrun simctl status_bar "$id" override --time 9:41 --batteryLevel 100 --cellularBars 4 2>/dev/null || true
 hub=~/Developer/hex-exact-sim-build/devicehub-sim
@@ -151,7 +158,7 @@ play() {
   local name=$1 script=$2 pose=$3 appearance=$4 dir=$out/$1 step=0 answered=0 line shot at=$3 where
   mkdir -p "$dir"
   rm -rf "$tests/sync" "$tests/result.xcresult" "$tests/attachments" && mkdir -p "$tests/sync"
-  local from=$(($(wc -c <"$writes" 2>/dev/null || echo 0) + 1))
+  local from=$(($( { wc -c <"$writes"; } 2>/dev/null || echo 0) + 1))
   # The loop reads from a process substitution, not a pipe, so the poses it moves to stay known here.
   while IFS= read -r line; do
     case $line in

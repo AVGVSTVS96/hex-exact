@@ -1,0 +1,17 @@
+# In the demo call: Photos and the camera open over the whole window, and close back to the call.
+launch call:/
+wait 6
+tap call-add
+tap Photos
+wait 2
+shoot photos
+tap Cancel
+wait 1
+tap call-add
+tap Camera
+system Allow
+wait 2
+shoot camera
+tap Close
+wait 1
+shoot back-in-call

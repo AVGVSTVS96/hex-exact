@@ -87,11 +87,10 @@ enum MediaPicker {
     top.present(alert, animated: true)
   }
 
-  /// A sheet as wide as the window. On a regular-width window (the Duo open, an iPad) iOS otherwise
-  /// draws a sheet at a page's width, an iPhone-sized card in the middle.
-  private static func fill(_ sheet: UIViewController) {
-    sheet.modalPresentationStyle = .pageSheet
-    sheet.sheetPresentationController?.prefersPageSizing = false
+  /// Over the whole window, as the camera is. On a regular-width window (the Duo open, an iPad) a
+  /// sheet is drawn as an iPhone-sized card in the middle, and the picker ignores `prefersPageSizing`.
+  private static func fill(_ picker: UIViewController) {
+    picker.modalPresentationStyle = .fullScreen
   }
 
   /// The picker's file is gone once its callback returns, so it's copied out first.

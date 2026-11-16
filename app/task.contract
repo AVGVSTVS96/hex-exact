@@ -137,7 +137,8 @@ component TaskBody
   derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${waiting > 0 ? `${waiting} need you · ` : ""}${row.state == "needs" ? `waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `working for ${lengthOf((now - row.since) / 1000)}` : row.state == "done" ? `done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}`
   derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
   derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
-  derive replyAsk = pageAsks.filter(a => a.id == replying)
+  // The reply box docked at the foot: for the question Bassim picked, else the first still open.
+  derive replyAsk = replying != "" ? pageAsks.filter(a => a.id == replying) : pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).slice(0, 1)
   derive weekly = places.filter(t => t.track.length > 0)
   // The door out to where this lives: the thread's own place, the finished item's, or a topic's
   // first question's.

@@ -15,8 +15,9 @@ as an inventory to draw on.
    (clock, battery, cameras, hinge, keyboard). No control or fixed part of ours ever sits under
    them, in any of the Duo's four poses, and the same size gives the same layout whether the
    phone is folded or not.
-3. **hex is the home.** Its face, one live line of what it's doing, the few things that need
-   you, what it's working on, what it decided. A call is one button away.
+3. **hex is the home.** Its face and one live line of what it's doing stay on top of its four
+   pages: Now (the few things that need you, what it's working on, what it decided), Feed,
+   Ideas and Goals. A call is one button away.
 4. **One system.** One row, one section head, one answer row, one composer, one set of colours
    each with one job, in light and dark.
 5. **The call holds.** It starts, reads, mutes, ends, reconnects and survives a locked screen.
@@ -74,6 +75,29 @@ until Hands photographs that pose.
 The question and Tasks in light, and Home and the question open like a book in light, are in
 `docs/plan/`.
 
+## hex's four pages
+
+Muse puts its face on top of Feed, Ideas and Goals, and switches between them at the foot of
+the screen. hex does the same, in its own column.
+
+```
+foot of hex's column                      beside the status icons
+┌─────────────────────────────┐ ┌──────┐  ┌──────┐ ┌──────────────────────────┐
+│  Now    Feed   Ideas  Goals │ │ Call │  │ Back │ │ Calls   Tasks   Settings │
+└─────────────────────────────┘ └──────┘  └──────┘ └──────────────────────────┘
+hex's own pages: its face and live        every other page: over Home when
+line stay, the list under them changes    folded, beside it with two columns
+```
+
+- **Now** is Home as drawn above: Needs you, Working on, hex decided.
+- **Feed** is what hex did and found, by day.
+- **Ideas** is what you floated for later, each with what hex has found on it since.
+- **Goals** is what you asked for and how far each is, and what hex keeps watch on.
+
+A row on any of the four opens over Home when folded and beside it when there's room for two
+columns, as a row on Now does. Back returns to the tab you left. Calls, Tasks and Settings
+stay where they are.
+
 ## The pieces
 
 ```
@@ -126,7 +150,7 @@ window size + what covers it (status icons, cameras, hinge, keyboard)
                          ▼
 room (one place, the app's root)
   columns   one or two, by width; two only when both read well
-  chrome    where Calls, Tasks, Settings and Back sit
+  chrome    where Calls, Tasks, Settings and Back sit, and hex's tabs and Call
   clear     the rectangle nothing covers
                          │
                          ▼
@@ -145,11 +169,18 @@ On the Duo, in all four poses:
   Where Home has a page beside it, the notice keeps to Home's side.
 - Calls, Tasks and Settings keep one place on every page. Back appears beside them without
   moving them.
-- Call keeps a clear spot in hex's column: at its foot, or beside hex's face when the column is
-  short. No row sits under it.
+- Now, Feed, Ideas and Goals are tabs at the foot of hex's column, each an icon with its name,
+  with Call beside them. A tap changes the list under hex's face at once; its face and live
+  line don't move. The tab you're on is marked, and Feed shows a dot when something is new.
+- The tabs and Call keep a clear spot at the foot of hex's column. When the column is short,
+  Call moves beside hex's face and the tabs keep the foot. A list fades out above them; no row
+  sits under them.
+- The tabs belong to hex's column. A page over Home has none; Back returns to the tab you left.
+  During a call Mute, End and Camera take their place, and the tabs come back when it ends.
 - The same window size gives the same layout, folded or not. Two columns appear only when both
   read well. No control or fixed part sits on the hinge; a list may scroll across it.
-- Fold, unfold, rotate: you stay on the page you were on, nothing jumps, the scroll holds.
+- Fold, unfold, rotate: you stay on the page and the tab you were on, nothing jumps, the scroll
+  holds.
 - The keyboard comes up: the field stays in view and nothing else moves.
 - In Split View, on an iPad and on a plain iPhone the same model lays the app out.
 
@@ -272,5 +303,5 @@ finished after this, not before.
 
 ## Not in this plan
 
-- Muse's Feed, Ideas, Goals and Spaces. This plan finishes what the app does today.
+- Muse's Spaces.
 - Matching the stable app for its own sake.

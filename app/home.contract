@@ -13,6 +13,8 @@ use Item, entriesOf, homeOf, problemOf from "./inbox.contract"
 // hex floats at the top of its room: the orb (Home draws it, so a call grows it from there) over a
 // glass pill with its name and one short live line.
 fn hexOrb(): number = 44
+// The persona fills two thirds of its frame (measured on the simulator), so its frame is larger.
+fn hexOrbFrame(): number = 66
 // What the pill takes under the orb's top: the orb, less the 9 it overlaps the pill, and the pill.
 fn hexHeight(): number = 72
 

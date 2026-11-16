@@ -110,5 +110,5 @@ component Chrome
         button press=open(path("settings")) class=Tap width=44 height=44 border-radius=22 background-color=(on == "settings" ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" aria-current=(on == "settings") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
           image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
         if needsYou > 0 and on != "tasks"
-          box position="absolute" top=4 left=76 width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
+          box position="absolute" top=4 left=76 width=10 height=10 border-radius=5 background-color="hex.ask" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
 

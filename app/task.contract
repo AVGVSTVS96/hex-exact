@@ -326,7 +326,7 @@ component TaskBody
                 ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=foot)
+          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=foot, answered=(said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0))
       else if docked
         button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=16 right=16 bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
           row class=Composer flex=1 align-items="center" padding="0 16px"

@@ -343,6 +343,8 @@ style TabTap
   :active
     -exact-press-scale=0.92
 
+// Not a tablist: iOS draws a tablist of symbol-over-label tabs as a native tab bar, 91pt tall in
+// its own glass oval around this pill.
 component HexTabs
   inject
     haptics: bool
@@ -356,9 +358,9 @@ component HexTabs
   slot
   view
     row gap=12 align-items="center" justify-content="center" testId="hex-tabs"
-      row backgroundMaterial="glass" border-radius=28 height=56 padding=4 box-sizing="border-box" gap=0 align-items="center" role="tablist" aria-label="hex" flex-shrink=0
+      row backgroundMaterial="glass" border-radius=28 height=56 padding=4 box-sizing="border-box" gap=0 align-items="center" aria-label="hex's pages" flex-shrink=0
         for t in hexTabs().filter(t => pages.filter(p => p == t.id).length > 0) key=t.id
-          button press=pick(t.id) class=TabTap background-color=(current == t.id ? "-exact-tertiary-fill" : "transparent") transition=springOf(still, "background-color") role="tab" aria-selected=(current == t.id) aria-label=(t.id == "feed" and fresh ? "Feed, new" : t.label) -exact-press-haptic=(haptics ? "selection" : "none") testId=`hex-tab-${t.id}`
+          button press=pick(t.id) class=TabTap background-color=(current == t.id ? "-exact-tertiary-fill" : "transparent") transition=springOf(still, "background-color") aria-current=(current == t.id) aria-label=(t.id == "feed" and fresh ? "Feed, new" : t.label) -exact-press-haptic=(haptics ? "selection" : "none") testId=`hex-tab-${t.id}`
             image t.icon width=22 height=22 object-fit="contain" color=(current == t.id ? "-exact-label" : "-exact-secondary-label") aria-hidden=true
             text t.label font-size=10 line-height=12 font-weight=(current == t.id ? 600 : 500) color=(current == t.id ? "-exact-label" : "-exact-secondary-label") white-space="nowrap"
             if t.id == "feed" and fresh

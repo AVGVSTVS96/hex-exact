@@ -10,9 +10,9 @@ use endingOf, badEnding, lengthOf, Tap, HexTabs, Mark, springOf, Primary from ".
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
-use HexHome, faceOf from "./home.contract"
+use HexHome, hexOrb from "./home.contract"
 use AnswerRow from "./ask.contract"
-use Room, Chrome from "./room.contract"
+use Room, Chrome, stacked, systemButtonsWidth from "./room.contract"
 use FeedView from "./feed.contract"
 use Ideas, Idea from "./ideas.contract"
 
@@ -161,8 +161,8 @@ component Home
 
   // Where things go, from the room: the chrome row beside the status icons, hex's column (the
   // whole clear width with one column, the first with two) with Call at its foot, and with two
-  // columns the words or the page a row opens in the second. There is one orb: at rest it is hex's
-  // face at the head of the column (home.contract faceOf); a call grows it from there in one motion,
+  // columns the words or the page a row opens in the second. There is one orb: at rest it is hex,
+  // floating at the top of its room on every page; a call grows it from there in one motion,
   // with hex's name, the call's clock and what hex is doing under it, and the words below (one
   // column) or beside (two). Pulling the words up gives them the whole column.
   derive W = viewport.width
@@ -176,17 +176,23 @@ component Home
   // Where the chrome row leaves hex's column clear (room.firstTop), hex starts at the row's top;
   // the update notice, when there is one, takes that row on hex's side.
   derive below = notice ? room.below : room.firstTop
-  derive compact = H < W
-  derive face = faceOf(hexW, compact)
-  // With more than one of hex's pages, its tabs take the foot at rest and Call stands beside them.
+  // With more than one of hex's pages and no system tabs (a binary from before the shell's bars),
+  // the app's own tabs take the foot at rest and Call stands beside them.
   derive tabbed = pages.length > 1 and status == "idle" and homeMode and not room.native
-  // The foot of hex's column: the tabs and Call at rest (room.tabs), Mute, End and Camera with their
-  // names in a call. A list in the column ends above them.
+  // hex's room: its column from the window's top down to the hinge (open like a laptop) or the
+  // window's foot, the page scrolling under hex at its top and Call at its trailing foot.
+  derive across = stacked(room)
+  derive roomBottom = H - room.across
+  // hex floats at the top, centred; open like a laptop in the bar's row, left of the system's buttons.
+  derive hexTop = across ? max(viewport.safeAreaTop, 16) + 2 : below - 6
+  derive hexX = across ? (room.bar.end - systemButtonsWidth()) / 2 - left : hexW / 2
+  derive callFoot = across ? 12 : bottom
   derive callSize = 64
+  derive fabSize = 58
   derive endSize = 68
   derive sideSize = 58
   derive controlsTop = H - bottom - 12 - endSize - 22
-  derive footTop = homeMode ? H - room.tabs.top : H - controlsTop
+  derive footTop = tabbed ? H - room.tabs.top : homeMode ? roomBottom : H - controlsTop
 
   // The orb: hex's face at rest; in a call at the head of the column (one) or the middle of the
   // first (two), its name, clock and agent line under it.
@@ -200,7 +206,7 @@ component Home
   // It stands where the call puts it, and at rest is moved and scaled onto the face: a transform,
   // so it springs between the two without laying anything out.
   derive orbX = left + hexW / 2
-  derive restShift = `${left + face.x - orbX}px ${below + face.y - callOrbY}px`
+  derive restShift = `${left + hexX - orbX}px ${hexTop + hexOrb() / 2 - callOrbY}px`
   derive glide = still ? "none" : "translate -exact-spring(380, 34, 1), scale -exact-spring(380, 34, 1), opacity -exact-spring(380, 34, 1)"
 
   // One column: the words fill the column under the orb's lines down to the controls (`rest`), or,
@@ -243,10 +249,10 @@ component Home
 
       Chrome(room=room, on="", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=open("/"))
 
-      // hex as the home: in hex's column under the chrome, down to the tabs and Call; with two columns
-      // the page a row opens beside it.
-      column position="absolute" top=below bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
-        HexHome(width=hexW, height=(H - footTop - below), compact=compact, face=false, headRight=max(left + hexW - room.headEnd, 0), headDown=max(room.headBottom - below, 0), persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
+      // hex as the home: hex's room, its page scrolling under hex to the top edge and under Call to the
+      // foot; with two columns the page a row opens beside it (below it open like a laptop).
+      column position="absolute" top=0 bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
+        HexHome(width=hexW, height=(H - footTop), top=hexTop, x=hexX, pad=(tabbed ? 26 : callFoot + fabSize + 12), still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
           column align-items="center" gap=8 padding="12px 0 0"
             CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
             if wrapped
@@ -257,8 +263,8 @@ component Home
         column position="absolute" top=room.secondTop bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
           children
 
-      // The orb: hex's face at rest on Now (Feed, Ideas and Goals scroll their own), grown into the call.
-      box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? face.size / bigOrb : 1) opacity=(homeMode and page != "now" ? 0 : 1) transition=glide z-index=2 pointer-events="none" testId="orb-spot"
+      // The orb: hex floating over its room at rest, grown into the call.
+      box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? hexOrb() / bigOrb : 1) transition=glide z-index=2 pointer-events="none" testId="orb-spot"
         hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width="100%" height="100%" role="img" aria-label=label testId="orb"
 
       // Under the orb in a call: hex, the clock or how it's connecting, and what hex is doing for it.
@@ -285,18 +291,18 @@ component Home
             text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
           CallWords(lines=lines, asks=activity.asks, said=said, width=room.second.width, live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
 
-      // The foot of hex's column. At rest: Call, with hex's tabs beside it once there are more pages
-      // than Now (room.contract places the pair). In a call: Mute, End and Camera, where a thumb reaches.
-      if homeMode
+      // At rest Call floats at the trailing foot of hex's room, over the page scrolling under it (the
+      // app's own tabs beside it in a binary without the system's). In a call: Mute, End and Camera,
+      // where a thumb reaches.
+      if tabbed
         row position="absolute" left=room.tabs.x width=room.tabs.width top=room.tabs.top height=callSize justify-content="center" align-items="center" z-index=4 testId="controls"
-          if tabbed
-            HexTabs(pages=pages, current=page, fresh=feedFresh, pick=pickPage)
-              CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
-          else
-            if two and talking
-              box position="absolute" left=24
-                WordsButton(size=52, shown=wordsShown, single=false, show=toggleWords)
+          HexTabs(pages=pages, current=page, fresh=feedFresh, pick=pickPage)
             CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
+      else if homeMode
+        row position="absolute" right=(hexRight + 12) bottom=(roomBottom + callFoot) height=fabSize gap=12 align-items="center" z-index=4 testId="controls"
+          if two and talking
+            WordsButton(size=52, shown=wordsShown, single=false, show=toggleWords)
+          CallButton(size=fabSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
       else
         row position="absolute" top=controlsTop left=left width=hexW justify-content="center" align-items="flex-start" gap=30 z-index=4 testId="controls"
           Labeled(text=(micOff ? "Unmute" : "Mute"))
@@ -473,11 +479,11 @@ component CallButton
     retry: bool
     primary: action
   view
-    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
+    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") box-shadow=(status == "idle" ? "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" : "none") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
       if busy
         progress width=(size / 3) height=(size / 3) color="#FFFFFF" aria-label="Connecting"
       else
-        image (status == "idle" ? "symbol:waveform" : "symbol:sf/phone.down.fill") width=(size * 0.36) height=(size * 0.36) object-fit="contain" color=(status == "idle" ? "-exact-background" : "#FFFFFF")
+        image (status == "idle" ? "symbol:waveform" : "symbol:sf/phone.down.fill") width=(size * (status == "idle" ? 0.45 : 0.36)) height=(size * (status == "idle" ? 0.45 : 0.36)) object-fit="contain" color=(status == "idle" ? "-exact-background" : "#FFFFFF")
 
 // A question hex put on screen during the call (§7): tap an answer, or say it. hex's pick wears
 // the mint wash with ✦, as everywhere; what Bassim chose fills with the accent.

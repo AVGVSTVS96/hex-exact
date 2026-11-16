@@ -129,6 +129,14 @@ fn roomIn(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, cle
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()
 
+// Open like a laptop, the hinge runs across the window.
+fn stacked(room: Room): bool = room.columns == 2 and room.across < room.height
+// Home's room: open like a laptop, its list is the window above the hinge and the page it opens the
+// window below, each the full width.
+fn homeRoomOf(room: Room): Room = stacked(room) ? Room(room, first=Span(x=room.clear.x, width=room.clear.width), second=Span(x=room.clear.x, width=room.clear.width), secondTop=room.across + 12, secondBelow=room.across + 12, secondHeadEnd=room.clear.x + room.clear.width) : room
+// The system's Calls, Tasks and Settings in the bar along the top, one glass group as iOS draws it.
+fn systemButtonsWidth(): number = 163
+
 // The chrome: Calls, Tasks (a dot when something needs Bassim) and Settings in one capsule at the
 // row's trailing end, beside the status icons; on a page over Home, Back to its left. It keeps one
 // place on every page.

@@ -20,6 +20,12 @@ shape Bar
   start: number
   end: number
 
+// hex's tabs (Now, Feed, Ideas, Goals) and Call: one row at the foot of hex's column, the capsule
+// of tabs at `x`, Call beside it, the pair centred in the column; `top` is the row's top.
+shape Foot
+  x: number
+  top: number
+
 shape Room
   width: number
   height: number
@@ -31,25 +37,40 @@ shape Room
   first: Span
   second: Span
   bar: Bar
-  // Where a page's content starts, under the chrome row.
+  // Where a column's content starts: hex's under the chrome row, the second's under the status
+  // icons too when they're above it.
   below: number
+  secondBelow: number
   // How far fixed controls at the foot stand off the window's bottom edge.
   foot: number
+  // Where hex's tabs and Call sit; a list in hex's column ends above `tabs.top`.
+  tabs: Foot
 
 // A chrome row is 44 tall; the capsule of three is 140 wide.
 fn barHeight(): number = 44
 fn capsuleWidth(): number = 140
+// The tabs: four of 54 in a capsule padded 4 each side; Call, 64 round, 12 to its right.
+fn tabWidth(): number = 54
+fn tabsWidth(): number = 4 * tabWidth() + 8
+fn callSize(): number = 64
+fn footWidth(): number = tabsWidth() + 12 + callSize()
 
 fn clearOf(v: Viewport): Rect = Rect(x=v.safeAreaLeft, y=v.safeAreaTop, width=v.width - v.safeAreaLeft - v.safeAreaRight, height=v.height - v.safeAreaTop - v.safeAreaBottom)
-// The status icons and cameras in the top band.
-fn bandCovers(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.y + o.height / 2 < v.safeAreaTop)
-// The widest stretch of [from, to] clear of every box in `taken`, 12 points off each.
-fn widestClear(from: number, to: number, taken: Rect[]): Span = match sortBy(range(taken.length + 1).map(i => Span(x=(i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from }), width=((i == taken.length ? to : match sortBy(taken, t => t.x).at(i) { case some(t) => t.x - 12, case none => to }) - (i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from })))), s => s.width, "desc").at(0) { case some(s) => s, case none => Span(x=from, width=to - from) }
-fn bandSpan(v: Viewport, p: Pose): Span = widestClear(v.safeAreaLeft + 16, v.width - v.safeAreaRight - 16, bandCovers(v, p))
-// The row goes inside the top band when the band is tall enough and, clear of the icons, wide
-// enough for the capsule and Back; else under it, across the clear rectangle.
-fn inBand(v: Viewport, p: Pose): bool = v.safeAreaTop >= barHeight() and bandCovers(v, p).length > 0 and bandSpan(v, p).width >= capsuleWidth() + 60
-fn barOf(v: Viewport, p: Pose): Bar = inBand(v, p) ? Bar(top=max(v.safeAreaTop / 2 - barHeight() / 2, 4), start=bandSpan(v, p).x, end=bandSpan(v, p).x + bandSpan(v, p).width) : Bar(top=v.safeAreaTop + 8, start=v.safeAreaLeft + 16, end=v.width - v.safeAreaRight - (v.safeAreaRight > 0 ? 8 : 16))
+// The status icons and cameras near the top of the window. iOS needn't count them in the safe area
+// (the Duo's cover screen reports none on its right, its icons and camera standing in a column
+// there), so the pose's occlusions place the row; one taller than half the window is a side
+// column the safe area already keeps.
+fn topCovers(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.y < v.height / 3 and o.height < v.height / 2)
+fn barTop(v: Viewport): number = v.safeAreaTop + 8
+// Those beside the row: it stops 10 short of the nearest on each side.
+fn rowCovers(v: Viewport, p: Pose): Rect[] = topCovers(v, p).filter(o => o.y < barTop(v) + barHeight() and o.y + o.height > barTop(v))
+fn barEnd(v: Viewport, p: Pose): number = min(v.width - v.safeAreaRight - (v.safeAreaRight > 0 ? 8 : 16), match sortBy(rowCovers(v, p).filter(o => o.x + o.width / 2 > v.width / 2), o => o.x).at(0) { case some(o) => o.x - 10, case none => v.width })
+fn barStart(v: Viewport, p: Pose): number = max(v.safeAreaLeft + 16, match sortBy(rowCovers(v, p).filter(o => o.x + o.width / 2 <= v.width / 2), o => o.x + o.width, "desc").at(0) { case some(o) => o.x + o.width + 10, case none => 0 })
+fn barOf(v: Viewport, p: Pose): Bar = Bar(top=barTop(v), start=barStart(v, p), end=barEnd(v, p))
+// Under the row; and for a column that has the icons above it, under them too, as a page's own
+// header has buttons at its trailing end.
+fn belowOf(v: Viewport): number = barTop(v) + barHeight() + 10
+fn belowIn(v: Viewport, p: Pose, column: Span): number = max(belowOf(v), match sortBy(topCovers(v, p).filter(o => o.x < column.x + column.width and o.x + o.width > column.x), o => o.y + o.height, "desc").at(0) { case some(o) => o.y + o.height + 8, case none => 0 })
 
 // Two columns only when both read well: each at least 300 wide. They part at the hinge when the
 // window has one down its middle, else at the middle of the window, where a book's fold lies.
@@ -58,7 +79,7 @@ fn foldOf(v: Viewport, p: Pose): Span = v.horizontalViewportSegments == 2 ? matc
 fn firstOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=clearOf(v).x, width=foldOf(v, p).x - clearOf(v).x) : Span(x=clearOf(v).x, width=clearOf(v).width)
 fn secondOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=foldOf(v, p).x + foldOf(v, p).width, width=clearOf(v).x + clearOf(v).width - foldOf(v, p).x - foldOf(v, p).width) : Span(x=v.width, width=0)
 
-fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=(inBand(v, p) ? v.safeAreaTop + 8 : v.safeAreaTop + 8 + barHeight() + 10), foot=max(v.safeAreaBottom, 12))
+fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x + max((firstOf(v, p).width - footWidth()) / 2, 8), top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()))
 
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()

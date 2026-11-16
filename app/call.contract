@@ -259,7 +259,7 @@ component Home
             box padding="8px 0" display="flex" justify-content="center"
               WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
       if two and homeMode and not wordsShown
-        column position="absolute" top=below bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
+        column position="absolute" top=room.secondBelow bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
           children
 
       // The agent line: what hex is doing for this call; tap for the Working tab.

@@ -63,7 +63,15 @@ until Hands photographs that pose.
 |---|---|
 | ![](plan/update-cover-up-dark.png) | ![](plan/home-cover-up-light.png) |
 
-Light versions of Home and the question are in `docs/plan/`.
+| A thread | Steps | hex decided |
+|---|---|---|
+| ![](plan/thread-cover-up-dark.png) | ![](plan/steps-cover-up-dark.png) | ![](plan/decided-cover-up-dark.png) |
+
+| Calls | Settings | A call, light |
+|---|---|---|
+| ![](plan/calls-cover-up-dark.png) | ![](plan/settings-cover-up-dark.png) | ![](plan/call-cover-up-light.png) |
+
+Light versions of the question and Tasks are in `docs/plan/`.
 
 ## The pieces
 

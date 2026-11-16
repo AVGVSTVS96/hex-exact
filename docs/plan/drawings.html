@@ -2,7 +2,7 @@
 <title>hex Exact, finished: drawings</title>
 <style>
 :root{color-scheme:light dark;
---bg:light-dark(#FFFFFF,#000000);--glass:light-dark(#FFFFFF,#1C1C1E);--glassEdge:light-dark(#0000001A,#FFFFFF1F);
+--bg:light-dark(#FFFFFF,#000000);--glass:light-dark(#FFFFFF,#1C1C1E);--glassEdge:light-dark(#00000024,#FFFFFF1F);
 --fill:light-dark(#7878801F,#7878803D);--fill2:light-dark(#F2F2F7,#1C1C1E);--sep:light-dark(#3C3C4336,#54545899);
 --text:light-dark(#0A0A0A,#F5F5F5);--sec:light-dark(#6B6B70,#A1A1A8);--ter:light-dark(#A6A6AB,#636368);
 --accent:light-dark(#1F8A6D,#C4F3E5);--accentW:light-dark(#D7F2EA,#1B3534);
@@ -98,7 +98,9 @@ svg{display:block}
 .a.pick .r{border-color:var(--accent)}
 .a .l{flex:1;min-width:0}.a .l .s{color:var(--sec);font-size:15px;line-height:20px}
 .a .k{color:var(--accent);font-size:13px;font-weight:600;white-space:nowrap;align-self:center}
-.dock{position:absolute;height:48px;border-radius:24px;display:flex;align-items:center;padding:0 5px 0 18px;color:var(--ter);font-size:17px;background:var(--fill2);border:.5px solid var(--glassEdge)}
+.dock .plus{flex:none;width:38px;height:38px;border-radius:50%;background:var(--fill);color:var(--text);display:grid;place-items:center;margin-right:10px}
+.dock .plus svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.dock{position:absolute;height:48px;border-radius:24px;display:flex;align-items:center;padding:0 5px;color:var(--ter);font-size:17px;background:var(--fill2);border:.5px solid var(--glassEdge)}
 .dock span{flex:1}.dock .mic{flex:none;width:38px;height:38px;border-radius:50%;background:var(--prom);color:var(--onprom);display:grid;place-items:center}
 .dock .mic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round}
 .sec{font-size:13px;line-height:18px;font-weight:600;color:var(--sec);margin:18px 0 6px;letter-spacing:.1px}
@@ -125,11 +127,71 @@ svg{display:block}
 .ctl{position:absolute;display:flex;gap:28px;align-items:center}
 .ctl .c{width:58px;height:58px;margin:5px 0;border-radius:50%;display:grid;place-items:center;color:var(--text)}
 .ctl .c.end{margin:0}
+.ctl .c.glass{background:light-dark(#F2F2F7,var(--glass))}
 .ctl .c svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ctl .end{width:68px;height:68px;background:var(--end);color:#fff;border:0;box-shadow:0 6px 20px #eb4b4b40}
 .ctl .end svg{width:30px;height:30px;stroke-width:2.2}
 .ctl .lab{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:90px;gap:6px;font-size:12px;line-height:16px;color:var(--sec)}
 .timer{color:var(--sec);font-size:15px;line-height:20px;font-variant-numeric:tabular-nums;margin-top:2px}
+/* a topic's thread */
+.th{display:flex;flex-direction:column;gap:12px}
+.th .hx{font-size:17px;line-height:24px;max-width:88%;text-wrap:pretty}
+.th .stamp{align-self:center;color:var(--ter);font-size:12px;line-height:16px;font-variant-numeric:tabular-nums}
+.photo{align-self:flex-end;width:210px;height:150px;border-radius:18px;position:relative;overflow:hidden;
+ background:radial-gradient(120% 70% at 20% 10%,#ffffff60,#fff0 60%),linear-gradient(115deg,#0000 38%,#8a8f9840 40%,#0000 43%,#0000 62%,#7d838c30 64%,#0000 66%),linear-gradient(160deg,#e9e7e2,#cfcac2 55%,#b9b2a7)}
+.photo::after{content:"";position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(90deg,#8a5a34,#a8703f 30%,#94603a 60%,#b07a48);box-shadow:inset 0 2px 0 #00000030}
+.mine.failed{opacity:.6}
+.fail{align-self:flex-end;display:flex;align-items:center;gap:8px;margin-top:-6px;font-size:13px;line-height:18px;color:var(--danger)}
+.fail .bang{width:16px;height:16px;border-radius:50%;background:var(--danger);color:var(--bg);display:grid;place-items:center;flex:none}.fail .bang svg{width:10px;height:10px;stroke:currentColor;stroke-width:2;stroke-linecap:round;fill:currentColor}
+.fail .pill{padding:4px 11px}
+/* steps */
+.plan{display:flex;gap:12px;align-items:flex-start;padding:12px 0 4px}
+.plan .t{font-size:17px;line-height:22px;font-weight:600}.plan .t.todo{color:var(--sec)}
+.plan .o{width:20px;height:20px;margin:1px;border-radius:6px;border:1.5px dashed var(--ter);flex:none}
+.ag{display:flex;align-items:center;gap:9px;margin-left:34px;padding:6px 0 4px;font-size:15px;line-height:20px}
+.ag .av{width:24px;height:24px;border-radius:7px;background:var(--fill);color:var(--text);display:grid;place-items:center;flex:none}
+.ag .av svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round}
+.ag b{font-weight:600}.ag .st{margin-left:auto;color:var(--sec);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}.ag .st.go{color:var(--prog)}
+.steps{margin-left:45px;padding-left:16px;border-left:1.5px solid var(--sep)}
+.st1{position:relative;display:flex;gap:6px;align-items:baseline;font-size:14px;line-height:19px;color:var(--sec);padding:4px 0}
+.st1::before{content:"";position:absolute;left:-20.5px;top:10px;width:7px;height:7px;border-radius:50%;background:var(--ter);box-shadow:0 0 0 2px var(--bg)}
+.st1 .tx{flex:1}.st1 .sp{width:7px;flex:none}.st1 .tm{color:var(--ter);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.st1 svg{width:7px;height:11px;stroke:var(--sec);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;align-self:center}
+.st1.open{color:var(--text);font-weight:500}.st1.open svg{transform:rotate(90deg);stroke:var(--text)}
+.res{margin:2px 0 8px;padding:10px 12px;border-radius:12px;background:var(--fill2);font-size:14px;line-height:20px;color:var(--text)}
+.res p{margin:0 0 6px}.res p:last-child{margin:0}.res b{font-weight:600}
+/* what hex decided */
+.dc{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:.5px solid var(--sep)}
+.dc .b{flex:1;min-width:0}.dc .t{font-weight:600}.dc .s{color:var(--sec);font-size:15px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc .cv{width:8px;height:13px;flex:none;color:var(--ter)}.dc .cv svg{width:8px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dc.open{border:0}.dc.open .cv svg{transform:rotate(90deg)}
+.story{margin:0 0 4px 34px;padding:0 0 12px;border-bottom:.5px solid var(--sep);font-size:15px;line-height:21px}
+.story .lb{font-size:12px;line-height:16px;font-weight:600;color:var(--ter);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 3px}
+.story .pk{color:var(--accent);font-weight:600}
+.story .gv{display:flex;gap:8px;color:var(--sec);margin-top:3px}.story .gv b{color:var(--text);font-weight:500;white-space:nowrap}
+/* calls */
+.day{font-size:13px;line-height:18px;font-weight:600;color:var(--sec);margin:18px 0 2px}
+.cl{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:.5px solid var(--sep)}
+.cl:last-child{border:0}
+.cl .w{width:32px;height:32px;border-radius:50%;background:var(--fill);color:var(--text);display:grid;place-items:center;flex:none}.cl .w svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;stroke-linecap:round;fill:none}
+.cl .b{flex:1;min-width:0}.cl .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cl .s{color:var(--sec);font-size:13px;line-height:18px;font-variant-numeric:tabular-nums}
+.cl .len{color:var(--sec);font-size:15px;font-variant-numeric:tabular-nums}
+/* settings */
+.grp{background:var(--fill2);border-radius:14px;overflow:hidden}
+.set{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:.5px solid var(--sep)}
+.set:last-child{border:0}
+.set .b{flex:1;min-width:0}.set .t{font-size:17px;line-height:22px}.set .s{font-size:13px;line-height:18px;color:var(--sec)}
+.set .pl{width:30px;height:30px;border-radius:50%;background:var(--fill);color:var(--text);display:grid;place-items:center;flex:none}.set .pl svg{width:11px;height:11px;fill:currentColor;margin-left:2px}
+.set .ck{width:22px;flex:none;color:var(--text)}.set .ck svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tog{width:51px;height:31px;border-radius:16px;background:var(--fill);position:relative;flex:none}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px #0003}
+.tog.on{background:#34C759}.tog.on::after{left:22px}
+.sw{display:flex;gap:14px;padding:12px 14px}
+.sw .orb{width:36px;height:36px}.sw .on{box-shadow:0 0 0 2.5px var(--bg),0 0 0 4.5px var(--text)}
+.orb.dusk::before{background:conic-gradient(from 20deg,#7b5cff,#c07bff,#ff8ad0,#ffb28a,#7b5cff,#4b6bff,#7b5cff)}
+.orb.sea::before{background:conic-gradient(from 20deg,#3ccfd8,#5b8cff,#7fe08a,#3ccfd8,#2b7bff,#3ccfd8)}
+.orb.ember::before{background:conic-gradient(from 20deg,#ff6f61,#ffb25e,#f7f35c,#ff6f61,#ff3d6e,#ff6f61)}
+.orb.mono::before{background:conic-gradient(from 20deg,#9a9aa2,#e6e6ea,#6a6a72,#c9c9cf,#9a9aa2)}
 /* the index */
 main{max-width:1600px;margin:auto;padding:28px 20px 80px}
 main h1{font-size:26px;margin:0 0 6px;font-weight:700}main h2{font-size:19px;margin:44px 0 4px;font-weight:600}
@@ -159,6 +221,11 @@ const I={
  cam:'<svg viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="13" height="11" rx="3"/><path d="M15.5 10.5l5-3v9l-5-3"/></svg>',
  end:'<svg viewBox="0 0 24 24"><path d="M3.2 13.6c-.6-.6-.6-1.6.1-2.2 4.8-4 12.6-4 17.4 0 .7.6.7 1.6.1 2.2l-1.3 1.3c-.5.5-1.3.6-1.9.2l-2-1.3c-.5-.3-.7-.8-.6-1.4l.2-1.2c-2-.7-4.4-.7-6.4 0l.2 1.2c.1.6-.1 1.1-.6 1.4l-2 1.3c-.6.4-1.4.3-1.9-.2z" style="fill:currentColor;stroke:none"/></svg>',
  x:'<svg viewBox="0 0 13 13"><path d="M2 2l9 9M11 2l-9 9"/></svg>',
+ plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+ up:'<svg viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5L12 6l5.5 5.5" style="stroke-width:2.3"/></svg>',
+ play:'<svg viewBox="0 0 12 12"><path d="M3.5 2.2v7.6L9.8 6z"/></svg>',
+ agent:'<svg viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="9" rx="3"/><path d="M8 4V2"/><circle cx="6" cy="8.5" r=".9" style="fill:currentColor;stroke:none"/><circle cx="10" cy="8.5" r=".9" style="fill:currentColor;stroke:none"/></svg>',
+ bang:'<svg viewBox="0 0 12 12"><path d="M6 2.8v4"/><circle cx="6" cy="9.2" r=".4"/></svg>',
  plane:'<svg viewBox="0 0 24 24"><path d="M2.5 11.2l18-7.4c.6-.2 1.1.3.9.9l-5.6 15.6c-.2.6-1 .7-1.4.2l-3.6-4.6-4.6 3 .9-5.3z"/></svg>',
 };
 const spin=(s=20)=>`<svg viewBox="0 0 20 20" width="${s}" height="${s}"><circle cx="10" cy="10" r="8" fill="none" stroke="var(--progW)" stroke-width="2.25"/><circle cx="10" cy="10" r="8" fill="none" stroke="var(--prog)" stroke-width="2.25" stroke-linecap="round" stroke-dasharray="14 40" transform="rotate(-30 10 10)"/></svg>`;
@@ -180,9 +247,9 @@ const furniture=p=>{const P=POSE[p];return (P.hinge=='v'?`<div class="hingeV" st
 
 // The toolbar: Calls, Tasks and Settings in one capsule, Back beside the status icons on inner pages,
 // the update notice in the row's free space.
-const toolbar=(p,{back=false,on='',update=false}={})=>{const P=POSE[p],top=P.bar.y-22;let end=P.bar.end,h='';
- if(back){h+=`<div class="circ glass" style="left:${end-44}px;top:${top}px" aria-label="Back">${I.back}</div>`;end-=54}
- const capL=end-140;
+// The capsule never moves; Back takes the place to its left.
+const toolbar=(p,{back=false,on='',update=false}={})=>{const P=POSE[p],top=P.bar.y-22,capL=P.bar.end-140;let h='';
+ if(back)h+=`<div class="circ glass" style="left:${capL-54}px;top:${top}px" aria-label="Back">${I.back}</div>`;
  h+=`<div class="cap glass" style="left:${capL}px;top:${top}px"><div class="i${on=='calls'?' on':''}">${I.calls}</div><div class="i${on=='tasks'?' on':''}">${I.tasks}${on=='tasks'?'':'<span class="dot"></span>'}</div><div class="i${on=='settings'?' on':''}">${I.settings}</div></div>`;
  if(update)h+=`<div class="upd glass" style="left:16px;top:${top}px"><b>Update ready</b><span class="go">Install</span><span class="x">${I.x}</span></div>`;
  return h};
@@ -230,10 +297,11 @@ const taskPage=t=>{const T={
  <div class="drow" style="align-items:center">${MD}<div class="b">${T.dec[0]}</div><span class="pill">Undo</span></div>`};
 
 // A question, flat.
-const question=({why=false}={})=>`<div class="ptitle">Kitchen remodel</div>
- <div class="meta" style="margin-top:6px"><span class="ad"></span>Question 1 of 2 · 3:40 PM</div>
+// Beside the list (book), the selected row already names the task, so the title folds into the meta line.
+const question=({why=false,beside=false}={})=>`${beside?'':'<div class="ptitle">Kitchen remodel</div>'}
+ <div class="meta" style="margin-top:${beside?0:6}px"><span class="ad"></span>${beside?'Kitchen remodel · ':''}Question 1 of 2 · 3:40 PM</div>
  <p class="qt">Quartz or wood for the island?</p>
- <p class="qb">The installer can cut either on the 22nd. Quartz needs no upkeep; butcher block is warmer but needs oiling every few months.</p>
+ <p class="qb">${beside?'Either can be cut on the 22nd. Quartz needs no upkeep; butcher block is warmer but needs oiling.':'The installer can cut either on the 22nd. Quartz needs no upkeep; butcher block is warmer but needs oiling every few months.'}</p>
  <div class="why${why?' open':''}"><b>Why</b>· from Telegram, 3:40 PM${I.chev}</div>
  ${why?`<div class="quote"><div class="who2"><span class="tile">${I.plane}</span>Installer</div>We can cut either slab on the 22nd. Quartz needs a template visit first, so tell us by Tuesday.</div>`:''}
  <div class="ans">
@@ -242,7 +310,7 @@ const question=({why=false}={})=>`<div class="ptitle">Kitchen remodel</div>
   <div class="a"><span class="r"></span><div class="l">Quartz counters, wood island<div class="s">€1,560</div></div></div>
   <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">Take it off your list</div></div></div>
  </div>`;
-const dock=(l,r,b=16)=>`<div class="dock" style="left:${l}px;right:${r}px;bottom:${b}px"><span>Reply in your own words</span><span class="mic">${I.mic}</span></div>`;
+const dock=(l,r,b=16,{text='Reply in your own words',send=false}={})=>`<div class="dock" style="left:${l}px;right:${r}px;bottom:${b}px"><span class="plus" aria-label="Add a photo">${I.plus}</span><span>${text}</span><span class="mic"${send?' aria-label="Send"':''}>${send?I.up:I.mic}</span></div>`;
 
 // Tasks.
 const tasksList=({tab='all',sel='',dec=2,n=3,tail=true}={})=>`<div class="tabs"><span${tab=='all'?' class="on"':''}>All</span><span${tab=='needs'?' class="on"':''}>Needs you<em>5</em></span><span${tab=='working'?' class="on"':''}>Working<em>2</em></span><span>Done<em>12</em></span><span>Quiet<em>4</em></span></div>
@@ -265,6 +333,60 @@ const agentLine=`<div class="agent">${spin(16)}<span>Asking the installer about 
 const controls=(cx,bottom)=>`<div class="ctl" style="left:${cx}px;bottom:${bottom}px;transform:translateX(-50%)">
  <div class="lab"><div class="c glass">${I.mic}</div>Mute</div><div class="lab"><div class="c end">${I.end}</div>End</div><div class="lab"><div class="c glass">${I.cam}</div>Camera</div></div>`;
 
+// A topic's thread: hex's words plain, yours in bubbles, a failure under what failed.
+const thread=`<div class="th">
+ <div class="stamp">Today 3:48 PM</div>
+ <div class="photo" role="img" aria-label="Photo: a quartz sample on a wooden counter"></div>
+ <div class="mine">The sample came. Here it is on the old counter.</div>
+ <div class="hx">The quartz will look much brighter against the oak floor. Matte costs €90 more; want it?</div>
+ <div class="mine">Yes, matte. Hold the slab until Tuesday.</div>
+ <div class="mine failed">And ask if they take the old counter away.</div>
+ <div class="fail"><span class="bang">${I.bang}</span>Not sent: no connection<span class="pill">Try again</span></div></div>`;
+// Steps: a plan item, the agent doing it, the steps it took.
+const steps=`
+ <div class="plan">${MDone}<div class="t">Get three countertop quotes</div></div>
+ <div class="ag"><span class="av">${I.agent}</span><span><b>Quote finder</b> · agent</span><span class="st">done in 12 min</span></div>
+ <div class="steps">
+  <div class="st1"><i class="sp"></i><span class="tx">Searched stone suppliers near you</span><span class="tm">3:02</span></div>
+  <div class="st1"><i class="sp"></i><span class="tx">Emailed four suppliers</span><span class="tm">3:04</span></div>
+  <div class="st1 open">${I.chev}<span class="tx">Read the three replies</span><span class="tm">3:14</span></div>
+  <div class="res"><p><b>Stonecraft</b>: quartz €2,140, template visit included, install from the 22nd.</p><p><b>Mill &amp; Oak</b>: butcher block €980, ready in two weeks.</p><p><b>Granite Bros</b>: quartz €2,390, no template visit before Dec 2.</p></div>
+ </div>
+ <div class="plan">${MW}<div class="t">Ask about the sink cutout</div></div>
+ <div class="ag"><span class="av">${I.agent}</span><span><b>Installer chat</b> · agent</span><span class="st go">working</span></div>
+ <div class="steps">
+  <div class="st1">${I.chev}<span class="tx">Wrote to Stonecraft on Telegram</span><span class="tm">3:41</span></div>
+  <div class="st1"><i class="sp"></i><span class="tx">Waiting for their answer</span><span class="tm">now</span></div>
+ </div>
+ <div class="plan"><span class="o"></span><div class="t todo">Book the template visit</div></div>`;
+// What hex decided, each with Undo; one opened to its full story.
+const DEC=[['Newsletter','Kept plain text for issue 14'],['Kitchen remodel','Asked for the sink cutout in every quote'],['Bike repair','Took the Saturday slot at the shop']];
+const decided=`
+ <div class="dc open">${MD}<div class="b"><div class="t">Lisbon trip</div><div class="s">Earlier flight home, no layover</div></div><span class="pill">Undo</span><span class="cv">${I.chev}</span></div>
+ <div class="story">
+  <div class="lb">hex picked</div><div class="pk">Sunday 7:05 AM, direct · €148</div>
+  <div class="lb">Why</div><div>You said you want to be home by noon on Sunday. It’s the only direct flight that lands before then.</div>
+  <div class="lb">What the others gave up</div>
+  <div class="gv"><b>10:30 via Madrid</b><span>€36 cheaper, but home at 4 PM</span></div>
+  <div class="gv"><b>1:15 PM direct</b><span>Same price, home after dinner</span></div>
+ </div>
+ ${DEC.map(([t,s])=>`<div class="dc">${MD}<div class="b"><div class="t">${t}</div><div class="s">${s}</div></div><span class="pill">Undo</span><span class="cv">${I.chev}</span></div>`).join('')}`;
+// Calls, by day: each with its length and what it was about.
+const CALLS=[['Today',[['Countertop quotes and the sink cutout','3:52 PM','4:12'],['Which train to Sintra','11:20 AM','1:48']]],
+ ['Yesterday',[['Issue 14: what goes first','6:05 PM','7:31'],['Bike shop opening hours','9:12 AM','0:54']]],
+ ['Thursday',[['Picking March’s novel','8:40 PM','12:06'],['Hotels near Alfama','1:15 PM','3:27']]]];
+const calls=CALLS.map(([d,cs])=>`<div class="day">${d}</div>${cs.map(([t,tm,len])=>`<div class="cl"><span class="w">${I.wave}</span><div class="b"><div class="t">${t}</div><div class="s">${tm}</div></div><span class="len">${len}</span></div>`).join('')}`).join('');
+// Settings: grouped, each says what it does; hex's face shows the persona and colour you picked.
+const set=(t,s,end)=>`<div class="set"><div class="b"><div class="t">${t}</div><div class="s">${s}</div></div>${end}</div>`;
+const ck=`<span class="ck"><svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 4.5"/></svg></span>`;
+const settings=`
+ <div style="display:flex;gap:14px;align-items:center;padding:0 6px"><div class="orb dusk" style="width:60px;height:60px"></div><div><div style="font-weight:600">hex</div><div class="psub" style="margin:0">Warm voice · Dusk</div></div></div>
+ <div class="sec" style="margin:14px 6px 6px">Voice · tap to hear it</div>
+ <div class="grp">${set('Warm','Slow and friendly, for long calls',`<span class="pl">${I.play}</span>${ck}`)}${set('Brisk','Short answers, straight to the point',`<span class="pl">${I.play}</span><span class="ck"></span>`)}${set('Calm','Low and even, good late at night',`<span class="pl">${I.play}</span><span class="ck"></span>`)}</div>
+ <div class="sec" style="margin:14px 6px 6px">Colour of hex’s face</div>
+ <div class="grp"><div class="sw"><div class="orb"></div><div class="orb dusk on"></div><div class="orb sea"></div><div class="orb ember"></div><div class="orb mono"></div></div></div>
+ <div class="sec" style="margin:14px 6px 6px">Calls</div>
+ <div class="grp">${set('Start on speaker','Calls open on the speaker, not the earpiece','<span class="tog on"></span>')}${set('Ring on reminders','hex calls you when a reminder is due','<span class="tog"></span>')}</div>`;
 const dev=(p,inner)=>{const P=POSE[p];return `<div class="dev" style="width:${P.w}px;height:${P.h}px">${inner}${furniture(p)}</div>`};
 const callBtn=(cx,bottom)=>`<div class="call" style="left:${cx-32}px;bottom:${bottom}px" aria-label="Call hex">${I.wave}</div>`;
 
@@ -302,8 +424,8 @@ const D={
   <div class="fade" style="height:110px"></div>${dock(16,16,18)}${toolbar('cover-up',{back:true})}`),
  'question-open-up':()=>dev('open-up',`
   <div class="pane" style="left:0;width:475px;padding:22px 16px 0"><div style="padding:0 6px">${tasksHead(true)}</div><div style="padding:12px 6px 0">${tasksList({tab:'needs',sel:'kitchen',dec:1})}</div></div>
-  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${question({why:true})}</div><div class="fade" style="height:100px"></div>${dock(24,24,18)}</div>
-  ${toolbar('open-up',{on:'tasks'})}`),
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:76px">${question({why:true,beside:true})}</div><div class="fade" style="height:100px"></div>${dock(24,24,18)}</div>
+  ${toolbar('open-up',{back:true,on:'tasks'})}`),
  // 4. A live call
  'call-cover-up':()=>dev('cover-up',`
   <div class="abs" style="left:0;right:0;top:80px;display:flex;flex-direction:column;align-items:center"><div class="orb" style="width:96px;height:96px"></div><div class="nm" style="font-weight:600;margin-top:10px">hex</div><div class="timer">4:12</div><div style="margin-top:10px">${agentLine}</div></div>
@@ -323,8 +445,34 @@ const D={
   ${toolbar('cover-up',{back:true,on:'tasks'})}`),
  'tasks-open-up':()=>dev('open-up',`
   <div class="pane" style="left:0;width:475px;padding:22px 16px 0"><div style="padding:0 6px">${tasksHead(true)}</div><div style="padding:12px 6px 0">${tasksList({sel:'kitchen-w',n:2,dec:1})}</div></div>
-  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${taskPage('kitchen')}</div><div class="fade" style="height:60px"></div></div>
-  ${toolbar('open-up',{on:'tasks'})}`),
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:76px">${taskPage('kitchen')}</div><div class="fade" style="height:60px"></div></div>
+  ${toolbar('open-up',{back:true,on:'tasks'})}`),
+ // 6. A topic's thread
+ 'thread-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:16px;right:16px;top:156px;bottom:84px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end">${thread}</div>
+  <div class="abs" style="left:0;right:0;top:0;height:178px;background:linear-gradient(var(--bg) 82%,transparent)"></div>
+  <div class="abs" style="left:22px;right:82px;top:84px"><div class="ptitle">Kitchen remodel</div><div class="psub">Working · started 40 min ago</div></div>
+  <div class="fade" style="height:90px"></div>${dock(16,16,18,{text:'Message',send:true})}${toolbar('cover-up',{back:true})}`),
+ // 7. Steps
+ 'steps-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:82px;top:84px"><div class="ptitle">Steps</div><div class="psub">Kitchen remodel · 1 of 3 done</div></div>
+  <div class="abs" style="left:20px;right:20px;top:150px">${steps}</div><div class="fade" style="height:50px"></div>
+  ${toolbar('cover-up',{back:true})}`),
+ // 8. What hex decided
+ 'decided-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:82px;top:84px"><div class="title">hex decided</div><div class="psub">12 this week · Undo puts it back to you</div></div>
+  <div class="abs" style="left:22px;right:22px;top:160px">${decided}</div><div class="fade" style="height:50px"></div>
+  ${toolbar('cover-up',{back:true})}`),
+ // 9. Calls
+ 'calls-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:82px;top:84px"><div class="title">Calls</div></div>
+  <div class="abs" style="left:22px;right:22px;top:126px">${calls}</div><div class="fade" style="height:50px"></div>
+  ${toolbar('cover-up',{back:true,on:'calls'})}`),
+ // 10. Settings
+ 'settings-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:82px;top:84px"><div class="title">Settings</div></div>
+  <div class="abs" style="left:16px;right:16px;top:136px">${settings}</div><div class="fade" style="height:40px"></div>
+  ${toolbar('cover-up',{back:true,on:'settings'})}`),
 };
 // The frames to draw: [screen, pose, themes, what it shows].
 const F=[
@@ -332,13 +480,18 @@ const F=[
  ['home','cover-side',['dark'],'Folded on its side. 678 wide is two columns: Home on the left, the row you picked beside it.'],
  ['home','open-up',['dark','light'],'Open like a book. Home on the left page, the task a row opens on the right; the hinge is the seam.'],
  ['home','open-side',['dark'],'Open on its side. Two columns again, so no row stretches 669 wide.'],
- ['update','cover-up',['dark'],'An update waiting: it sits in the toolbar row’s free space, clear of hex.'],
+ ['update','cover-up',['dark'],'An update waiting, on Home only: Update ready, Install, and × to hide it, in the toolbar row’s free space, clear of hex.'],
  ['question','cover-up',['dark','light'],'A question, flat. Back beside the status icons; Not needed is one more row like the answers; your own words docked at the foot.'],
  ['question','open-up',['dark','light'],'Book: Needs you on the left, the question beside it, Why opened in one tap.'],
- ['call','cover-up',['dark'],'A live call: hex’s face stays, the words bright, mute, end and camera in thumb reach.'],
+ ['call','cover-up',['dark','light'],'A live call: hex’s face stays, the words bright, mute, end and camera in thumb reach.'],
  ['call','open-up',['dark'],'Book: hex and the controls on the left, the words on the right.'],
- ['tasks','cover-up',['dark'],'Tasks: tabs with counts, each state in its own colour, Undo on what hex decided.'],
+ ['tasks','cover-up',['dark','light'],'Tasks: tabs with counts, each state in its own colour, Undo on what hex decided.'],
  ['tasks','open-up',['dark'],'Book: Tasks beside the task you picked.'],
+ ['thread','cover-up',['dark'],'A topic’s thread: hex’s words plain, yours in bubbles, a photo, a message that didn’t send with why and Try again under it, and the composer docked at the foot.'],
+ ['steps','cover-up',['dark'],'Steps: plan items are bold with a box, agents sit under them with their own tile, steps hang off a rail in small grey type. A long result opens in place; the turned chevron says it’s open.'],
+ ['decided','cover-up',['dark'],'What hex decided, as its own list, each with Undo. One opened to its whole story: what hex picked, why, and what the other answers gave up.'],
+ ['calls','cover-up',['dark'],'Calls by day, each with what it was about and how long it ran.'],
+ ['settings','cover-up',['dark'],'Settings in groups, each saying what it does. hex’s face at the top takes the persona and colour you pick; a voice plays on tap.'],
 ];
 const q=new URLSearchParams(location.search);
 const theme=q.get('theme');if(theme)document.documentElement.style.colorScheme=theme;
@@ -347,7 +500,7 @@ else{
  const fig=(s,p,t,cap)=>{const P=POSE[p],k=`${s}-${p}`,sc=Math.min(1,(P.w>P.h?520:300)/P.w);
   return `<figure><div class="frame" style="width:${P.w*sc}px;height:${P.h*sc}px;color-scheme:${t}"><div style="transform:scale(${sc});transform-origin:0 0">${D[k]()}</div></div><figcaption><b>${k}-${t}</b></figcaption></figure>`};
  let h=`<h1>hex Exact, finished</h1><p class="lede">Drawn from the app’s own colours and type at the Duo’s real sizes. Every name and number is made up. Open one frame alone with <code>?only=home-cover-up&amp;theme=dark</code>.</p>`;
- let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks'}[s]}</h2>`;last=s}
+ let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks',thread:'A topic’s thread',steps:'Steps',decided:'What hex decided',calls:'Calls',settings:'Settings'}[s]}</h2>`;last=s}
   h+=`<p class="lede">${cap}</p><div class="grid">${ts.map(t=>fig(s,p,t,cap)).join('')}</div>`}
  m.innerHTML=h;
 }

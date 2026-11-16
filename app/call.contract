@@ -6,11 +6,12 @@
 // It follows the room: with two columns the orb and controls take the first and the words the
 // second; with one, the orb rises to make room for the words.
 use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks, Goals from "./shapes.contract"
-use endingOf, badEnding, lengthOf, Tap, HexTabs, Mark, springOf, Primary from "./parts.contract"
+use endingOf, badEnding, lengthOf, Tap, HexTabs, Mark, springOf, Primary, StageHead, ShowMore, Row, Note, whenOf from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
-use HexHome, hexOrb, hexOrbFrame from "./home.contract"
+use HexHome, hexOrb, hexOrbFrame, needsOf, markOf, lineFor, pageFor from "./home.contract"
+use Item, problemOf from "./inbox.contract"
 use AnswerRow from "./ask.contract"
 use Room, Chrome, stacked from "./room.contract"
 use FeedView from "./feed.contract"
@@ -21,7 +22,9 @@ use Ideas, Idea from "./ideas.contract"
 fn reachedBy(ask: Ask, settled: number, missed: number): string = `${settled > 0 ? ` and cleared its ${missed > 0 ? "" : ["telegram", "discord"].filter(app => ask.places.filter(p => p.app == app).length > 0).map(app => app == "telegram" ? "Telegram " : "Discord ").join("and ")}buttons` : ""}${missed > 0 ? `. ${unreached(missed)}` : ""}`
 
 // One line of the live transcript: a caption, photos and videos Bassim sent (media, and note:
-// "sending", why not, or ""), or the call's ask at index `ask` (-1 for anything else).
+// "sending", why not, or ""), the call's ask at index `ask` (-1 for anything else), or an agent
+// hex has working for the call (who: agent, `src` its topic). `src` on hex's words is what hex
+// checked for them.
 shape Line
   id: string
   at: number
@@ -30,6 +33,7 @@ shape Line
   ask: number
   media: Media[]
   note: string
+  src: string
 
 // Where a call held elsewhere is, and how it started, as the stable app says it.
 fn whereOf(source: string): string = source == "web" ? "On the web page" : source == "phone-in" or source == "phone-out" ? "On your phone" : "In the app"
@@ -67,6 +71,8 @@ component Home
     answer: action
     answerMany: action
     answerAll: action
+    // Bring a task, or everything that waits ("asks"), into the call.
+    talk: action
     // What Bassim did with each question here, newest last, and the agent that just finished.
     said: Said[]
     finished: string
@@ -162,10 +168,9 @@ component Home
 
   // Where things go, from the room: the chrome row beside the status icons, hex's column (the
   // whole clear width with one column, the first with two) with Call at its foot, and with two
-  // columns the words or the page a row opens in the second. There is one orb: at rest it is hex,
-  // floating at the top of its room on every page; a call grows it from there in one motion,
-  // with hex's name, the call's clock and what hex is doing under it, and the words below (one
-  // column) or beside (two). Pulling the words up gives them the whole column.
+  // columns the page a row opens in the second. There is one orb: at rest it is hex, floating at
+  // the top of its room on every page; a call grows it from there in one motion into the call's
+  // panel.
   derive W = viewport.width
   derive H = viewport.height
   derive left = room.first.x
@@ -195,40 +200,38 @@ component Home
   derive listPad = across ? 20 : bottom + 70
   derive callSize = 64
   derive fabSize = 58
-  derive endSize = 68
-  derive sideSize = 58
-  derive controlsTop = H - bottom - 12 - endSize - 22
-  derive footTop = tabbed ? H - room.tabs.top : homeMode ? roomBottom : H - controlsTop
+  derive footTop = tabbed ? H - room.tabs.top : homeMode ? roomBottom : 0
 
-  // The orb: hex's face at rest; in a call at the head of the column (one) or the middle of the
-  // first (two), its name, clock and agent line under it.
-  derive agentShown = live and agent.id != ""
-  // Open like a laptop the fold runs across the window: the orb and its lines stay above it.
-  derive foldTop = room.across
-  derive stackBottom = min(controlsTop, foldTop - 16)
-  derive bigOrb = round(single ? max(min(min(hexW * 0.42, H * 0.2), 150), 60) : max(min(min(hexW - 96, (stackBottom - below) * 0.5), 260), 80))
-  derive under = 8 + 24 + 22 + (agentShown ? 36 : 0) + 8
-  derive callOrbY = single ? below + 14 + bigOrb / 2 : below + (stackBottom - below) / 2 - (bigOrb + under) / 2 + bigOrb / 2
+  // In a call the orb grows into a panel: across the head of hex's column when it's taller than
+  // wide, else down its leading side (folded on its side, and above the hinge open like a laptop),
+  // with the words under it or beside it. Its name, clock and what hex is doing ride a pill on its
+  // edge; End, Mute and Camera sit in one glass group where Call was (open like a laptop, still
+  // beside the system's tabs).
+  derive callH = across ? room.across : H
+  derive aside = across or (single and W > H)
+  derive panelW = aside ? left + round(hexW * 0.44) : left + hexW
+  derive panelH = aside ? callH : round(min(H * 0.33, 240))
+  // The orb as seen: the persona fills two thirds of its frame.
+  derive seen = aside ? min(150, round((panelW - left) * 0.5)) : 124
+  derive bigOrb = round(seen * 1.5)
+  derive orbX = aside ? panelW / 2 : left + hexW / 2
+  derive callOrbY = aside ? round(callH * 0.43) : round(room.clear.y + (panelH - room.clear.y) / 2 - 4)
+  derive pillTop = aside ? callOrbY + seen / 2 + 18 : panelH - 18
+  derive ctlSize = across ? 48 : 54
+  derive ctlRight = across ? callRight : hexRight + 10
+  derive ctlBottom = across ? callBottom : max(bottom - 3, 9)
+  derive footShown = footer != ""
+  derive wordsTop = aside ? below : panelH + 22 + (footShown ? 24 : 0)
+  derive wordsBottom = across ? H - room.across + 10 : ctlBottom + ctlSize + 18
+  derive wordsLeft = aside ? panelW + 14 - 16 : left
+  derive wordsRight = aside ? right : hexRight
   // It stands where the call puts it, and at rest is moved and scaled onto the face: a transform,
   // so it springs between the two without laying anything out.
-  derive orbX = left + hexW / 2
   derive restShift = `${left + hexX - orbX}px ${hexTop + hexOrb() / 2 - callOrbY}px`
   derive glide = still ? "none" : "translate -exact-spring(380, 34, 1), scale -exact-spring(380, 34, 1), opacity -exact-spring(380, 34, 1)"
-
-  // One column: the words fill the column under the orb's lines down to the controls (`rest`), or,
-  // pulled up, the whole column (`full`). The handle drags the panel's height natively; a release
-  // carries on at the finger's speed to the nearer end.
-  derive wordsTop = callOrbY + bigOrb / 2 + under
-  derive restHeight = max(controlsTop - 8 - wordsTop, 96)
-  derive fullHeight = controlsTop - 8 - below
-  derive wordsHeight = reading ? fullHeight : restHeight
-  derive readable = talking or live
-  action letGo(height: number, velocity: number)
-    setReading(height + velocity * 0.15 > (restHeight + fullHeight) / 2)
-  action flip
-    setReading(not reading)
-  derive wordsLeft = two ? secondLeft : left
-  derive wordsRight = two ? right : hexRight
+  derive fade = springOf(still, "opacity")
+  derive callShown = not homeMode
+  derive agentShown = live and agent.id != ""
   // With two columns at rest, the last call's words stay beside the home until Bassim opens a page
   // or puts them away: `away` is the call whose words he put away.
   state away = ""
@@ -260,7 +263,8 @@ component Home
       column position="absolute" top=0 bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
         HexHome(width=hexW, height=(H - footTop), top=hexTop, x=hexX, dark=(viewport.prefersColorScheme == "dark"), pad=(tabbed ? 26 : listPad), still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
           column align-items="center" gap=8 padding="12px 0 0"
-            CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
+            if footShown
+              text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
             if wrapped
               box padding="0 10px" display="flex" justify-content="center" width="100%" box-sizing="border-box"
                 WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
@@ -269,37 +273,47 @@ component Home
         column position="absolute" top=room.secondTop bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
           children
 
+      // The call's panel: the orb's colour behind it, a hint rather than a wash.
+      box position="absolute" left=0 top=0 width=panelW height=panelH overflow="hidden" border-top-right-radius=(aside ? 34 : 0) border-bottom-right-radius=34 border-bottom-left-radius=(aside ? 0 : 34) background-color="-exact-background" border-right=(aside ? "0.5px solid -exact-separator" : "none") border-bottom=(aside ? "none" : "0.5px solid -exact-separator") box-sizing="border-box" opacity=(callShown ? 1 : 0) transition=fade z-index=2 pointer-events="none" aria-hidden=true testId="call-panel"
+        image (viewport.prefersColorScheme == "dark" ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(orbX - seen * 1.6) top=(callOrbY - seen * 1.2) width=(seen * 3.2) height=(seen * 2.4) opacity=0.75 testId="call-glow"
+
       // The orb: hex floating over its room at rest, grown into the call.
-      box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? hexOrbFrame() / bigOrb : 1) transition=glide z-index=2 pointer-events="none" testId="orb-spot"
+      box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? hexOrbFrame() / bigOrb : 1) transition=glide z-index=3 pointer-events="none" testId="orb-spot"
         hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width="100%" height="100%" role="img" aria-label=label testId="orb"
 
-      // Under the orb in a call: hex, the clock or how it's connecting, and what hex is doing for it.
-      column position="absolute" top=(callOrbY + bigOrb / 2 + 8) left=left right=hexRight align-items="center" gap=2 padding="0 20px" box-sizing="border-box" opacity=(homeMode ? 0 : 1) pointer-events=(homeMode ? "none" : "auto") transition=springOf(still, "opacity") z-index=2 testId="stage"
-        text "hex" font="-exact-title3" font-weight=600 color="-exact-label"
-        CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
-        if agentShown
-          button press=openTasks("working") class=Tap display="flex" flex-direction="row" align-items="center" justify-content="center" gap=8 min-height=36 max-width="100%" margin-top=6 aria-live="polite" aria-label=`hex is ${agent.state == "running" ? "working" : agent.state}: ${agentText}${agentWhere != "" ? `, ${agentWhere}` : ""}` testId="agent-line"
-            Mark(state=(agent.state == "running" ? "working" : agent.state == "failed" ? "failed" : "done"), size=18)
-            text agentText font="-exact-subheadline" color=(agent.state == "failed" ? "hex.danger" : "hex.progress") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+      // On the panel's edge: hex, the clock or how it's connecting, and what hex is doing; under it
+      // what went wrong, or where a call held elsewhere is.
+      column position="absolute" top=pillTop left=(orbX - 160) width=320 align-items="center" gap=6 opacity=(callShown ? 1 : 0) pointer-events=(callShown ? "auto" : "none") transition=fade z-index=5 testId="stage"
+        button press=openTasks("working") disabled=(not agentShown) class=Tap display="flex" flex-direction="row" align-items="center" gap=8 height=36 max-width="100%" padding="0 15px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(agentShown ? `hex, ${label}, working on ${agentWhere}` : `hex, ${label}`) testId="call-pill"
+          text "hex" font="-exact-subheadline" font-weight=600 color="-exact-label" flex-shrink=0
+          CallLines(status=status, call=call, elapsed=elapsed)
+          if agentShown
+            row gap=6 align-items="center" min-width=0 flex-shrink=1 testId="agent-line"
+              Dots(still=still, tint=(agent.state == "failed" ? "hex.danger" : "hex.progress"))
+              text (agent.state == "running" ? agentWhere : agentText) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+        if footShown
+          text footer font="-exact-footnote" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" testId="footer"
 
-      // The words: one column, a panel under the orb's lines that pulls up over them; two, the
-      // second column.
-      if single
-        column id="words" position="absolute" bottom=(H - controlsTop + 8) left=left right=hexRight height=wordsHeight max-height=fullHeight box-sizing="border-box" overflow="hidden" background-color="-exact-background" opacity=(homeMode ? 0 : 1) pointer-events=(homeMode ? "none" : "auto") transition=springOf(still, "height") z-index=3 testId="words"
-          box heightDragFor="words" heightrelease=letGo press=flip touch-action="none" height=28 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-label=(reading ? "Put the words down" : "Pull the words up") testId="words-handle"
-            box width=36 height=5 border-radius=3 background-color="-exact-tertiary-label"
-          if live and not talking
-            text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
-          CallWords(lines=lines, asks=activity.asks, said=said, width=hexW, live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
-      else
-        column position="absolute" top=room.secondBelow bottom=bottom left=wordsLeft right=wordsRight opacity=(homeMode ? (wordsShown ? 1 : 0) : readable ? 1 : 0) pointer-events=(homeMode and not wordsShown ? "none" : "auto") transition=springOf(still, "opacity") z-index=1 testId="words"
-          if live and not talking
-            text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
-          CallWords(lines=lines, asks=activity.asks, said=said, width=room.second.width, live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
+      // The words: under the panel, or beside it.
+      column position="absolute" top=wordsTop bottom=wordsBottom left=wordsLeft right=wordsRight opacity=(callShown ? 1 : 0) pointer-events=(callShown ? "auto" : "none") transition=fade z-index=1 testId="words"
+        if live and not talking and running.length == 0
+          text "Your conversation will appear here." font="-exact-subheadline" color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
+        CallWords(lines=lines, asks=activity.asks, said=said, width=(W - wordsLeft - wordsRight), live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
+
+      // Open, beside the call (below it like a laptop): what hex checked for it and what still
+      // needs Bassim, which hex can go through with him while he's on.
+      if two
+        column position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=0 left=(across ? left : secondLeft) right=right opacity=(callShown ? 1 : 0) pointer-events=(callShown ? "auto" : "none") transition=fade z-index=1 testId="call-work"
+          CallWork(record=liveRecord, needs=needsOf(tasks, asks, said, now), tasks=tasks, now=now, offset=offset, known=(tasks.version > 0 or asks.version > 0), sideBySide=across, pad=(across ? H - room.tabs.top + 12 : bottom + 12), goThrough=(here and live), talk=talk, openTask=openTask, openTasks=openTasks)
+
+      // With two columns at rest, the last call's words beside the home until a page is opened.
+      if two and homeMode
+        column position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=bottom left=(across ? left : secondLeft) right=right opacity=(wordsShown ? 1 : 0) pointer-events=(wordsShown ? "auto" : "none") transition=fade z-index=1 testId="words-beside"
+          CallWords(lines=lines, asks=activity.asks, said=said, width=room.second.width, live=false, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
 
       // At rest Call floats at the trailing foot of hex's room, over the page scrolling under it (the
-      // app's own tabs beside it in a binary without the system's). In a call: Mute, End and Camera,
-      // where a thumb reaches.
+      // app's own tabs beside it in a binary without the system's). In a call: Camera, Mute and End
+      // in one glass group, End where Call was.
       if tabbed
         row position="absolute" left=room.tabs.x width=room.tabs.width top=room.tabs.top height=callSize justify-content="center" align-items="center" z-index=4 testId="controls"
           HexTabs(pages=pages, current=page, fresh=feedFresh, pick=pickPage)
@@ -310,34 +324,98 @@ component Home
             WordsButton(size=52, shown=wordsShown, single=false, show=toggleWords)
           CallButton(size=fabSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
       else
-        row position="absolute" top=controlsTop left=left width=hexW justify-content="center" align-items="flex-start" gap=30 z-index=4 testId="controls"
-          Labeled(text=(micOff ? "Unmute" : "Mute"))
-            MuteButton(size=sideSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(elsewhere or status == "idle" or status == "ending" or not call.shell))
-          Labeled(text=(status == "idle" ? "Call" : "End"))
-            CallButton(size=endSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
-          Labeled(text="Camera")
-            if here and call.shell
-              AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=sideSize, disabled=false, add=share)
-            else
-              box width=sideSize height=sideSize border-radius=(sideSize / 2) backgroundMaterial="glass" opacity=0.4 aria-hidden=true
+        row position="absolute" right=ctlRight bottom=ctlBottom gap=6 padding=5 border-radius=(ctlSize / 2 + 5) backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" align-items="center" z-index=5 testId="controls"
+          if here and call.shell
+            AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=ctlSize, disabled=false, add=share)
+          else
+            box width=ctlSize height=ctlSize border-radius=(ctlSize / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" opacity=0.4 aria-hidden=true
+              image "symbol:sf/video.fill" width=(ctlSize * 0.38) height=(ctlSize * 0.38) object-fit="contain" color="-exact-label"
+          MuteButton(size=ctlSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(elsewhere or status == "idle" or status == "ending" or not call.shell))
+          CallButton(size=ctlSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
 
-// A call control with its name under it.
-component Labeled
+keyframes callDot
+  50% opacity=0.25
+
+// Three dots that breathe in turn while hex works.
+component Dots
   props
-    text: string
-  slot
+    still: bool
+    tint: string
   view
-    column align-items="center" gap=6 min-width=58
-      box height=68 display="flex" align-items="center" justify-content="center"
-        children
-      text text font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" aria-hidden=true
+    row gap=3 flex-shrink=0 aria-hidden=true
+      for i in [0, 1, 2] key=i
+        box width=4 height=4 border-radius=2 background-color=tint opacity=(i == 0 ? 0.35 : i == 1 ? 0.65 : 1) animation=(still ? "none" : `callDot 1.2s ease-in-out ${i * 0.2}s infinite`)
+
+// m:ss into the call.
+fn clockOf(ms: number): string = `${floor(ms / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}`
+// What Bassim had just asked when hex said something `at` ms in.
+fn askedBefore(r: CallRecord, at: number): string = match r.turns.filter(t => t.who == "you" and t.at < at).at(-1) { case some(t) => t.text, case none => "" }
+
+// Beside the call: what hex checked for what he asked, newest first, then the first few things that
+// need him, each opening its page, and hex going through all of them with him in the call.
+component CallWork
+  inject
+    haptics: bool
+  props
+    record: CallRecord
+    needs: Item[]
+    tasks: Tasks
+    now: number
+    offset: number
+    known: bool
+    sideBySide: bool
+    pad: number
+    goThrough: bool
+    talk: action
+    openTask: action
+    openTasks: action
+  derive checks = sortBy(record.moments.filter(m => m.kind == "say" and m.checked != ""), m => m.at, "desc")
+  derive shownNeeds = needs.slice(0, 3)
+  action go(e: Item)
+    if pageFor(e, tasks) == ""
+      openTasks("needs")
+    else
+      openTask(pageFor(e, tasks))
+  view
+    scroll flex=1 min-height=0 padding=`0 6px ${pad}px` box-sizing="border-box" testId="call-work-scroll"
+      row flex-direction=(sideBySide ? "row" : "column") align-items=(sideBySide ? "flex-start" : "stretch")
+        if checks.length > 0
+          column flex=(sideBySide ? 1 : 0) min-width=0 testId="call-sources"
+            StageHead(state="working", label="Sources", n=checks.length, known=true, pad="9px 10px", id="call-sources-head")
+            for m, i in checks key=`${m.at}-${i}`
+              row gap=10 padding="9px 10px" align-items="flex-start" testId=`call-source-${i}`
+                box padding-top=1 flex-shrink=0
+                  Mark(state="done", size=22)
+                column flex=1 min-width=0 gap=2
+                  row gap=8 align-items="baseline"
+                    text (askedBefore(record, m.at) != "" ? askedBefore(record, m.at) : m.text) font="-exact-headline" color="-exact-label" line-clamp=2 flex=1 min-width=0
+                    text clockOf(m.at) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+                  text m.checked font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+          if not sideBySide
+            box height=0 margin="5px 0 5px 42px" border-top="0.5px solid -exact-separator"
+        column flex=(sideBySide ? 1 : 0) min-width=0 border-left=(sideBySide and checks.length > 0 ? "0.5px solid -exact-separator" : "none") testId="call-needs"
+          StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="9px 10px", id="call-needs-head")
+          for e in shownNeeds key=e.id
+            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=false, href="", label=`${e.topic}: ${lineFor(e)}`, id=`call-need-${e.id}`, press=go(e))
+          if known and needs.length == 0
+            Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 42px", id="call-needs-empty")
+          if needs.length > shownNeeds.length
+            ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="call-needs-more", press=openTasks("needs"))
+          if goThrough and needs.length > 0
+            button press=talk("asks") class=Tap display="flex" flex-direction="row" align-items="center" justify-content="center" gap=6 height=32 margin="6px 10px 0" border-radius=16 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId="call-go-through"
+              image "symbol:waveform" width=16 height=16 object-fit="contain" color="-exact-label" aria-hidden=true
+              text `Go through ${needs.length} with hex` font="-exact-headline" color="-exact-label"
 
 // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
 fn isElsewhere(call: CallState, activity: Activity, liveRecord: CallRecord): bool = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0
 // The call's words and its asks, in the order they came. The last call's stay until the next. The
 // shell stamps its words in epoch ms and hex its asks in ms into the call, as it does a call's
 // record.
-fn linesOf(call: CallState, captions: Captions, activity: Activity, liveRecord: CallRecord, live: bool): Line[] = sortBy((isElsewhere(call, activity, liveRecord) ? liveRecord.turns.map((t, i) => Line(id=`r${i}`, at=t.at, who=(t.who == "you" ? "you" : "hex"), text=t.text, ask=-1, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1, media=t.media, note=t.note))).concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=(isElsewhere(call, activity, liveRecord) ? c.at : call.started + c.at), who="hex", text="", ask=i, media=[Media(id="", kind="", aspect=0)].slice(0, 0), note="")) : []), l => l.at)
+fn linesOf(call: CallState, captions: Captions, activity: Activity, liveRecord: CallRecord, live: bool): Line[] = sortBy((isElsewhere(call, activity, liveRecord) ? liveRecord.turns.map((t, i) => Line(id=`r${i}`, at=t.at, who=(t.who == "you" ? "you" : "hex"), text=t.text, ask=-1, media=noMedia(), note="", src=(t.who == "you" ? "" : checkedAt(liveRecord, t.at)))) : captions.turns.map(t => Line(id=`t${t.id}`, at=t.at, who=t.who, text=t.text, ask=-1, media=t.media, note=t.note, src=(t.who == "hex" and call.started > 0 ? checkedAt(liveRecord, t.at - call.started) : "")))).concat(live ? activity.asks.map((c, i) => Line(id=`a${c.ask.id}`, at=(isElsewhere(call, activity, liveRecord) ? c.at : call.started + c.at), who="hex", text="", ask=i, media=noMedia(), note="", src="")) : []), l => l.at).concat(live ? activity.tasks.filter(t => t.state == "running").map(t => Line(id=`g${t.id}`, at=0, who="agent", text=(t.line != "" ? t.line : t.text), ask=-1, media=noMedia(), note="", src=t.to)) : [])
+fn noMedia(): Media[] = [Media(id="", kind="", aspect=0)].slice(0, 0)
+// What hex checked for what it said `at` ms into the call: its record's say moment within a few
+// seconds of it (the shell's clock and hex's start a moment apart).
+fn checkedAt(r: CallRecord, at: number): string = match r.moments.filter(m => m.kind == "say" and m.checked != "" and max(m.at - at, at - m.at) < 4000).at(0) { case some(m) => m.checked, case none => "" }
 
 // What was said, as it was said: hex's words large, Bassim's in a bubble, photos and videos he sent,
 // and the questions hex put on screen. The last two lines read at full strength, earlier ones a
@@ -356,14 +434,20 @@ component CallWords
     openTask: action
     reshare: action
   view
-    list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 20px" mask-image="linear-gradient(to bottom, transparent 0, #000 24px, #000 94%, transparent 100%)"
-      for l, i in lines key=l.id
-        column
+    list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 16px" mask-image="linear-gradient(to bottom, transparent 0, #000 40px)"
+      for l in lines key=l.id
+        column padding="6px 0"
           if l.ask >= 0
             for c in asks.slice(l.ask, l.ask + 1) key=c.ask.id
               CallAskCard(card=c, said=said.filter(s => s.id == c.ask.id and s.verb == "answer"), haptics=haptics, answer=answer, answerMany=answerMany, openTask=openTask)
+          else if l.who == "agent"
+            button press=openTask(l.src) class=Tap display="flex" flex-direction="row" gap=10 align-items="flex-start" text-align="left" aria-label=`hex is working on ${l.src}: ${l.text}` testId=`line-${l.id}`
+              Mark(state="working", size=20)
+              column flex=1 min-width=0
+                text l.src font="-exact-subheadline" font-weight=600 color="hex.progress"
+                text l.text font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
           else if l.media.length > 0
-            column align-items="flex-end" gap=4 padding="4px 0" testId=`line-${l.id}`
+            column align-items="flex-end" gap=4 testId=`line-${l.id}`
               box opacity=(l.note == "sending" ? 0.6 : 1)
                 Album(media=l.media, width=min(width * 0.6, 260))
               if l.note == "sending"
@@ -371,9 +455,16 @@ component CallWords
               else if l.note != ""
                 button press=reshare(l.id.slice(1)) disabled=(not live) class=Tap testId=`reshare-${l.id}`
                   text `Not sent · ${l.note}${live ? " · Tap to try again" : ""}` font="-exact-caption1" color="-exact-system-red" text-align="end"
+          else if l.who == "you"
+            row justify-content="flex-end"
+              text l.text user-select="text" max-width="84%" font="-exact-body" color="-exact-label" padding="9px 14px" border-radius=20 background-color="-exact-tertiary-fill" overflow-wrap="break-word" testId=`line-${l.id}`
           else
-            row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
-              text l.text user-select="text" max-width=(l.who == "you" ? "82%" : "100%") font=(l.who == "you" ? "-exact-body" : "-exact-title3") font-weight=(l.who == "you" ? 400 : 500) color=(i >= lines.length - 2 ? "-exact-label" : "-exact-secondary-label") padding=(l.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(l.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word" testId=`line-${l.id}`
+            column max-width="94%" gap=5 testId=`line-${l.id}`
+              text l.text user-select="text" font="-exact-body" color="-exact-label" overflow-wrap="break-word"
+              if l.src != ""
+                row gap=6 align-items="center" min-width=0
+                  image "symbol:icon.done" width=10 height=10 object-fit="contain" color="hex.accent" aria-hidden=true
+                  text l.src font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0 aria-label=`Checked ${l.src}`
 
 // The call while a page covers Home: a bar at the foot of the clear rectangle with hex's orb, its
 // clock, Mute and End. A tap on the orb or its name goes back to the call. With two columns and Tasks
@@ -429,25 +520,20 @@ component CallDock
         MuteButton(size=48, mute=mute, micOff=micOff, hushed=false, disabled=(status == "ending" or not call.shell))
       CallButton(size=48, status=status, busy=(status != "live"), retry=false, primary=stop)
 
-// Under the orb: the call's clock, its connecting, and how it went.
+// In the call's pill: its clock (a slashed mic before it while muted), or how it's connecting.
 component CallLines
   props
     status: string
     call: CallState
     elapsed: number
-    liveRecord: CallRecord
-    footer: string
-    footerBad: bool
   view
     if status == "live"
-      row gap=6 align-items="center" testId="elapsed"
+      row gap=5 align-items="center" flex-shrink=0 testId="elapsed"
         if call.muted
           image "symbol:sf/mic.slash.fill" width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-        time datetime=elapsed format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" text-align="center"
-    if status == "connecting" or status == "reconnecting"
-      text (status == "reconnecting" ? "Reconnecting…" : "Calling hex…") font="-exact-subheadline" color="-exact-secondary-label" testId="connecting"
-    if footer != ""
-      text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
+        time datetime=elapsed format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap"
+    else if status != "idle"
+      text (status == "reconnecting" ? "Reconnecting…" : status == "ending" ? "Ending…" : "Calling…") font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" testId="connecting"
 
 // The last call's words: on a phone brought up over the home, on a fold shown or put away beside it.
 component WordsButton
@@ -472,7 +558,7 @@ component MuteButton
     disabled: bool
     mute: action
   view
-    button press=mute disabled=disabled class=Tap width=size height=size border-radius=(size / 2) backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(micOff ? "Unmute microphone" : hushed ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
+    button press=mute disabled=disabled class=Tap width=size height=size border-radius=(size / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(micOff ? "Unmute microphone" : hushed ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
       image (micOff ? "symbol:sf/mic.slash.fill" : hushed ? "symbol:sf/speaker.slash.fill" : "symbol:sf/mic.fill") width=(size * 0.37) height=(size * 0.37) object-fit="contain" color=(micOff ? "-exact-system-red" : "-exact-label")
 
 component CallButton
@@ -485,11 +571,11 @@ component CallButton
     retry: bool
     primary: action
   view
-    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") box-shadow=(status == "idle" ? "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" : "none") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
+    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "hex.danger") box-shadow=(status == "idle" ? "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" : "none") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
       if busy
-        progress width=(size / 3) height=(size / 3) color="#FFFFFF" aria-label="Connecting"
+        progress width=(size / 3) height=(size / 3) color="-exact-background" aria-label="Connecting"
       else
-        image (status == "idle" ? "symbol:waveform" : "symbol:sf/phone.down.fill") width=(size * (status == "idle" ? 0.45 : 0.36)) height=(size * (status == "idle" ? 0.45 : 0.36)) object-fit="contain" color=(status == "idle" ? "-exact-background" : "#FFFFFF")
+        image (status == "idle" ? "symbol:waveform" : "symbol:sf/phone.down.fill") width=(size * (status == "idle" ? 0.45 : 0.36)) height=(size * (status == "idle" ? 0.45 : 0.36)) object-fit="contain" color="-exact-background"
 
 // A question hex put on screen during the call (§7): tap an answer, or say it. hex's pick wears
 // the mint wash with ✦, as everywhere; what Bassim chose fills with the accent.
@@ -513,11 +599,15 @@ component CallAskCard
     else
       answer(ask.id, label)
   view
-    column gap=6 margin="8px 0" padding-top=10 border-top="0.5px solid -exact-separator" testId=`call-ask-${ask.id}`
+    column gap=6 margin=(sent != "" ? 0 : "8px 0") padding-top=(sent != "" ? 0 : 10) border-top=(sent != "" ? "none" : "0.5px solid -exact-separator") testId=`call-ask-${ask.id}`
       if sent != ""
-        row gap=8 align-items="center"
-          image "symbol:select-fill" width=18 height=18 object-fit="contain" color="hex.accent" aria-hidden=true
-          text `Sent “${sent}” to ${ask.topic}${reachedBy(ask, card.settled, card.missed)}` font="-exact-subheadline" flex=1
+        row gap=10 align-items="flex-start" aria-label=`Sent “${sent}” to ${ask.topic}${reachedBy(ask, card.settled, card.missed)}`
+          Mark(state="done", size=20)
+          column flex=1 min-width=0
+            text `Sent to ${ask.topic}` font="-exact-subheadline" font-weight=600 color="-exact-label"
+            text `“${sent}”` font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
+            if card.missed > 0
+              text unreached(card.missed) font="-exact-footnote" color="hex.danger"
       else
         row gap=8 align-items="center"
           box width=8 height=8 border-radius=4 background-color="hex.ask" flex-shrink=0 aria-hidden=true

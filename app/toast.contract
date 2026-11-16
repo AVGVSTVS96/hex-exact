@@ -27,6 +27,9 @@ component UpdateToast
   // The free stretch of the chrome row: from its start to the capsule, and with two columns no
   // further than hex's.
   derive spanEnd = min(capsuleX(room), room.columns == 2 ? room.first.x + room.first.width : capsuleX(room)) - 10
+  // Where the stretch is short (the Duo folded upright gives about 200pt), the pill alone says it.
+  derive roomy = spanEnd - room.bar.start >= 270
+  derive verb = step == "failed" ? "Try again" : live ? (roomy ? "Hang up & install" : "Hang up & update") : (roomy ? "Install" : "Install update")
   action install
     if step != "installing"
       step = "installing"
@@ -46,14 +49,15 @@ component UpdateToast
     if shown and place == "home"
       row position="absolute" top=room.bar.top left=room.bar.start width=(spanEnd - room.bar.start) height=44 justify-content="flex-start" z-index=3 pointer-events="none" testId="update-toast"
         row pointer-events="auto" backgroundMaterial="glass" border-radius=22 height=44 max-width="100%" align-items="center"
-          button id="update-install" press=install change=heard class=Tap height=44 min-width=0 padding=(step == "installing" ? "0 16px" : "0 4px 0 16px") display="flex" flex-direction="row" align-items="center" gap=10 aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
+          button id="update-install" press=install change=heard class=Tap height=44 min-width=0 padding=(step == "installing" ? "0 16px" : roomy ? "0 4px 0 16px" : "0 0 0 6px") display="flex" flex-direction="row" align-items="center" gap=10 aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
             if step == "installing"
               progress width=16 height=16 aria-label="Installing"
               text "Installing…" font="-exact-subheadline" font-weight=600 color="-exact-label" white-space="nowrap"
             else
-              text (step == "failed" ? "Didn't start" : live ? "Ends the call" : "Update ready") font="-exact-subheadline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
-              box padding="7px 14px" border-radius=999 background-color="-exact-label" flex-shrink=0
-                text (step == "failed" ? "Try again" : "Install") font="-exact-subheadline" font-weight=600 color="-exact-background" white-space="nowrap"
+              if roomy
+                text (step == "failed" ? "Didn't start" : "Update ready") font="-exact-subheadline" color="-exact-label" white-space="nowrap" flex-shrink=0
+              box padding="7px 12px" border-radius=999 background-color="-exact-label" min-width=0
+                text verb font="-exact-subheadline" font-weight=600 color="-exact-background" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
           if step != "installing"
             button press=skip(build.latest) class=Tap width=44 height=44 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-label="Hide until the next build" testId="update-dismiss"
               image "symbol:close" width=12 height=12 object-fit="contain" color="-exact-secondary-label" aria-hidden=true

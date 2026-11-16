@@ -115,7 +115,10 @@ component Face
     spoken: number
     size: number
   view
-    hex-orb state="idle" silenced="false" persona=persona tint=tint palette=(palette == "original" ? "" : palette) reaction=reaction still=(still ? "true" : "false") speak=`${spoken}` width=size height=size role="img" aria-label=`hex as ${persona}` testId="settings-orb"
+    // The orb draws its disc about two thirds of its frame, leaving room for its glow; the frame
+    // overlaps what's around it so the disc sits as close to its name as drawn.
+    box margin=`${-0.16 * size}px 0 ${-0.19 * size}px`
+      hex-orb state="idle" silenced="false" persona=persona tint=tint palette=(palette == "original" ? "" : palette) reaction=reaction still=(still ? "true" : "false") speak=`${spoken}` width=size height=size role="img" aria-label=`hex as ${persona}` testId="settings-orb"
 
 // One setting: its icon, its name, what it does in a grey line, and its control (children) on the
 // right, or under the words where the column is narrow.

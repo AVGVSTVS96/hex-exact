@@ -19,6 +19,7 @@ fn sourceSymbol(source: string): string = source == "web" ? "symbol:sf/globe" : 
 fn detailOf(c: CallRow, now: number, offset: number): string = [formatTime(c.started, offset, "short")].concat(naming(c, now) ? ["naming…"] : []).concat(c.tasks > 0 ? [`${c.tasks} ${c.tasks == 1 ? "task" : "tasks"}`] : []).join(" · ")
 
 // The page's title, under the chrome, kept clear of the status icons on its trailing side.
+// With two columns the title is in the first, clear of the status icons over the second.
 component PageTitle
   props
     text: string
@@ -26,7 +27,7 @@ component PageTitle
     left: number
     id: string
   view
-    text text role="heading" aria-level=1 font="-exact-large-title" font-weight=700 color="-exact-label" line-clamp=2 padding=`0 ${max(room.width - room.bar.end, 20)}px 0 ${left}px` testId=id
+    text text role="heading" aria-level=1 font="-exact-large-title" font-weight=700 color="-exact-label" line-clamp=2 padding=`0 ${room.columns == 2 ? 20 : max(room.width - room.bar.end, 20)}px 0 ${left}px` testId=id
 
 component CallsList
   inject

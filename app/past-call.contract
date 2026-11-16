@@ -127,7 +127,7 @@ component PastBody
           progress aria-label="Loading the call" margin="64px auto"
       else
         column gap=18
-          row gap=6 align-items="center" justify-content="center" testId="past-call-source"
+          row gap=6 align-items="center" testId="past-call-source"
             image sourceSymbol(c.source) width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
             text sourceLine(c.source) font="-exact-footnote" color="-exact-secondary-label"
           if c.summary != "" or c.why != "" or c.waiting.length > 0

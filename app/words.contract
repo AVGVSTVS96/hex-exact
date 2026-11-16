@@ -34,4 +34,4 @@ component YourWords
         column min-height=(room.columns == 2 ? 0 : max(0, room.headBottom - room.below))
           PageTitle(text="Your words", room=room, left=20, id="words-title")
         text "How hex talks to you, on every call. Back keeps it." font="-exact-subheadline" color="-exact-secondary-label" padding="2px 20px 0"
-        textarea value=(touched ? draft : words) input=edit change=save maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="12px 20px 0" min-height=160 padding="12px 14px" border-radius=16 background-color="-exact-tertiary-fill" font="-exact-body" aria-label="Your words" autofocus=true testId="words-field"
+        textarea value=(touched ? draft : words) input=edit change=save maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="12px 20px 0" width="calc(100% - 40px)" box-sizing="border-box" min-height=160 padding="12px 14px" border-radius=16 background-color="-exact-tertiary-fill" font="-exact-body" aria-label="Your words" testId="words-field"

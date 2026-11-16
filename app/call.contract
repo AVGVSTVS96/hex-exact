@@ -310,8 +310,8 @@ component Home
 
       // Open, beside the call (below it like a laptop): what hex checked for it and what still
       // needs Bassim, which hex can go through with him while he's on.
-      if two
-        column position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=0 left=(across ? left : secondLeft) right=right opacity=(callShown ? 1 : 0) pointer-events=(callShown ? "auto" : "none") transition=fade z-index=1 testId="call-work"
+      if two and callShown
+        column position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=0 left=(across ? left : secondLeft) right=right z-index=1 testId="call-work"
           CallWork(record=liveRecord, needs=needsOf(tasks, asks, said, now), tasks=tasks, now=now, offset=offset, known=(tasks.version > 0 or asks.version > 0), sideBySide=across, pad=(across ? H - room.tabs.top + 12 : bottom + 12), goThrough=(here and live), talk=talk, openTask=openTask, openTasks=openTasks)
 
       // With two columns at rest, the last call beside the home until a page is opened: its wrap-up

@@ -62,6 +62,13 @@ component CallsList
   derive pad = room.clear.x + 20
   derive listLeft = two ? room.first.x : 0
   derive listWidth = two ? room.first.width : room.width
+  // A row opens its call: beside the list with two columns, over it with one. One press, not a
+  // link that also presses, which opened nothing folded.
+  action openCall(id: string)
+    if two
+      select(id)
+    else
+      open(path("pastCall", id))
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="calls-list" position="absolute" inset=0 background-color="-exact-background" testId="calls"
       Chrome(room=room, on="calls", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
@@ -79,7 +86,7 @@ component CallsList
                 if c.id == undoable
                   DeletedRow(c=c, undo=undoRemove)
                 else
-                  CallRowView(c=c, now=now, offset=offset, two=two, selected=(two and c.id == selected), select=select, remove=remove, removing=removing, removeError=removeError)
+                  CallRowView(c=c, now=now, offset=offset, two=two, selected=(two and c.id == selected), select=openCall, remove=remove, removing=removing, removeError=removeError)
 
 // One call: a disc with how it came in, its name, when and what came of it, and how long.
 // Swiped from the right, Delete.
@@ -100,7 +107,7 @@ component CallRowView
     // Under each row a hairline from its disc to its length, as drawn.
     column
       scroll swipeContent=`${c.id}-row` swipeTrailing=(c.live ? "" : `${c.id}-delete`) display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`call-${c.id}`
-        link id=`${c.id}-row` href=(two ? "" : path("pastCall", c.id)) press=select(c.id) class=RowTap width="100%" flex-shrink=0 scroll-snap-align="start" gap=14 align-items="center" padding="10px 12px" background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected aria-label=`${nameOf(c)}, ${c.live ? "live now" : `${detailOf(c, now, offset)}, ${clockOf(c.seconds)} long`}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`call-open-${c.id}`
+        button id=`${c.id}-row` press=select(c.id) class=RowTap width="100%" flex-shrink=0 scroll-snap-align="start" gap=14 align-items="center" padding="10px 12px" background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected aria-label=`${nameOf(c)}, ${c.live ? "live now" : `${detailOf(c, now, offset)}, ${clockOf(c.seconds)} long`}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`call-open-${c.id}`
           box width=40 height=40 border-radius=20 flex-shrink=0 background-color=(c.live ? "hex.progress.wash" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" aria-hidden=true
             image sourceSymbol(c.source) width=18 height=18 object-fit="contain" color=(c.live ? "hex.progress" : "-exact-label")
           column flex=1 min-width=0 gap=2

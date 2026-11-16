@@ -1,0 +1,190 @@
+// A goal: what Bassim asked for in his own words, when it's done, and where it stands, with its
+// steps and its topic a tap away. When it waits on him its question comes first; reached, it shows
+// the proof. One answer row ends it: "Not needed" while hex works on it, "Not what I asked" once
+// it's reached, each confirmed on its own row with Undo. "Add to this goal" is docked at the foot
+// and goes to its topic. A page over Home, or with two columns the page beside it.
+use Goal, Goals, Media from "./shapes.contract"
+use Mark, Note, Tap, Composer, ComposerField, whenOf from "./parts.contract"
+use Room, Chrome from "./room.contract"
+use Confirmed from "./ask.contract"
+use AddMedia, Waiting from "./media.contract"
+
+// What Bassim did on a goal or watch page, until he leaves it: `${id}\t${verb}\t${status}\t${error}`,
+// verb drop | reopen | stop, status sending | done | failed.
+fn changeOf(changes: string[], id: string): string = match changes.filter(l => l.startsWith(`${id}\t`)).at(-1) { case some(l) => l, case none => "" }
+fn partOf(line: string, i: number): string = match line.split("\t").at(i) { case some(p) => p, case none => "" }
+fn draftOf(drafts: string[], key: string): string = match drafts.filter(l => l.startsWith(`${key}\t`)).at(0) { case some(l) => l.slice(key.length + 1), case none => "" }
+fn goalOf(goals: Goals, id: string): Goal = match goals.goals.filter(g => g.id == id).at(0) { case some(g) => g, case none => Goal(id="", title="", group="", topic="", app="", run="", link="", state="", line="", ask="", words=[], doneWhen="", proof="", proofLinks=[], asked=0, at=0) }
+fn dayAndTime(at: number, now: number, offset: number): string = whenOf(at, now, offset) == formatTime(at, offset, "short") ? `today, ${formatTime(at, offset, "short")}` : whenOf(at, now, offset)
+
+component GoalPage
+  props
+    entry: Entry
+    room: Room
+    id: string
+    goals: Goals
+    now: number
+    offset: number
+    needsYou: number
+    working: number
+    loading: bool
+    changes: string[]
+    drafts: string[]
+    attached: Media[]
+    attachedTo: string
+    addError: string
+    change: action
+    undo: action
+    message: action
+    keepDraft: action
+    attach: action
+    detach: action
+    openTask: action
+    open: action
+    openTasks: action
+    back: action
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="goal"
+      Chrome(room=room, on="goal", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
+      column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
+        GoalBody(foot=room.foot, id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+
+component GoalBody
+  inject
+    haptics: bool
+  props
+    // Room under the page's foot: the bar and, during a call, the docked call.
+    foot: number
+    id: string
+    goals: Goals
+    now: number
+    offset: number
+    loading: bool
+    changes: string[]
+    drafts: string[]
+    attached: Media[]
+    attachedTo: string
+    addError: string
+    change: action
+    undo: action
+    message: action
+    keepDraft: action
+    attach: action
+    detach: action
+    openTask: action
+    open: action
+  derive g = goalOf(goals, id)
+  derive done = g.state == "done"
+  derive did = changeOf(changes, id)
+  derive verb = partOf(did, 1)
+  view
+    column flex=1 min-height=0 testId=`goal-${id}`
+      scroll flex=1 min-height=0 padding=`0 16px ${g.run != "" ? 24 : foot + 16}px` testId="goal-page"
+        if g.id == ""
+          Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading this goal" : "This goal is no longer on your list."), pad="24px 0", id="goal-missing")
+        else
+          column gap=4 padding="0 0 16px"
+            text g.title font="-exact-title1" font-weight=700 role="heading" aria-level=1 user-select="text"
+            text `Goal · ${g.group}${g.asked > 0 ? ` · asked ${whenOf(g.asked, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
+          if g.words.length > 0
+            column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="goal-asked"
+              text "You asked" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
+              for w, i in g.words key=i
+                text w font="-exact-body" color="-exact-label" user-select="text"
+          if g.doneWhen != ""
+            column gap=8 margin-bottom=22 testId="goal-done-when"
+              text "Done when" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
+              text g.doneWhen font="-exact-body" color="-exact-label" user-select="text"
+          column gap=10 testId="goal-stands"
+            text (done ? `Reached ${dayAndTime(g.at, now, offset)}` : "Where it stands") font="-exact-subheadline" font-weight=600 color=(done ? "-exact-secondary-label" : "hex.progress")
+            if g.state == "needs" and g.run != ""
+              button press=openTask(g.run) class=Tap display="flex" flex-direction="row" gap=14 align-items="flex-start" text-align="left" min-height=44 aria-label=`hex asks: ${g.line}` -exact-press-haptic=(haptics ? "selection" : "none") testId="goal-question"
+                Mark(state="asks", size=26)
+                column flex=1 min-width=0 gap=2
+                  text (g.line != "" ? g.line : "hex has a question for you") font="-exact-body" font-weight=600 color="-exact-label"
+                  text "Answer it" font="-exact-subheadline" color="hex.ask"
+                image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" margin-top=6
+            else
+              row gap=14 align-items="flex-start"
+                Mark(state=(done ? "done" : g.state == "idle" ? "paused" : g.state == "dropped" ? "stopped" : g.state), size=26)
+                text (done ? (g.proof != "" ? g.proof : "Reached.") : g.state == "unstarted" ? "Not started yet." : g.line != "" ? g.line : g.state == "working" ? "hex is working on it." : g.state == "dropped" ? "Taken off your goals." : "Nothing is running on it now.") font="-exact-body" color="-exact-label" flex=1 min-width=0 user-select="text"
+            row gap=22 flex-wrap="wrap" padding-left=40 testId="goal-links"
+              if done
+                for l in g.proofLinks key=l.url
+                  link href=l.url display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 testId=`goal-proof-${l.label}`
+                    text l.label font="-exact-body" font-weight=600 color="-exact-label"
+                    image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+              if g.run != ""
+                link href=path("steps", g.run) display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 testId="goal-steps"
+                  text "Steps" font="-exact-body" font-weight=600 color="-exact-label"
+                  image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+                button press=openTask(g.run) class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-label=`Topic, ${g.topic}` testId="goal-topic"
+                  text "Topic" font="-exact-body" font-weight=600 color="-exact-label"
+                  image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+          column margin-top=12 border-top="0.5px solid -exact-separator" testId="goal-answers"
+            if verb == "drop" or (verb == "" and g.state == "dropped")
+              Confirmed(label="Not needed", detail="hex stops and takes it off your goals", failed=(partOf(did, 2) == "failed" ? `Not sent · ${partOf(did, 3)}` : ""), status=(partOf(did, 2) == "sending" ? "Sending…" : "Off your goals"), missed=0, id="goal-dropped", undo=undo(id, "drop"), again=change(id, "drop"))
+            else if verb == "reopen"
+              Confirmed(label="Not what I asked", detail="hex picks it up again", failed=(partOf(did, 2) == "failed" ? `Not sent · ${partOf(did, 3)}` : ""), status=(partOf(did, 2) == "sending" ? "Sending…" : "Sent back to hex"), missed=0, id="goal-reopened", undo=undo(id, "reopen"), again=change(id, "reopen"))
+            else if done
+              GoalAnswer(label="Not what I asked", detail="hex picks it up again", dashed=false, id="goal-reopen", press=change(id, "reopen"))
+            else if g.id != ""
+              GoalAnswer(label="Not needed", detail="hex stops and takes it off your goals", dashed=true, id="goal-drop", press=change(id, "drop"))
+      if g.run != ""
+        column padding=`6px 12px ${foot}px` testId="goal-foot"
+          AddToGoal(run=g.run, title=g.title, draft=draftOf(drafts, `thread:${g.run}`), keep=keepDraft, message=message, attached=(attachedTo == `thread:${g.run}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${g.run}` ? addError : ""), attach=attach, detach=detach)
+
+// An answer row at a goal's or watch's foot: a ring (dashed when it takes something away), what
+// it does, and what follows.
+component GoalAnswer
+  inject
+    haptics: bool
+  props
+    label: string
+    detail: string
+    dashed: bool
+    id: string
+    press: action
+  view
+    button press=press class=Tap display="flex" flex-direction="row" gap=14 align-items="center" padding="12px 0" min-height=44 border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${label}: ${detail}` testId=id
+      box width=26 height=26 border-radius=13 flex-shrink=0 box-sizing="border-box" border=(dashed ? "1.5px dashed -exact-tertiary-label" : "1.5px solid -exact-tertiary-label") aria-hidden=true
+      column flex=1 min-width=0 gap=2
+        text label font="-exact-body" color=(dashed ? "-exact-secondary-label" : "-exact-label")
+        text detail font="-exact-subheadline" color=(dashed ? "-exact-tertiary-label" : "-exact-secondary-label")
+
+// "Add to this goal": Bassim's words to the goal's topic, with photos. The keyboard stays up after
+// a send, and a draft is kept if he leaves.
+component AddToGoal
+  props
+    run: string
+    title: string
+    draft: string
+    keep: action
+    message: action
+    attached: Media[]
+    addError: string
+    attach: action
+    detach: action
+  state text = ""
+  state started = false
+  derive words = started ? text : draft
+  derive empty = words.trim() == "" and attached.length == 0
+  action add(source: string)
+    attach(`thread:${run}`, source)
+  action edit(v: string)
+    text = v
+    started = true
+    keep(`thread:${run}`, v)
+  action send
+    message(run, words.trim())
+    text = ""
+    started = true
+  view
+    column gap=4 testId="goal-add"
+      Waiting(media=attached, error=addError, remove=detach)
+      row gap=8 align-items="flex-end"
+        AddMedia(menu="goal-add-media", label="Add a photo or video", glass=false, size=44, disabled=(attached.length >= 4), add=add)
+        row class=Composer flex=1 min-width=0
+          textarea id="goal-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=130 placeholder="Add to this goal" aria-label=`Add to ${title}` testId="goal-field"
+          button press=send disabled=empty buttonStyle="filled" retainFocus=true margin="4px 0" aria-label="Send to its topic" testId="goal-send"
+            image "symbol:send"

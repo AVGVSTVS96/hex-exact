@@ -2,11 +2,12 @@
 // then the list of the page under it. Now is the few things that need Bassim, what hex is working
 // on and what it decided for him; Feed, Ideas and Goals join it as tabs at the foot of hex's column.
 // Home shows it whenever no call is on; Tasks has the rest.
-use Tasks, Asks, TaskRow from "./shapes.contract"
+use Tasks, Asks, TaskRow, Goals from "./shapes.contract"
 use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap from "./parts.contract"
 use Said from "./said.contract"
 use FeedList, FeedView from "./feed.contract"
 use IdeasList, Ideas, Idea from "./ideas.contract"
+use GoalsList from "./goals.contract"
 use Item, entriesOf, homeOf, problemOf from "./inbox.contract"
 
 // hex's face in its column: stacked (the orb over its name and live line) when the window is
@@ -90,6 +91,15 @@ component HexHome
     ideasFailed: bool
     openIdea: action
     retryIdeas: action
+    goals: Goals
+    goalsOpened: string[]
+    goalsChosen: bool
+    goalsFailed: bool
+    goalsWhy: string
+    toggleProject: action
+    openGoal: action
+    openWatch: action
+    retryGoals: action
   // What the call just left (how it ended, its wrap-up), at the top of Now.
   slot
   derive known = tasks.version > 0 or asks.version > 0
@@ -139,6 +149,8 @@ component HexHome
               FeedList(feed=feed, now=now, offset=offset, width=(width - 12), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
             else if p == "ideas"
               IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
+            else if p == "goals"
+              GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
 
 // hex's live line: what it's doing, two lines at most, ending in an ellipsis; a tap opens that work.
 component LiveLine

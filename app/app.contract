@@ -24,6 +24,10 @@ use DecidedPage, decidedPath from "./decided.contract"
 use Feed, FeedEntry, FeedView from "./feed.contract"
 use Ideas, IdeaOne, IdeaDone from "./ideas.contract"
 use IdeaScreen, IdeaPane, IdeaAct, ideaActOf, ideaActLine, undoOf, weekdayNumber from "./idea.contract"
+use Goals from "./shapes.contract"
+use GoalPage, GoalBody from "./goal.contract"
+use groupsOf from "./goals.contract"
+use WatchPage, WatchBody from "./watch.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
 // Every screen and sheet. Home is hex, and the call; the rest open over it. hexexact://go/<path> opens any
@@ -32,6 +36,8 @@ routes nav
   home "/"
     decided "/decided"
     idea "/ideas/:id"
+    goal "/goals/:id"
+    watch "/goals/w/:id"
     calls "/calls"
       pastCall "/calls/:id"
     tasks "/tasks"
@@ -115,6 +121,19 @@ component App
   derive room = roomOf(viewport, pose)
   // hex's own pages that are built: Now until Feed, Ideas and Goals join it. With one, no tabs show.
   derive hexPages = ["now"]
+
+  // Goals (goals.contract): what Bassim asked for and what hex watches, kept current and kept on
+  // the phone. goalsOpen holds the projects he left open, once he's opened or shut one
+  // (goalsChosen); until then the top one is. goalChanges says what he did on a goal or watch page
+  // until he leaves it: `${id}\t${verb}\t${status}\t${error}`.
+  state goalsOpen = [""].slice(0, 0) persist
+  state goalsChosen = false persist
+  state goalChanges = [""].slice(0, 0)
+  resource liveGoals = watchGoals() as shape Goals else empty()
+  resource keptGoals = keptGoals() as shape Goals else empty()
+  derive goals = liveGoals.version > 0 ? liveGoals : keptGoals
+  resource keepingGoals = keep("/goals", `${liveGoals.version}`) when liveGoals.version > 0 as shape Reply else empty()
+  derive goalsWhy = match failure(liveGoals) { case some(f) => f.message, case none => "" }
 
   // Feed (feed.contract): the last Feed hex gave shows until it answers; older stretches load as
   // the list reaches its end. feedSeen is the newest entry Bassim has had Feed open for; feedMark,
@@ -207,7 +226,7 @@ component App
   derive chatOpen = names.includes("thread") or names.includes("task") or besideId != ""
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
   // A topic (`topic:<name>`) or a finished item (`done:<id>`) opens a page made from the lists.
-  derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") or taskId.startsWith("idea:") ? "" : taskId
+  derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") or taskId.startsWith("idea:") or taskId.startsWith("goal:") or taskId.startsWith("watch:") ? "" : taskId
   resource task = watchTask(threadId) when threadId != "" as shape TaskPage else empty()
   resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
   resource check = loadCheck() when names.includes("check") as shape Check else empty()
@@ -232,6 +251,7 @@ component App
   mutation talked as shape Reply
   mutation messaged as shape Reply queue then settleMessage
   mutation stopped as shape Sent
+  mutation goalChanged as shape Sent queue then settleGoal
   mutation removed as shape Reply queue
   mutation previewed as shape Reply
   mutation saved as shape Reply queue refreshes settings
@@ -352,6 +372,51 @@ component App
     if page == "feed" or hexPage == "feed"
       feedSeen = max(feedSeen, feedLatest)
     hexPage = page
+
+  // Goals
+  derive firstProject = match groupsOf(goals).at(0) { case some(n) => n, case none => "" }
+  derive openGoalId = top(nav).name == "goal" or top(nav).name == "watch" ? top(nav).params.id : besideId.startsWith("goal:") ? besideId.slice(5) : besideId.startsWith("watch:") ? besideId.slice(6) : ""
+  action toggleProject(name: string)
+    goalsOpen = goalsChosen ? (goalsOpen.includes(name) ? goalsOpen.filter(n => n != name) : goalsOpen.concat([name])) : (firstProject == name ? [""].slice(0, 0) : [firstProject, name].filter(n => n != ""))
+    goalsChosen = true
+  action openGoal(id: string)
+    if room.columns == 2
+      besidePage(`goal:${id}`)
+    else
+      open(path("goal", id))
+  action openWatch(id: string)
+    if room.columns == 2
+      besidePage(`watch:${id}`)
+    else
+      open(path("watch", id))
+  action retryGoals
+    refresh liveGoals
+  // Not needed (drop), Not what I asked (reopen), Stop watching (stop): confirmed on its row at once.
+  action changeGoal(id: string, verb: string)
+    goalChanges = goalChanges.filter(l => not l.startsWith(`${id}\t`)).concat([`${id}\t${verb}\tsending\t`])
+    if haptics
+      haptic("selection")
+    if verb == "stop"
+      send goalChanged = changeWatch(id, verb)
+    else
+      send goalChanged = changeGoal(id, verb)
+  action undoGoal(id: string, verb: string)
+    goalChanges = goalChanges.filter(l => not l.startsWith(`${id}\t`))
+    if verb == "stop"
+      send goalChanged = changeWatch(id, "undo")
+    else
+      send goalChanged = changeGoal(id, "undo")
+  action settleGoal
+    match goalChanged
+      case some(r)
+        goalChanges = goalChanges.map(l => l.startsWith(`${r.id}\t`) ? `${l.split("\t").slice(0, 2).join("\t")}\t${r.ok ? "done" : "failed"}\t${r.error.replaceAll("\t", " ")}` : l)
+      case none
+        goalChanges = goalChanges
+  // What he did on a page holds until he leaves it.
+  task leaveGoal key=`${top(nav).id}|${besideId}`
+    after(1, forgetGoalChanges)
+  action forgetGoalChanges
+    goalChanges = goalChanges.filter(l => l.startsWith(`${openGoalId}\t`))
 
   // Feed
   action moreFeed
@@ -665,15 +730,23 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, feedFresh=feedFresh, feed=feed, openFeed=openFeed, discuss=discussFeed, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=idea.idea, ideasFailed=failed(liveIdeas), openIdea=openIdea, retryIdeas=retryIdeas, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, feedFresh=feedFresh, feed=feed, openFeed=openFeed, discuss=discussFeed, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=idea.idea, ideasFailed=failed(liveIdeas), openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpen, goalsChosen=goalsChosen, goalsFailed=failed(liveGoals), goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
             if besideId.startsWith("idea:")
               IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? viewport.keyboardHeight + 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
+            else if besideId.startsWith("goal:")
+              GoalBody(foot=(callOn ? room.foot + 64 + 12 : room.foot), id=besideId.slice(5), goals=goals, now=now, offset=clock.utcOffset, loading=(not current(liveGoals)), changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+            else if besideId.startsWith("watch:")
+              WatchBody(foot=(callOn ? room.foot + 64 + 12 : room.foot), id=besideId.slice(6), goals=goals, now=now, offset=clock.utcOffset, loading=(not current(liveGoals)), changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask)
             else if besideId != ""
               TaskBody(id=besideId, pane=true, room=room, clearTop=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "idea"
           IdeaScreen(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea, open=open, openTasks=openTasks, back=back)
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
+        if e.name == "goal"
+          GoalPage(entry=e, room=room, id=e.params.id, goals=goals, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=(not current(liveGoals)), changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open, openTasks=openTasks, back=back)
+        if e.name == "watch"
+          WatchPage(entry=e, room=room, id=e.params.id, goals=goals, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=(not current(liveGoals)), changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"
           CallsList(entry=e, room=room, now=now, offset=clock.utcOffset, calls=callsShown, counts=counts, loading=(not current(liveCalls)), failed=failed(liveCalls), docked=callOn, selected=paneCall, select=pickCall, open=open, openTasks=openTasks, remove=removeCall, undoRemove=undoRemove, undoable=undoable, removing=removing, removeError=removeError, back=back)
           if callsPane and paneCall != ""

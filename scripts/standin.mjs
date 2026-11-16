@@ -65,6 +65,27 @@ const ideas = [
   idea("t-12", "Move the newsletter to Sundays", "Newsletter", "sunday mornings might get more opens", 40, "", [check(25, 9, false, "Sunday sends open about 4% better in two studies; the gap is small.")]),
 ];
 
+// Goals (/goals) are his own where his hex serves them; made up only where it doesn't yet: the Lisbon
+// trip of the drawings, and what hex watches.
+const goal = (id, title, group, state, line, words, doneWhen, proof, at) => ({ id, title, group, topic: group, app: "telegram", run: "standin-lisbon", link: "", state, line, ask: "", words, doneWhen, proof, asked: day(3, 10, 0), at });
+const watching = (id, title, topic, every, said, extra = []) => ({ id, stopped: false, title, topic, run: "", every, next: day(-1, 9, 0), asked: [], does: `Check ${title.toLowerCase()} and say what changed.`, runs: [{ at: day(0, 9, 0), said }, ...extra] });
+const goals = {
+  version: 1,
+  goals: [
+    goal("t-11", "A hotel near Alfama under €180", "Lisbon trip", "working", "Checking three that have a lift", ["find us somewhere in alfama, not over 180 a night, and it needs a lift"], "A room is booked in Alfama, under €180 a night, with a lift.", "", day(0, 15, 28)),
+    goal("t-12", "A day in Sintra", "Lisbon trip", "needs", "9:15 or 11:40 train?", ["plan a day in sintra, not too early"], "Train times and a plan for the day are in the topic.", "", day(0, 13, 12)),
+    goal("t-13", "Dinner on Saturday night", "Lisbon trip", "unstarted", "", ["somewhere good for dinner saturday, fish"], "A table for two is booked for Saturday.", "", day(1, 9, 0)),
+    goal("t-1", "Flights, aisle seats", "Lisbon trip", "done", "", ["book us both ways, direct if you can, and i want the aisle"], "Both flights are booked, with an aisle seat each way.", "Out Friday 9:05, back Sunday 7:05, both direct. €296 for the two of you.", day(0, 15, 10)),
+    goal("t-14", "A brass pot rail, 90 cm", "Kitchen remodel", "unstarted", "", ["find a pot rail that fits over the hob"], "One is ordered, cut to 90 cm.", "", day(2, 11, 0)),
+    goal("t-5", "Book the installer", "Kitchen remodel", "done", "", ["get the installer in before the 25th"], "A date before the 25th is booked.", "Morning of the 22nd, two hours, €180 paid on the day.", day(1, 16, 20)),
+  ],
+  watching: [
+    watching("rail-strike", "Rail strike on the 22nd", "Lisbon trip", "every day at 9 AM", "No strike called. The union vote was put off to December.", [{ at: day(1, 9, 0), said: "No strike called yet. The union meets on Thursday." }, { at: day(2, 9, 0), said: "Nothing new about a strike." }]),
+    watching("passport", "Passport renewal", "Lisbon trip", "every Monday at 10 AM", "Still in the queue. It said 3 weeks on the 2nd."),
+    watching("hinges", "Soft-close hinges in stock", "Kitchen remodel", "every day at 8 AM", "Back in stock at €8 each."),
+  ],
+};
+
 let writes = 0;
 createServer(async (request, response) => {
   const url = new URL(request.url, "http://standin");
@@ -82,6 +103,12 @@ createServer(async (request, response) => {
     const found = one[1] ? ideas.find((i) => i.id === one[1]) : { ideas };
     if (found) response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ version: 1, ...found }));
     else response.writeHead(404).end();
+    return;
+  }
+  const goalsServed = url.pathname === "/goals" && (await fetch(`${HEX_URL}/goals`, { headers }).then((r) => r.status !== 404, () => false));
+  if (request.method === "GET" && url.pathname === "/goals" && !goalsServed) {
+    if (url.searchParams.get("after")) await new Promise((done) => setTimeout(done, 25_000));
+    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(goals));
     return;
   }
   if (request.method === "GET") {

@@ -1,0 +1,33 @@
+# Goals from Home on his own goals (the stand-in passes /goals through; its writes never reach hex):
+# Watching and the projects, one opened, a watch with its earlier checks and Stop watching, a
+# reached goal with Not what I asked and Undo, one hex works on with Not needed and Add to this
+# goal, and one waiting on him. The ids are his as of Nov 15; a reached goal leaves after a week.
+launch /
+tap hex-tab-goals
+shoot goals
+tap goals-more-watching
+shoot goals-watching
+tap goals-project-iikb
+shoot goals-project-open
+scroll goals-project-iikb
+shoot goals-scrolled
+launch /goals/w/edd-keeper
+shoot watch
+tap watch-earlier
+shoot watch-earlier
+tap watch-stop
+shoot watch-stopped
+launch /goals/t-1001
+shoot goal-reached
+tap goal-reopen
+shoot goal-reopened
+tap goal-reopened-undo
+shoot goal-undone
+launch /goals/t-1036
+shoot goal-working
+tap goal-drop
+shoot goal-dropped
+type goal-field Two rooms are fine if it's cheaper
+shoot goal-typing
+launch /goals/t-1038
+shoot goal-needs

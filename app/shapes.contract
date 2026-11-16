@@ -460,3 +460,58 @@ shape PhonePrefs
   persona: string
   personaColor: string
   palette: string
+
+// Goals: what Bassim asked hex for, each where it stands, and what hex keeps watch on for him
+// (hex's GET /goals). A goal is a task: state working | needs | idle (hex worked on it, nothing runs
+// now) | unstarted | done | dropped (Not needed, in the last day). `group` is its project, else its topic; `run` its topic's page;
+// `ask` the question it waits on; `words` his own; `proof` what reached it, as said and its links.
+shape Goal
+  id: string
+  title: string
+  group: string
+  topic: string
+  app: string
+  run: string
+  link: string
+  state: string
+  line: string
+  ask: string
+  words: string[]
+  doneWhen: string
+  proof: string
+  proofLinks: Link[]
+  asked: number
+  at: number
+
+// One run of a watch: when it ran and what it ended saying ("" while it runs).
+shape WatchRun
+  at: number
+  said: string
+
+// A reminder or check hex runs on a timer for him: its name, how often, when next, his words, what
+// hex does, and its last runs, newest first.
+shape Watch
+  id: string
+  // Just stopped from here: it stays until Undo or hex restarts.
+  stopped: bool
+  title: string
+  topic: string
+  run: string
+  every: string
+  next: number
+  asked: string[]
+  does: string
+  runs: WatchRun[]
+
+// A project (or a topic without one) on Goals: its name and its bar, reached first.
+shape GoalGroup
+  name: string
+  states: string[]
+
+// Grouped and ranked in data/goals.ts: his hex has hundreds of goals, too many to sort here within
+// a list step budget. `groups` runs by what wants him first, `goals` by group then rank.
+shape Goals
+  version: number
+  goals: Goal[]
+  groups: GoalGroup[]
+  watching: Watch[]

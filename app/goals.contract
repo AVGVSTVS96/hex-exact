@@ -1,0 +1,84 @@
+// Goals: what Bassim asked hex for and how far each is, and what hex keeps watch on for him. Muse's
+// Goals, with its Tracking on top. Only the rows: Home draws hex's face over them, scrolls them and
+// stops them above the tabs.
+use Goal, Goals, Watch from "./shapes.contract"
+use Head, GoalProject, Row, ShowMore, Note, whenOf, dayOf, Tap from "./parts.contract"
+
+fn markOfGoal(state: string): string = state == "needs" ? "asks" : state == "idle" ? "paused" : state
+// A project's goals, already ranked in data/goals.ts.
+fn groupGoals(g: Goals, name: string): Goal[] = g.goals.filter(x => x.group == name and x.state != "dropped")
+fn groupsOf(g: Goals): string[] = g.groups.map(x => x.name)
+fn toGo(g: Goals): number = g.goals.filter(x => x.state != "done" and x.state != "dropped").length
+
+// Where a goal stands, in one line.
+fn standsOf(x: Goal, now: number, offset: number): string = x.state == "done" ? `Reached ${dayOrTime(x.at, now, offset)}` : x.state == "unstarted" ? "Not started" : x.line != "" ? x.line : x.state == "working" ? "Working on it" : x.state == "needs" ? "Waits on you" : "Nothing running now"
+fn dayOrTime(at: number, now: number, offset: number): string = whenOf(at, now, offset) == formatTime(at, offset, "short") ? "today" : whenOf(at, now, offset)
+
+// A watch's last word: the first sentence its last finished run ended on.
+fn lastRun(w: Watch): string = match w.runs.filter(r => r.said != "").at(0) { case some(r) => r.said, case none => "" }
+fn lastRunAt(w: Watch): number = match w.runs.filter(r => r.said != "").at(0) { case some(r) => r.at, case none => 0 }
+fn plainOf(text: string): string = text.replaceAll("**", "").replaceAll("`", "")
+fn sentenceOf(text: string): string = match plainOf(text).split(". ").at(0) { case some(s) => s.endsWith(".") ? s.slice(0, -1) : s, case none => "" }
+// When it runs next, as Bassim would say it: "today at 9 AM", "tomorrow", "on Monday", "on Dec 6".
+fn nextWords(next: number, now: number, offset: number): string = next == 0 ? "" : dayOf(next, offset) == dayOf(now, offset) ? `today at ${formatTime(next, offset, "short")}` : dayOf(next, offset) == dayOf(now, offset) + 1 ? "tomorrow" : dayOf(next, offset) < dayOf(now, offset) + 7 ? `on ${match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(dayOf(next, offset) % 7) { case some(d) => d, case none => "" }}` : `on ${match formatDate(next, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }}`
+fn watchLine(w: Watch, now: number, offset: number): string = w.stopped ? "Stopped" : `${lastRun(w) != "" ? `${sentenceOf(lastRun(w))}. ` : ""}${w.next == 0 ? "Not set to run again" : `Checks again ${nextWords(w.next, now, offset)}`}`
+
+component GoalsList
+  inject
+    haptics: bool
+  props
+    goals: Goals
+    now: number
+    offset: number
+    failed: bool
+    // Why hex couldn't be reached, when it couldn't.
+    why: string
+    // Which projects are open; Bassim's choice once he's made one, else the top one.
+    opened: string[]
+    chosen: bool
+    // What's open beside the list with two columns: `goal:<id>` or `watch:<name>`.
+    beside: string
+    toggle: action
+    openGoal: action
+    openWatch: action
+    retry: action
+  state allWatches = false
+  state allGroups = false
+  derive known = goals.version > 0
+  derive watches = goals.watching
+  derive groups = goals.groups
+  derive open = chosen ? opened : groupsOf(goals).slice(0, 1)
+  derive shownWatches = allWatches ? watches : watches.slice(0, 2)
+  derive shownGroups = allGroups ? groups : groups.slice(0, 5)
+  view
+    column testId="goals"
+      if failed and not known
+        Note(kind="failed", text=(why != "" ? why : "Can't reach hex."), pad="24px 10px 4px", id="goals-offline")
+        button press=retry class=Tap align-self="flex-start" min-height=44 padding="0 10px 0 44px" aria-label="Try again" testId="goals-retry"
+          text "Try again" font="-exact-subheadline" font-weight=600 color="-exact-label"
+      else if not known
+        Note(kind="loading", text="Loading your goals", pad="24px 10px", id="goals-loading")
+      else if watches.length == 0 and groups.length == 0
+        Note(kind="empty", text="Nothing asked for yet. Ask hex for something and it shows here.", pad="24px 10px", id="goals-empty")
+      if watches.length > 0
+        Head(label="Watching", n=watches.length, pad="18px 10px 6px", id="goals-head-watching")
+        for w in shownWatches key=w.id
+          Row(mark="watch", title=w.title, line=watchLine(w, now, offset), lines=2, failed=false, stamp="", n=0, selected=(beside == `watch:${w.id}`), href="", label=`Watching ${w.title}: ${watchLine(w, now, offset)}`, id=`goals-watch-${w.id}`, press=openWatch(w.id))
+        if watches.length > 2
+          ShowMore(n=watches.length - 2, shown=allWatches, pad="6px 10px", id="goals-more-watching", press=toggleWatches)
+      if groups.length > 0
+        row gap=12 align-items="baseline" padding="22px 10px 6px" role="heading" aria-level=2 aria-label=`Goals, ${toGo(goals)} to go` testId="goals-head-goals"
+          text "Goals" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1
+          text (toGo(goals) == 0 ? "All reached" : `${toGo(goals)} to go`) font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
+        for p in shownGroups key=p.name
+          GoalProject(name=p.name, states=p.states, open=open.includes(p.name), id=`goals-project-${p.name}`, toggle=toggle(p.name))
+          if open.includes(p.name)
+            for x in groupGoals(goals, p.name) key=x.id
+              box padding-left=34
+                Row(mark=markOfGoal(x.state), title=x.title, line=standsOf(x, now, offset), lines=1, failed=false, stamp=(x.state == "unstarted" or x.state == "idle" ? "" : whenOf(x.at, now, offset)), n=0, selected=(beside == `goal:${x.id}`), href="", label=`${x.title}: ${standsOf(x, now, offset)}`, id=`goals-goal-${x.id}`, press=openGoal(x.id))
+        if groups.length > 5
+          ShowMore(n=groups.length - 5, shown=allGroups, pad="6px 10px", id="goals-more-projects", press=toggleGroups)
+  action toggleWatches
+    allWatches = not allWatches
+  action toggleGroups
+    allGroups = not allGroups

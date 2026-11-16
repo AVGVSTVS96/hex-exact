@@ -149,7 +149,7 @@ component IdeaBody
         row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 20 : 16)
           column flex=(wide ? 1 : 0) min-width=0 gap=0
             row gap=6 align-items="center" min-height=24 padding-right=inset
-              Mark(state=(idea.looking ? "found" : "idea"), size=22)
+              Mark(state=(idea.checks.filter(c => c.news).length > 0 ? "found" : idea.looking ? "looking" : "idea"), size=24)
               if project != ""
                 text project font="-exact-subheadline" font-weight=600 color=(idea.looking ? "hex.progress" : "-exact-secondary-label") margin-left=4 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
               text `Idea · floated ${dayWord(idea.at, now, offset)}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" margin-left=(project == "" ? 4 : 0) flex-shrink=0
@@ -158,7 +158,7 @@ component IdeaBody
             if idea.said != ""
               button press=toggleSaid class=Tap display="flex" flex-direction="column" align-items="stretch" gap=2 margin-top=12 padding="1px 0 1px 12px" border-left="2.5px solid -exact-separator" text-align="left" aria-expanded=saidWhole aria-label=`You said: ${idea.said}` testId="idea-said"
                 text `You said · ${dayWord(idea.at, now, offset)}` font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
-                text idea.said font="-exact-callout" color="-exact-label" line-clamp=(saidWhole ? 0 : wide ? 12 : 4)
+                text idea.said font="-exact-callout" color="-exact-label" line-clamp=(saidWhole or wide ? 0 : 5)
           column flex=(wide ? 1 : 0) min-width=0 gap=0 testId="idea-rail"
             for c in idea.checks.slice(0, 1) key=c.at
               CheckStep(check=c, newest=true, now=now, offset=offset, lines=(foundWhole ? 0 : wide ? 4 : 6), earlier=(older.length > 0 ? `${older.length} earlier` : ""), open=earlier, id="idea-found", whole=toggleFound, toggleEarlier=toggleEarlier)

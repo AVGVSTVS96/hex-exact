@@ -115,8 +115,8 @@ keyframes markSpin
 // A state's mark, in a square of `size`, as the drawings have them: a question an amber disc with
 // ?; something only Bassim can do an empty box; hex's pick mint with ✦, and what hex decided a mint ✦
 // on its wash; working a turning blue half ring; done a mint-checked box; failed red with a warning
-// triangle. Feed, Ideas and Goals add theirs: something hex found or looks into (binoculars on
-// blue), something it watches (a clock), an idea (a bulb) and a goal not started (a dashed box).
+// triangle. Feed, Ideas and Goals add theirs: something hex found (binoculars on blue), something
+// it looks into (binoculars on its wash), something it watches (a clock), an idea (a bulb) and a goal not started (a dashed box).
 // Otherwise read a dot; paused, stopped, pending (dashed) and idle (a ring) in grey.
 component Mark
   inject
@@ -153,12 +153,12 @@ component Mark
       else if state == "paused"
         box width=size height=size border-radius=(size / 2) background-color=washOf(state) display="flex" align-items="center" justify-content="center"
           image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
-      else if state == "found"
-        box width=size height=size border-radius=(size / 2) background-color="hex.progress.wash" display="flex" align-items="center" justify-content="center"
-          image "symbol:icon.found" width=glyph height=glyph object-fit="contain" color="hex.progress"
+      else if state == "found" or state == "looking"
+        box width=size height=size border-radius=(size / 2) background-color=(state == "found" ? "hex.progress" : "hex.progress.wash") display="flex" align-items="center" justify-content="center"
+          image "symbol:icon.found" width=round(size * 0.6) height=round(size * 0.6) object-fit="contain" color=(state == "found" ? "-exact-background" : "hex.progress")
       else if state == "watch" or state == "idea"
         box width=size height=size border-radius=(size / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
-          image (state == "watch" ? "symbol:icon.watch" : "symbol:icon.ideas") width=glyph height=glyph object-fit="contain" color=(state == "idea" ? "-exact-secondary-label" : "-exact-label")
+          image (state == "watch" ? "symbol:icon.watch" : "symbol:icon.ideas") width=round(size * 0.6) height=round(size * 0.6) object-fit="contain" color=(state == "idea" ? "-exact-secondary-label" : "-exact-label")
       else if state == "read"
         box width=dot height=dot border-radius=(dot / 2) background-color="-exact-tertiary-label"
       else if state == "stopped"

@@ -76,10 +76,10 @@ fn isTelegram(url: string): bool = hostOf(url) == "t.me"
 fn linkIcon(url: string): string = isGitHub(url) ? "symbol:sf/arrow.triangle.branch" : isTelegram(url) ? "symbol:sf/paperplane.fill" : "symbol:sf/link"
 fn chipOf(l: Link, topic: string): string = isGitHub(l.url) ? (urlPart(l.url, 5) == "commit" ? urlPart(l.url, 6).slice(0, 7) : urlPart(l.url, 5) == "pull" ? `#${urlPart(l.url, 6)}` : urlPart(l.url, 5) != "" ? urlPart(l.url, 5) : urlPart(l.url, 4)) : isTelegram(l.url) ? "Telegram" : hostOf(l.url)
 // The proof chip goes only where it fits whole beside the topic and time.
-fn chipFits(e: FeedEntry, width: number): bool = match e.links.at(0) { case some(l) => e.topic.length * 6.8 + 72 + chipOf(l, e.topic).length * 7.4 + 34 + 44 <= width, case none => false }
+fn chipFits(e: FeedEntry, width: number): bool = match e.links.at(0) { case some(l) => e.topic.length * 6.8 + 72 + chipOf(l, e.topic).length * 7.4 + 34 + 96 <= width, case none => false }
 
 // About how tall an entry draws at `width`, so a wide room can split Feed into two even columns.
-fn linesAt(t: string, perChar: number, width: number): number = min(2, max(1, ceil(t.length * perChar / max(width, 100))))
+fn linesAt(t: string, perChar: number, width: number): number = min(3, max(1, ceil(t.length * perChar / max(width, 100))))
 fn storyHeight(e: FeedEntry, width: number): number = 48 + 22 * linesAt(e.title, 8.9, width - 44) + (e.body != "" and e.body != e.title ? 4 + 20 * linesAt(e.body, 7.4, width - 44) : 0) + (e.pictures.length > 0 ? 188 : 0)
 fn partHeight(p: FeedPart, width: number): number = 32 + (p.earlier ? 32 : 0) + sum(p.entries.map(e => storyHeight(e, width)))
 // The parts before `i` take less than half the whole, counting half of `i` itself: it goes left.
@@ -154,9 +154,10 @@ component FeedTitle
   derive totals = range(7).map(i => (match done.at(i) { case some(n) => n, case none => 0 }) + (match decided.at(i) { case some(n) => n, case none => 0 }) + (match found.at(i) { case some(n) => n, case none => 0 }))
   derive most = max(1, match sortBy(totals, n => n, "desc").at(0) { case some(n) => n, case none => 1 })
   view
-    row align-items="flex-end" justify-content="space-between" gap=12 padding="0 10px 2px" testId="feed-title"
-      text "Feed" role="heading" aria-level=1 font="-exact-title1" font-weight=700 color="-exact-label"
-      row gap=7 align-items="flex-end" flex-shrink=0 aria-label=`This week: ${sum(done)} done, ${sum(decided)} decided, ${sum(found)} found` testId="feed-week"
+    // The week hangs from the title's line, so the title sits where Ideas' and Goals' do.
+    row align-items="flex-end" justify-content="space-between" gap=12 padding="0 10px" testId="feed-title"
+      text "Feed" role="heading" aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label"
+      row gap=7 align-items="flex-end" flex-shrink=0 margin-top=-12 aria-label=`This week: ${sum(done)} done, ${sum(decided)} decided, ${sum(found)} found` testId="feed-week"
         for t, i in totals key=i
           column width=12 gap=4 align-items="center" aria-hidden=true
             column height=30 justify-content="flex-end"
@@ -237,9 +238,9 @@ component FeedStory
         box padding-top=1 flex-shrink=0
           Mark(state=markOf(entry), size=22)
         column flex=1 min-width=0 gap=2
-          text entry.title font="-exact-headline" color="-exact-label" line-clamp=2 overflow-wrap="anywhere"
+          text entry.title font="-exact-headline" color="-exact-label" line-clamp=3 overflow-wrap="break-word"
           if body != ""
-            text body font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2 overflow-wrap="anywhere"
+            text body font="-exact-subheadline" color="-exact-secondary-label" line-clamp=3 overflow-wrap="break-word"
           if entry.pictures.length > 0
             box padding-top=6
               Pictures(media=entry.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=max(width - 54, 120), height=180)
@@ -254,5 +255,7 @@ component FeedStory
             image linkIcon(proof.url) width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
             text chipOf(proof, entry.topic) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
         box flex=1
-        button press=act class=Tap width=44 height=34 margin-right=2 display="flex" align-items="center" justify-content="flex-end" padding-right=8 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(entry.kind == "decided" ? `Undo, put ${entry.title} back on your list` : `Discuss ${entry.title} with hex`) testId=(entry.kind == "decided" ? `feed-${entry.id}-undo` : `feed-${entry.id}-discuss`)
-          image (entry.kind == "decided" ? "symbol:sf/arrow.uturn.backward" : "symbol:sf/bubble.left") width=16 height=16 object-fit="contain" color="-exact-secondary-label"
+        button press=act class=PillTap min-height=34 margin-right=6 flex-shrink=0 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(entry.kind == "decided" ? `Undo, put ${entry.title} back on your list` : `Discuss ${entry.title} with hex`) testId=(entry.kind == "decided" ? `feed-${entry.id}-undo` : `feed-${entry.id}-discuss`)
+          box class=PillFace height=28 padding="0 11px" box-sizing="border-box" gap=5
+            image (entry.kind == "decided" ? "symbol:sf/arrow.uturn.backward" : "symbol:waveform") width=13 height=13 object-fit="contain" color="-exact-label" aria-hidden=true
+            text (entry.kind == "decided" ? "Undo" : "Discuss") font="-exact-footnote" font-weight=600 color="-exact-label" white-space="nowrap"

@@ -158,7 +158,8 @@ component TasksList
                 if tab != "all" or i < firstFew() or opened.includes(s)
                   ProjectRow(topic=t, now=now, offset=offset, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=two, selected=(two and beside == homeOf(pageOf(t), tasks.tasks)), select=openPage(pageOf(t)))
               if tab == "all" and topics.filter(x => stageOf(x) == s).length > firstFew()
-                ShowMore(n=(topics.filter(x => stageOf(x) == s).length - firstFew()), shown=opened.includes(s), pad="2px 10px", id=`more-${s}`, press=toggleStage(s))
+                // It counts what the hidden projects hold, as the stage's head does, not the projects.
+                ShowMore(n=sum(topics.filter(x => stageOf(x) == s).slice(firstFew()).map(t => t.entries.filter(e => not away.includes(e.id)).length)), shown=opened.includes(s), pad="2px 10px", id=`more-${s}`, press=toggleStage(s))
               if s == "needs" and picks.length > 1
                 link href=path("picks") class=RowTap align-items="center" padding="10px 10px" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-picks"
                   Mark(state="pick", size=22)

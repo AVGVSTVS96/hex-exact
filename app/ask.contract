@@ -104,7 +104,7 @@ component AskCard
     undo(ask.id)
   view
     column padding="4px 6px 12px" testId=`ask-card-${ask.id}`
-      row gap=24 align-items="flex-start" flex-direction=(wide ? "row" : "column")
+      row gap=(wide ? 24 : 0) align-items="flex-start" flex-direction=(wide ? "row" : "column")
         column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%")
           AskHead(mark=(settled ? "done" : "asks"), tint=(settled ? "-exact-secondary-label" : "hex.ask"), topic=ask.topic, tag=ask.tag, count=countOf(n, of, whenOf(ask.at, now, offset)), title=ask.question, words=ask.context)
           if ask.pictures.length > 0
@@ -154,7 +154,7 @@ component AskCard
                   column gap=6 align-items="center" width=(shotsTall * shapeOf(o.aspect)) flex-shrink=0
                     Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=(shotsTall * shapeOf(o.aspect)), square=false)
                     text o.label font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
-        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%") gap=2 margin-top=(wide ? -4 : 4) role=(ask.multiple ? "group" : "radiogroup") aria-label="Answers"
+        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%") gap=2 margin-top=(wide ? -8 : 20) role=(ask.multiple ? "group" : "radiogroup") aria-label="Answers"
           for o in ask.options key=o.label
             if mine and picks.includes(o.label)
               Confirmed(label=o.label, detail=o.detail, status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-option-${ask.id}-${o.label}`, undo=takeBack, again=again(ask.id))
@@ -197,7 +197,7 @@ component StuckCard
   derive doors = entry.tiles.filter(t => t.link != "")
   view
     column padding="4px 6px 12px" testId=`stuck-card-${entry.id}`
-      row gap=24 align-items="flex-start" flex-direction=(wide ? "row" : "column")
+      row gap=(wide ? 24 : 0) align-items="flex-start" flex-direction=(wide ? "row" : "column")
         column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%")
           AskHead(mark=entry.mark, tint="hex.danger", topic=entry.topic, tag="", count=countOf(n, of, whenOf(entry.at, now, offset)), title=entry.title, words=entry.line)
           if doors.length > 0
@@ -207,7 +207,7 @@ component StuckCard
                   box class=ChipFace
                     image appSymbol(p.app) width=12 height=12 object-fit="contain" color="-exact-label" aria-hidden=true
                     text `Open in ${appName(p.app)}` font="-exact-footnote" font-weight=600 color="-exact-label"
-        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%") margin-top=(wide ? -4 : 4)
+        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%") margin-top=(wide ? -8 : 20)
           AnswerRow(label=entry.action, detail=(entry.sent ? "Sent to hex" : "hex starts it again"), pick=false, chosen=entry.sent, role="", disabled=entry.sent, id=`act-${entry.id}`, press=act(entry.id))
 
 // One answer to a question, the same row everywhere a question shows: a ring (a rounded square when

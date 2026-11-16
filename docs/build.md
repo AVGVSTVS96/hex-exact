@@ -28,7 +28,7 @@ what done means and who builds which part; `docs/parity.md` is the stable app, s
 | `app/data/*.ts`, `app/app.ts` | hex's endpoints (`hex.ts` is the client and the long poll) | shared |
 | `app/call.contract` | Home: the orb, captions, the call's asks, agent line, controls, toolbar | foundation, then (c) for the orb |
 | `app/home.contract` | Home with no call on: hex's face and live line, Needs you, Working on, what hex decided; on a book fold the page a row opens beside | Muse (1) |
-| `app/tasks.contract`, `task.contract`, `thread.contract`, `steps.contract`, `picks.contract`, `pick.contract`, `last-check.contract`, `ask.contract` (a question's card and own-words reply), `inbox.contract` (the ranked list of everything), `rows.contract` (its rows and swipes), `said.contract` (what was answered or sent from here), `app.tamber` (hex's colours) | all of parity §9 | (a) Tasks |
+| `app/needs.contract` (Needs you in full), `tasks.contract`, `task.contract`, `thread.contract`, `steps.contract`, `picks.contract`, `pick.contract`, `last-check.contract`, `ask.contract` (a question's card and own-words reply), `inbox.contract` (the ranked list of everything), `rows.contract` (its rows and swipes), `said.contract` (what was answered or sent from here), `app.tamber` (hex's colours) | all of parity §9 | (a) Tasks |
 | `app/calls.contract`, `past-call.contract`, `wrap-up.contract`, `settings.contract`, `voice.contract`, `words.contract`, a new `toast.contract` | §5, 6, 10, 11 | (b) Calls, settings, toast |
 | `shell/**`, `app/modules/apple/Hex.swift` | Live Activity, reconnect, interruptions, sounds, camera and photos, the orb | (c) Swift side |
 
@@ -38,7 +38,7 @@ gets a new prop. Its own `state` (a draft, a chosen option) stays in the screen.
 
 ## What the root gives you
 
-**Routes** (`hexexact://go/<path>` opens any): `/` Home · `/calls` · `/calls/:id` · `/tasks` ·
+**Routes** (`hexexact://go/<path>` opens any): `/` Home · `/needs` · `/calls` · `/calls/:id` · `/tasks` ·
 `/tasks/t/:id` · `/tasks/t/:id/messages` · `/tasks/t/:id/steps` · `/tasks/picks` ·
 `/tasks/picks/:id` · `/tasks/check` · `/settings` · `/settings/voice` · `/settings/voice/words`.
 

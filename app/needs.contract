@@ -1,0 +1,283 @@
+// Needs you: everything that waits on Bassim, by what it asks of him (decide, stuck, only he can do,
+// look, threads waiting), with how it splits as one bar, and hex's ways through it on top: its picks
+// to take at once, what it decided itself this week, its last check. A page over Home; with two
+// columns the page a row opens is beside it (under it open like a laptop). Room wider than tall: the
+// head and hex's rows on the left, the sections on the right.
+use Tasks, Asks, Ask, Check from "./shapes.contract"
+use Mark, StageHead, ShowMore, Note, RowTap, PillTap, PillFace, Tap, Primary, whenOf from "./parts.contract"
+use Room, Chrome, stacked from "./room.contract"
+use Said from "./said.contract"
+use Item, picksOf from "./inbox.contract"
+use needsOf, pageFor, decidedWeek from "./home.contract"
+use choiceOf from "./picks.contract"
+
+// Its sections, in order: what it asks of him.
+fn needKinds(): string[] = ["decide", "stuck", "do", "look", "threads"]
+fn kindOf(e: Item, asks: Ask[]): string = e.kind == "stuck" ? "stuck" : e.kind == "task" ? "threads" : match asks.filter(a => a.id == e.id).at(0) { case some(a) => a.kind == "do" ? "do" : a.kind == "look" ? "look" : "decide", case none => "decide" }
+fn needLabel(k: string): string = k == "decide" ? "Decide" : k == "stuck" ? "Stuck" : k == "do" ? "Only you can do" : k == "look" ? "Look" : "Threads waiting"
+fn needShort(k: string): string = k == "decide" ? "decide" : k == "stuck" ? "stuck" : k == "do" ? "do" : k == "look" ? "look" : "threads"
+// Each section's share of the bar: stuck in red, the rest amber, fainter the less it asks of him.
+fn needInk(k: string): string = k == "stuck" ? "hex.danger" : "hex.ask"
+fn needAlpha(k: string): number = k == "do" ? 0.62 : k == "look" ? 0.4 : k == "threads" ? 0.22 : 1
+// The first few of a section; Decide, the most pressing, shows three.
+fn firstOf(k: string): number = k == "decide" ? 3 : 2
+fn askOf(asks: Ask[], id: string): option<Ask> = asks.filter(a => a.id == id).at(0)
+fn picksIn(a: Ask): string[] = a.options.filter(o => o.pick).map(o => o.label)
+// The page a row opens: its thread, and every stuck run together.
+fn needPage(e: Item, tasks: Tasks): string = e.kind == "stuck" ? "topic:Stuck" : pageFor(e, tasks)
+
+component NeedsPage
+  inject
+    haptics: bool
+  props
+    entry: Entry
+    // Home's room: open like a laptop the list is above the hinge and the page below it.
+    room: Room
+    now: number
+    offset: number
+    tasks: Tasks
+    asks: Asks
+    said: Said[]
+    picked: string[]
+    counts: number
+    working: number
+    loading: bool
+    failed: bool
+    callOn: bool
+    // The page beside the list ("check" for the last check), "" with one column.
+    beside: string
+    select: action
+    open: action
+    openTasks: action
+    answerAll: action
+    act: action
+    talk: action
+    back: action
+  slot
+  state opened = [""].slice(0, 0)
+  state tapped = ""
+  derive two = room.columns == 2
+  derive across = stacked(room)
+  derive known = tasks.version > 0 or asks.version > 0
+  derive needs = needsOf(tasks, asks, said, now)
+  derive kinds = needKinds().filter(k => needs.filter(e => kindOf(e, asks.asks) == k).length > 0)
+  derive picks = picksOf(asks.asks, said)
+  derive taking = picks.filter(a => choiceOf(picked, a) != "")
+  derive week = decidedWeek(asks.decided, now, offset)
+  // The list's column: the first of two, else the clear width; open like a laptop, above the hinge.
+  derive colX = two ? room.first.x : room.clear.x
+  derive colW = two ? room.first.width : room.clear.width
+  derive colH = across ? room.across : room.height
+  derive wide = colW >= 520 and colW > colH
+  derive right = two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)
+  // Go through them floats at the list's foot, except where the room is short (wide), or a call is
+  // docked there.
+  derive floating = not wide and not callOn and needs.length > 1
+  derive lit = two ? match sortBy(needs.filter(e => needPage(e, tasks) == beside), e => (e.id == tapped ? 0 : 1)).at(0) { case some(e) => e.id, case none => "" } : ""
+  action go(e: Item)
+    if two
+      tapped = e.id
+      select(needPage(e, tasks))
+    else
+      open(path("task", needPage(e, tasks)))
+  action more(k: string)
+    opened = opened.includes(k) ? opened.filter(x => x != k) : opened.concat([k])
+  action takeAll
+    answerAll(taking.map(a => a.id), taking.map(a => choiceOf(picked, a)))
+  action showCheck
+    if two
+      tapped = ""
+      select("check")
+    else
+      open(path("check"))
+  action goThrough
+    if haptics
+      haptic("selection")
+    talk("asks")
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="needs"
+      Chrome(room=room, on="needs", needsYou=counts, working=working, open=open, openTasks=openTasks, back=back)
+      scroll id="needs-list" position="absolute" top=room.below bottom=(across ? room.height - room.across : callOn ? room.foot + 64 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(callOn ? "linear-gradient(to top, transparent 0, #000 26px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)") testId="needs-list"
+        column padding=`0 ${right + 6}px ${floating ? room.foot + 8 + 50 + 20 : callOn ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
+          if failed and not known
+            Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="needs-offline")
+          if loading and not known and not failed
+            Note(kind="loading", text="Loading what needs you", pad="24px 10px", id="needs-loading")
+          row gap=(wide ? 4 : 0) flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch")
+            column flex=(wide ? 1 : 0) min-width=0
+              // The title and its line stand beside the status icons; the rows start under their cover.
+              column min-height=(two ? 0 : max(0, room.headBottom - room.below))
+                row gap=10 align-items="baseline" padding="0 10px 10px" testId="needs-title"
+                  text "Needs you" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"
+                  if known
+                    text `${needs.length}` font="-exact-title1" font-weight=400 color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+              if needs.length > 0
+                Mix(needs=needs, asks=asks.asks, kinds=kinds)
+              column margin="12px 0 6px"
+                if picks.length > 0
+                  row align-items="center" gap=0 testId="needs-picks"
+                    button press=open(path("picks")) class=RowTap align-items="center" gap=10 flex=1 min-width=0 width="auto" aria-label=`hex has ${picks.length} ${picks.length == 1 ? "pick" : "picks"}, see them` -exact-press-haptic=(haptics ? "selection" : "none") testId="needs-open-picks"
+                      Mark(state="decided", size=22)
+                      text `hex has ${picks.length} ${picks.length == 1 ? "pick" : "picks"}` font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                    button press=takeAll disabled=(taking.length == 0) class=PillTap margin-right=6 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Take all ${taking.length} of hex’s picks` testId="needs-take-all"
+                      box class=PillFace height=32 padding="0 12px" box-sizing="border-box" background-color="hex.accent.wash"
+                        text "Take all" font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap"
+                  box height=0.5 margin="0 0 0 42px" background-color="-exact-separator"
+                if asks.decided.length > 0
+                  button press=open(path("decided")) class=RowTap align-items="center" gap=10 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${sum(week)} this week` testId="needs-decided"
+                    Mark(state="decided", size=22)
+                    text font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+                      text "hex decided"
+                      text (colW / (wide ? 2 : 1) < 340 ? ` ${sum(week)}` : ` ${sum(week)} this week`) font-weight=400 color="-exact-secondary-label"
+                    Week(week=week)
+                    image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+                  box height=0.5 margin="0 0 0 42px" background-color="-exact-separator"
+                if asks.check.at > 0
+                  button press=showCheck class=RowTap align-items="center" gap=10 background-color=(two and beside == "check" ? "-exact-quaternary-fill" : "transparent") aria-current=(two and beside == "check") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Checked ${whenOf(asks.check.at, now, offset)}, ${asks.check.fixed} fixed, ${asks.check.flagged} flagged` testId="needs-check"
+                    Mark(state="done", size=22)
+                    text "Checked" font="-exact-headline" color="-exact-label" white-space="nowrap"
+                    text whenOf(asks.check.at, now, offset) font="-exact-subheadline" color="-exact-secondary-label" font-variant-numeric="tabular-nums" white-space="nowrap" flex=1
+                    if asks.check.fixed > 0
+                      text `${asks.check.fixed} fixed` font="-exact-subheadline" color="hex.accent" font-variant-numeric="tabular-nums" white-space="nowrap"
+                    if asks.check.flagged > 0
+                      text `${asks.check.flagged} flagged` font="-exact-subheadline" color="hex.ask" font-variant-numeric="tabular-nums" white-space="nowrap"
+                    image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+              if not floating and needs.length > 1
+                GoThrough(press=goThrough, inline=true)
+              if known and needs.length == 0
+                Note(kind="empty", text="Nothing waits on you", pad="12px 10px", id="needs-empty")
+              if wide
+                for k in kinds.filter(x => x == "stuck") key=k
+                  Section(kind=k, items=needs.filter(e => kindOf(e, asks.asks) == k), first=1, shown=opened.includes(k), asks=asks.asks, now=now, offset=offset, lit=lit, go=go, more=more, act=act)
+            column flex=(wide ? 1 : 0) min-width=0
+              for k, i in kinds.filter(x => not wide or x != "stuck") key=k
+                if i > 0
+                  box height=0.5 margin="5px 0 5px 42px" background-color="-exact-separator"
+                Section(kind=k, items=needs.filter(e => kindOf(e, asks.asks) == k), first=firstOf(k), shown=opened.includes(k), asks=asks.asks, now=now, offset=offset, lit=lit, go=go, more=more, act=act)
+      if floating
+        row position="absolute" left=colX width=colW bottom=(room.foot + 8) justify-content="center" pointer-events="none" testId="needs-go-row"
+          GoThrough(press=goThrough, inline=false)
+      if two
+        column position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width testId="needs-beside"
+          children
+
+// How what waits splits by what it asks of him: one bar, then each part's count.
+component Mix
+  props
+    needs: Item[]
+    asks: Ask[]
+    kinds: string[]
+  view
+    column padding="0 10px" gap=8 testId="needs-mix"
+      row height=8 gap=2 border-radius=4 overflow="hidden" aria-hidden=true
+        for k in kinds key=k
+          box flex=needs.filter(e => kindOf(e, asks) == k).length height=8 border-radius=1 background-color=needInk(k) opacity=needAlpha(k)
+      row flex-wrap="wrap" gap="4px 14px"
+        for k in kinds key=k
+          row gap=4 align-items="center" aria-label=`${needs.filter(e => kindOf(e, asks) == k).length} ${needLabel(k)}`
+            box width=8 height=8 border-radius=2 margin-right=2 background-color=needInk(k) opacity=needAlpha(k)
+            text `${needs.filter(e => kindOf(e, asks) == k).length}` font="-exact-footnote" font-weight=600 color="-exact-label" font-variant-numeric="tabular-nums"
+            text needShort(k) font="-exact-footnote" color="-exact-secondary-label"
+
+// What hex decided each of the last seven days, a mint bar a day.
+component Week
+  props
+    week: number[]
+  derive most = match sortBy(week, n => n, "desc").at(0) { case some(n) => max(1, n), case none => 1 }
+  view
+    row gap=3 align-items="flex-end" height=22 flex-shrink=0 aria-hidden=true testId="needs-week"
+      for n, i in week key=i
+        if n > 0
+          box width=5 height=max(3, round(n / most * 22)) border-radius=2 background-color="hex.accent"
+        else
+          box width=3 height=3 margin="0 1px" border-radius=1.5 background-color="hex.accent" opacity=0.3
+
+// A call with hex about everything that waits: at the list's foot, or in it where the room is short.
+component GoThrough
+  props
+    press: action
+    inline: bool
+  view
+    button press=press class=Primary min-height=50 padding="0 22px" margin=(inline ? "4px 10px 10px" : "0") gap=8 pointer-events="auto" box-shadow=(inline ? "none" : "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))") aria-label="Go through them with hex, in a call" testId=(inline ? "needs-go-inline" : "needs-go")
+      image "symbol:waveform" width=20 height=20 object-fit="contain" color="-exact-background" aria-hidden=true
+      text "Go through them with hex" font="-exact-headline" color="-exact-background" white-space="nowrap"
+
+// One section: its head, its first few rows, then "Show N more", which opens the rest in place.
+component Section
+  props
+    kind: string
+    items: Item[]
+    first: number
+    shown: bool
+    asks: Ask[]
+    now: number
+    offset: number
+    lit: string
+    go: action
+    more: action
+    act: action
+  view
+    column testId=`needs-${kind}`
+      StageHead(state=(kind == "stuck" ? "failed" : "asks"), label=needLabel(kind), n=items.length, known=true, pad="9px 10px", id=`needs-head-${kind}`)
+      for e, i in items key=e.id
+        if shown or i < first or e.id == lit
+          NeedRow(entry=e, kind=kind, asks=asks, now=now, offset=offset, selected=(e.id == lit), press=go(e), act=act(e.id))
+      if items.length > first
+        ShowMore(n=items.length - first, shown=shown, pad="8px 10px 10px", id=`needs-more-${kind}`, press=more(kind))
+
+// A row of Needs you: its mark, the topic with its tags, when, and what it asks in full-strength type;
+// hex's pick in mint under a question; a stuck run's own action at its end.
+component NeedRow
+  inject
+    haptics: bool
+  props
+    entry: Item
+    kind: string
+    asks: Ask[]
+    now: number
+    offset: number
+    selected: bool
+    press: action
+    act: action
+  derive ask = askOf(asks, entry.id)
+  derive tag = match ask { case some(a) => a.tag, case none => "" }
+  derive sends = match ask { case some(a) => a.sends, case none => false }
+  derive picks = match ask { case some(a) => picksIn(a), case none => [""].slice(0, 0) }
+  derive stuck = kind == "stuck"
+  derive title = stuck ? entry.title : entry.topic
+  derive line = stuck ? entry.line : entry.title
+  view
+    row align-items="center" gap=0 testId=`need-${entry.id}`
+      button press=press class=RowTap gap=10 flex=1 min-width=0 width="auto" border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${title}: ${line}` testId=`need-open-${entry.id}`
+        box padding-top=1 flex-shrink=0
+          if kind == "threads"
+            box width=22 height=22 border-radius=11 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
+              image "symbol:sf/bubble.left" width=12 height=12 object-fit="contain" color="-exact-secondary-label"
+          else
+            Mark(state=(stuck ? "failed" : kind == "do" ? "needs" : "asks"), size=22)
+        column flex=1 min-width=0 gap=2
+          row gap=8 align-items="baseline"
+            text title font="-exact-headline" color="-exact-label" line-clamp=(stuck ? 2 : 1) flex-shrink=1 min-width=0
+            if tag != ""
+              text tag font-size=12 line-height="18px" font-weight=600 color=(tag == "money" ? "hex.ask" : "-exact-secondary-label") padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" white-space="nowrap" flex-shrink=0
+            if sends
+              row gap=3 align-items="center" align-self="center" height=18 padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" flex-shrink=0 aria-label="sends in your name"
+                image "symbol:sf/paperplane.fill" width=9 height=9 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                text "sends" font-size=12 line-height="18px" font-weight=600 color="-exact-secondary-label"
+            box flex=1
+            if not stuck
+              text whenOf(entry.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+          if line != "" and line != title
+            text line font="-exact-subheadline" color=(kind == "threads" or stuck ? "-exact-secondary-label" : "-exact-label") line-clamp=(kind == "threads" ? 1 : 2)
+          if stuck
+            text whenOf(entry.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+          if picks.length > 0
+            row gap=4 align-items="center" min-width=0 margin-top=2
+              image "symbol:icon.pick" width=11 height=11 object-fit="contain" color="hex.accent" aria-hidden=true
+              text match picks.at(0) { case some(p) => p, case none => "" } font="-exact-footnote" font-weight=600 color="hex.accent" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0 flex-shrink=1
+              if picks.length > 1
+                text ` +${picks.length - 1}` font="-exact-footnote" color="hex.accent" white-space="nowrap"
+      if stuck and entry.action != ""
+        button press=act disabled=entry.sent class=PillTap margin-right=4 -exact-press-haptic=(haptics ? "selection" : "none") testId=`need-act-${entry.id}`
+          box class=PillFace height=32 padding="0 12px" box-sizing="border-box"
+            text (entry.sent ? "Sent" : entry.action) font="-exact-subheadline" font-weight=600 color=(entry.sent ? "-exact-secondary-label" : "-exact-label") white-space="nowrap"

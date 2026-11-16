@@ -1,9 +1,15 @@
-// The last check (§9.9): when hex last went through everything, what it read, what it fixed on its
-// own and what it flagged for Bassim.
-use Viewport, Check from "./shapes.contract"
-use Mark, Note, whenOf from "./parts.contract"
-use Room, Chrome from "./room.contract"
-use PageTitle from "./calls.contract"
+// The last check (§9.9): when hex last went through everything and why, what it read (one bar),
+// what came of it (fixed, flagged, stuck, came back to Bassim, as four numbers), then what it
+// flagged for him, what it fixed on its own, and the questions it handed back. A page of its own, or
+// beside Needs you with two columns.
+use Viewport, Check, Count from "./shapes.contract"
+use Mark, Note, StageHead, ShowMore, whenOf from "./parts.contract"
+use Room, Chrome, stacked from "./room.contract"
+
+// What it read, most first, in greys that fade with each part.
+fn readAlpha(i: number): number = i == 0 ? 1 : i == 1 ? 0.6 : i == 2 ? 0.38 : 0.2
+// How many questions that came back show before "Show N more".
+fn backFew(): number = 5
 
 component LastCheck
   props
@@ -21,55 +27,141 @@ component LastCheck
     openTasks: action
     back: action
   derive two = room.columns == 2
-  derive inner = two ? "0 20px" : `0 ${max(room.width - room.clear.x - room.clear.width, 0) + 20}px 0 ${room.clear.x + 20}px`
+  derive across = stacked(room)
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="last-check"
       Chrome(room=room, on="check", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
-      // Open like a book: what it read and flagged on the left of the fold, what it fixed on the right.
-      scroll id="last-check" position="absolute" top=room.below bottom=0 left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(room.foot + 24) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
-        // The title stands beside the status icons; what follows starts under their foot.
-        column min-height=(two ? 0 : max(0, room.headBottom - room.below))
-          PageTitle(text="Last check", room=room, left=(two ? 20 : room.clear.x + 20), id="check-title")
-        column padding=inner gap=12
-          if check.at > 0
-            text `${whenOf(check.at, now, offset)}${check.why != "" ? ` · ${check.why}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
-          if loading and check.at == 0
-            Note(kind="loading", text="Loading the last check", pad="24px 0", id="check-loading")
-          if failed and check.at == 0
-            Note(kind="failed", text="hex hasn't checked yet, or can't be reached.", pad="24px 0", id="check-failed")
-          if check.read.length > 0
-            row gap=8 flex-wrap="wrap"
-              for r in check.read key=r.label
-                column gap=0 padding="8px 12px" border-radius=14 background-color="-exact-tertiary-fill" min-width="4.5rem"
-                  text `${r.n}` font="-exact-title2" font-weight=700 font-variant-numeric="tabular-nums"
-                  text r.label font="-exact-caption1" color="-exact-secondary-label"
-          if check.flagged.length > 0
-            text "For you to look at" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" role="heading" aria-level=2 padding-top=8
-            for n in check.flagged key=`${n.title}${n.text}`
-              row gap=12 align-items="flex-start"
-                Mark(state="asks", size=22)
-                column flex=1 gap=2
-                  text n.title font="-exact-headline"
-                  text n.text font="-exact-subheadline" color="-exact-secondary-label"
-                  if n.did != ""
-                    text n.did font="-exact-footnote" color="-exact-tertiary-label"
-          if not two
-            Fixed(check=check)
+      // With two columns, what it read and what came of it in the first, its notes in the second.
+      column position="absolute" top=room.below bottom=(across ? room.height - room.across : 0) left=(two ? room.first.x : room.clear.x) width=(two ? room.first.width : room.clear.width) padding-right=(two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)) box-sizing="border-box"
+        CheckBody(check=check, loading=loading, failed=failed, now=now, offset=offset, width=(two ? room.first.width : room.clear.width), height=(across ? room.across : room.height), foot=(across ? 0 : room.foot), part=(two ? "head" : "all"), top=(two ? 0 : max(0, room.headBottom - room.below)), id="check-page")
       if two
-        scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`0 20px ${room.foot + 24}px` box-sizing="border-box" testId="check-beside"
-          Fixed(check=check)
+        column position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width
+          CheckBody(check=check, loading=loading, failed=failed, now=now, offset=offset, width=room.second.width, height=(across ? room.height - room.across : room.height), foot=room.foot, part="notes", top=0, id="check-notes")
 
-// What hex fixed on its own: a heading, then each with a done mark.
-component Fixed
+// The check itself, scrolling in the column it's given. part: all | head (title, read, outcomes,
+// what came back) | notes (flagged, fixed). Wider than tall, all of it in two columns, head first.
+component CheckBody
   props
     check: Check
+    loading: bool
+    failed: bool
+    now: number
+    offset: number
+    width: number
+    height: number
+    foot: number
+    part: string
+    // How far the content keeps under the column's top (the status icons beside the title).
+    top: number
+    id: string
+  state backOpen = false
+  derive wide = part == "all" and width >= 520 and width > height
+  derive known = check.at > 0
+  action toggleBack
+    backOpen = not backOpen
   view
-    column gap=12
-      if check.fixed.length > 0
-        text "Fixed on its own" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" role="heading" aria-level=2 padding-top=8
-        for n in check.fixed key=`${n.title}${n.text}`
-          row gap=12 align-items="flex-start"
-            Mark(state="done", size=22)
-            column flex=1 gap=2
-              text n.title font="-exact-headline"
-              text (n.did != "" ? `${n.text} ${n.did}.` : n.text) font="-exact-subheadline" color="-exact-secondary-label"
+    scroll flex=1 min-height=0 height="100%" overflow-y="auto" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId=id
+      column padding=`0 6px ${foot + 24}px` box-sizing="border-box"
+        column min-height=top
+          if part != "notes"
+            row gap=10 align-items="baseline" padding="0 10px" testId="check-title"
+              text "Last check" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"
+              if known
+                text whenOf(check.at, now, offset) font="-exact-title1" font-weight=400 color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
+            if check.why != ""
+              text `After ${check.why}` font="-exact-subheadline" color="-exact-secondary-label" padding="2px 10px 0"
+        if loading and not known
+          Note(kind="loading", text="Loading the last check", pad="24px 10px", id="check-loading")
+        if failed and not known
+          Note(kind="failed", text="hex hasn't checked yet, or can't be reached.", pad="24px 10px", id="check-failed")
+        if known
+          row gap=(wide ? 4 : 0) flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch")
+            if part != "notes"
+              column flex=(wide ? 1 : 0) min-width=0
+                if check.read.length > 0
+                  Read(read=sortBy(check.read, r => r.n, "desc"))
+                row margin="16px 10px 8px" testId="check-outcomes"
+                  Outcome(n=check.fixed.length, label="fixed", ink="hex.accent", first=true)
+                  Outcome(n=check.flagged.length, label="flagged", ink="hex.ask", first=false)
+                  Outcome(n=check.stuck.length, label="stuck", ink="hex.danger", first=false)
+                  Outcome(n=check.back.length, label="came back", ink="-exact-label", first=false)
+                if part == "head" or wide
+                  Back(check=check, open=backOpen, toggle=toggleBack)
+            if part != "head"
+              column flex=(wide ? 1 : 0) min-width=0
+                if check.flagged.length > 0
+                  StageHead(state="asks", label="Flagged for you", n=check.flagged.length, known=true, pad="9px 10px", id="check-head-flagged")
+                  for n in check.flagged key=`${n.title}${n.text}`
+                    row gap=10 align-items="flex-start" padding="9px 10px"
+                      box width=22 height=22 border-radius=11 margin-top=1 background-color="hex.ask.fill" display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-hidden=true
+                        image "symbol:sf/flag.fill" width=11 height=11 object-fit="contain" color="hex.ask.ink"
+                      column flex=1 min-width=0 gap=2
+                        text n.title font="-exact-headline" color="-exact-label" line-clamp=2
+                        text n.text font="-exact-subheadline" color="-exact-secondary-label" line-clamp=3 user-select="text"
+                        if n.did != ""
+                          text n.did font="-exact-footnote" font-weight=600 color="hex.ask"
+                if check.fixed.length > 0
+                  StageHead(state="pick", label="Fixed on its own", n=check.fixed.length, known=true, pad="9px 10px", id="check-head-fixed")
+                  for n in check.fixed key=`${n.title}${n.text}`
+                    row gap=10 align-items="flex-start" padding="9px 10px"
+                      box padding-top=1 flex-shrink=0
+                        Mark(state="done", size=22)
+                      column flex=1 min-width=0 gap=2
+                        text n.title font="-exact-headline" color="-exact-label" line-clamp=2
+                        text n.text font="-exact-subheadline" color="-exact-secondary-label" line-clamp=3 user-select="text"
+                        if n.did != ""
+                          text n.did font="-exact-footnote" font-weight=600 color="hex.accent"
+            if part == "all" and not wide
+              Back(check=check, open=backOpen, toggle=toggleBack)
+
+// What it read: the total, one bar of its parts, and each part's count.
+component Read
+  props
+    read: Count[]
+  view
+    column padding="16px 10px 0" gap=0 testId="check-read"
+      row justify-content="space-between" margin-bottom=6
+        text "READ" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" letter-spacing=0.4
+        text `${sum(read.map(r => r.n))}` font="-exact-footnote" font-weight=600 color="-exact-label" font-variant-numeric="tabular-nums"
+      row height=8 gap=2 border-radius=4 overflow="hidden" aria-hidden=true
+        for r, i in read key=r.label
+          box flex=r.n min-width=3 height=8 border-radius=1 background-color="-exact-secondary-label" opacity=readAlpha(i)
+      row flex-wrap="wrap" gap="4px 14px" margin-top=8
+        for r, i in read key=r.label
+          row gap=4 align-items="center"
+            box width=8 height=8 border-radius=2 margin-right=2 background-color="-exact-secondary-label" opacity=readAlpha(i)
+            text `${r.n}` font="-exact-footnote" font-weight=600 color="-exact-label" font-variant-numeric="tabular-nums"
+            text r.label font="-exact-footnote" color="-exact-secondary-label"
+
+// One thing that came of the check, as a number over its word.
+component Outcome
+  props
+    n: number
+    label: string
+    ink: string
+    first: bool
+  view
+    column flex=1 min-width=0 padding-left=(first ? 0 : 10) border-left=(first ? "none" : "0.5px solid -exact-separator") aria-label=`${n} ${label}`
+      text `${n}` font="-exact-title1" font-weight=600 color=(n == 0 ? "-exact-tertiary-label" : ink) font-variant-numeric="tabular-nums"
+      text label font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap"
+
+// The questions the check handed back to Bassim: an amber point each, the first few, then the rest.
+component Back
+  props
+    check: Check
+    open: bool
+    toggle: action
+  view
+    if check.back.length > 0
+      column testId="check-back"
+        row padding="14px 10px 6px" align-items="flex-end"
+          text "Came back to you" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" flex=1
+          text `${check.back.length}` font="-exact-footnote" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+        for q, i in check.back key=q.id
+          if open or i < backFew()
+            row gap=10 align-items="center" min-height=32 padding="0 10px"
+              box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+                box width=6 height=6 border-radius=3 background-color="hex.ask"
+              text q.question font="-exact-subheadline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex=1 min-width=0
+        if check.back.length > backFew()
+          ShowMore(n=check.back.length - backFew(), shown=open, pad="8px 10px 10px", id="check-back-more", press=toggle)

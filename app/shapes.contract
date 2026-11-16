@@ -144,6 +144,8 @@ shape Ask
   was: string[]
   decided: number
   took: string
+  // Answering it sends something in Bassim's name.
+  sends: bool
 
 // mark: paused | failed. sent: hex has already been asked to act.
 shape Stuck
@@ -190,13 +192,21 @@ shape Count
   label: string
   n: number
 
-// GET /asks/check: the last time hex went through everything.
+// A question the check handed back to Bassim.
+shape Back
+  id: string
+  question: string
+
+// GET /asks/check: the last time hex went through everything: what it read, fixed on its own,
+// flagged for Bassim, found stuck, and handed back to him.
 shape Check
   at: number
   why: string
   read: Count[]
   fixed: Note[]
   flagged: Note[]
+  stuck: Stuck[]
+  back: Back[]
 
 // GET /asks/:id/words: the message an ask came from.
 shape Words

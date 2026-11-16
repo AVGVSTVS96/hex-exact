@@ -12,14 +12,15 @@ use Thread from "./thread.contract"
 use Steps from "./steps.contract"
 use Picks from "./picks.contract"
 use Pick from "./pick.contract"
-use LastCheck from "./last-check.contract"
+use LastCheck, CheckBody from "./last-check.contract"
+use NeedsPage from "./needs.contract"
 use SettingsScreen from "./settings.contract"
 use VoicePage from "./voice.contract"
 use YourWords from "./words.contract"
 use UpdateToast, noticeOf from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
-use Room, roomOf, homeRoomOf, belowIn from "./room.contract"
+use Room, roomOf, homeRoomOf, belowIn, stacked from "./room.contract"
 use DecidedPage, decidedPath, DecidedPane from "./decided.contract"
 use Feed, FeedEntry, FeedView from "./feed.contract"
 use Ideas, IdeaOne, IdeaDone from "./ideas.contract"
@@ -35,6 +36,7 @@ use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, wit
 routes nav
   home "/"
     decided "/decided"
+    needs "/needs"
     idea "/ideas/:id"
     goal "/goals/:id"
     watch "/goals/w/:id"
@@ -73,6 +75,8 @@ component App
   state answering = ""
   // The page beside the Tasks list when it's wide; "" until Bassim picks one (the first topic).
   state beside = ""
+  // The page beside Needs you with two columns ("check" for the last check); "" for the first.
+  state needsBeside = ""
   // What Bassim did with each question and message here, as said.contract's lines, so screens show
   // it at once and say how it went.
   state said = [""].slice(0, 0)
@@ -227,7 +231,8 @@ component App
   // Home beside a page: two columns with no call on, the first thing that needs Bassim until he
   // picks one.
   derive homeBeside = room.columns == 2 and top(nav).name == "home" and call.status == "idle" and activity.call == "" ? (beside != "" ? beside : firstNeed(tasks, asks, saids, now)) : ""
-  derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : homeBeside
+  derive needsOpen = split and top(nav).name == "needs"
+  derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : needsOpen ? (needsBeside == "check" ? "" : needsBeside != "" ? needsBeside : firstNeed(tasks, asks, saids, now)) : homeBeside
   derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => besideId }
   derive chatOpen = names.includes("thread") or names.includes("task") or besideId != ""
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
@@ -235,7 +240,7 @@ component App
   derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") or taskId.startsWith("idea:") or taskId.startsWith("goal:") or taskId.startsWith("watch:") ? "" : taskId
   resource task = watchTask(threadId) when threadId != "" as shape TaskPage else empty()
   resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
-  resource check = loadCheck() when names.includes("check") as shape Check else empty()
+  resource check = loadCheck() when names.includes("check") or names.includes("needs") as shape Check else empty()
   resource settings = loadSettings() when names.includes("settings") as shape Settings else empty()
   // The message an ask came from: the pick on top of the screen, else the one opened on a card.
   derive pickId = match stack(nav).filter(e => e.name == "pick").at(-1) { case some(e) => e.params.id, case none => "" }
@@ -388,6 +393,10 @@ component App
       let id = beside.slice(besideKind.length + 1)
       nav = push(nav, besideKind == "goal" ? path("goal", id) : besideKind == "watch" ? path("watch", id) : besideKind == "decided" ? decidedPath(id) : path("idea", id))
       beside = ""
+  action pickNeed(page: string)
+    needsBeside = page
+    if haptics
+      haptic("selection")
   action pickTab(t: string)
     tab = t
     if haptics
@@ -800,6 +809,12 @@ component App
               TaskBody(id=besideId, pane=true, room=homeRoom, clearTop=0, end=max(0, homeRoom.clear.x + homeRoom.clear.width - homeRoom.secondHeadEnd), head=(homeRoom.secondBelow - homeRoom.secondTop), foot=homeRoom.foot, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "idea"
           IdeaScreen(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, callOn=callOn, idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea, open=open, openTasks=openTasks, back=back)
+        if e.name == "needs"
+          NeedsPage(entry=e, room=homeRoom, now=now, offset=clock.utcOffset, tasks=tasks, asks=asks, said=saids, picked=picked, counts=counts.yours, working=counts.working, loading=(not current(liveTasks) or not current(liveAsks)), failed=(failed(liveTasks) or failed(liveAsks)), callOn=callOn, beside=(needsBeside == "check" ? "check" : besideId), select=pickNeed, open=open, openTasks=openTasks, answerAll=answerAll, act=act, talk=talk, back=back)
+            if needsBeside == "check"
+              CheckBody(check=check, loading=(not current(check)), failed=failed(check), now=now, offset=clock.utcOffset, width=homeRoom.second.width, height=(stacked(homeRoom) ? homeRoom.height - homeRoom.across : homeRoom.height), foot=homeRoom.foot, part="all", top=0, id="check-beside")
+            else if besideId != ""
+              TaskBody(id=besideId, pane=true, room=homeRoom, clearTop=0, end=0, head=0, foot=homeRoom.foot, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "goal"
@@ -831,11 +846,11 @@ component App
             if split
               TaskBody(id=e.params.id, pane=true, room=room, clearTop=0, end=0, head=0, foot=room.foot, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "picks"
-          Picks(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, openTasks=openTasks, asks=asks, said=saids, picked=picked, now=now, offset=clock.utcOffset, words=words, wordsAsk=wordsId, pick=pick, open=open, answerAll=answerAll, back=back)
+          Picks(entry=e, viewport=viewport, room=homeRoom, needsYou=counts.yours, working=counts.working, openTasks=openTasks, asks=asks, said=saids, picked=picked, now=now, offset=clock.utcOffset, words=words, wordsAsk=wordsId, pick=pick, open=open, answerAll=answerAll, back=back)
         if e.name == "pick"
           Pick(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, openTasks=openTasks, now=now, offset=clock.utcOffset, asks=asks, picked=picked, words=words, wordsAsk=wordsId, showWords=showWords, pick=pick, open=open, back=back)
         if e.name == "check"
-          LastCheck(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
+          LastCheck(entry=e, viewport=viewport, room=homeRoom, needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
         if e.name == "settings"
           SettingsScreen(entry=e, room=room, settings=settings, counts=counts, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, still=still, docked=callOn, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, preview=previewVoice, open=open, openTasks=openTasks, back=back)
         if e.name == "voice"

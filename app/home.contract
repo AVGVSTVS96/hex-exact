@@ -201,7 +201,9 @@ component NowList
   state tapped = ""
   derive lit = split and beside != "" ? match sortBy(shownNeeds.concat(shownWork).filter(e => pageFor(e, tasks) == beside), e => (e.id == tapped ? 0 : 1)).at(0) { case some(e) => e.id, case none => "" } : ""
   action go(e: Item)
-    if pageFor(e, tasks) == ""
+    if pageFor(e, tasks) == "" and e.stage == "needs"
+      open(path("needs"))
+    else if pageFor(e, tasks) == ""
       openTasks(e.stage)
     else if split
       tapped = e.id
@@ -220,7 +222,7 @@ component NowList
           if known and needs.length == 0
             Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 42px", id="home-empty-needs")
           if needs.length > shownNeeds.length
-            ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=openTasks("needs"))
+            ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=open(path("needs")))
           if picks.length > 0
             row gap=10 align-items="center" padding="1px 10px" testId="home-picks"
               Mark(state="decided", size=22)

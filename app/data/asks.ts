@@ -32,6 +32,7 @@ export const ask = (a: Json): Ask => ({
   was: strings(a.was),
   decided: at(a.decided),
   took: str(a.took),
+  sends: bool(a.sends),
 });
 
 // id: the ask it's about, so the screen knows which question the reply settles.
@@ -39,6 +40,8 @@ const sent = (id: string, r: { ok: boolean; error: string; reply: unknown }): Re
   const reply = obj(r.reply);
   return { id, ok: r.ok, error: r.error, topic: str(reply.topic), missed: num(reply.missed) };
 };
+
+const stuck = (s: Json) => ({ id: str(s.id), app: str(s.app), title: str(s.title), why: str(s.why), action: str(s.action), mark: str(s.mark), at: at(s.at), sent: bool(s.sent) });
 
 export const asks: Partial<Sources> = {
   // Everything that waits on Bassim: questions, stuck runs, fresh results, the last check.
@@ -49,7 +52,7 @@ export const asks: Partial<Sources> = {
         version: num(b.version),
         asks: list(b.asks, ask),
         decided: list(b.decided, ask),
-        stuck: list(b.stuck, (s) => ({ id: str(s.id), app: str(s.app), title: str(s.title), why: str(s.why), action: str(s.action), mark: str(s.mark), at: at(s.at), sent: bool(s.sent) })),
+        stuck: list(b.stuck, stuck),
         fresh: list(b.fresh, (f) => ({ id: str(f.id), app: str(f.app), topic: str(f.topic), title: str(f.title), line: str(f.line), at: at(f.at), read: bool(f.read) })),
         check: { at: at(check.at), why: str(check.why), fixed: num(check.fixed), flagged: num(check.flagged) },
       };
@@ -63,6 +66,8 @@ export const asks: Partial<Sources> = {
       read: Object.entries(obj(b.read)).map(([label, n]) => ({ label, n: num(n) })),
       fixed: list(b.fixed, note),
       flagged: list(b.flagged, note),
+      stuck: list(b.stuck, stuck),
+      back: list(b.back, (q) => ({ id: str(q.id), question: str(q.question) })),
     };
   },
   loadWords: async ([id]) => {

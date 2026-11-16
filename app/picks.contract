@@ -1,22 +1,27 @@
-// hex's picks (§9.6): the questions where hex already knows what it would choose. Bassim takes its
-// picks, changes one, or leaves one for later, then answers them all at once.
+// hex's picks (§9.6): every question hex knows its answer to, each showing that answer among the
+// others (a dot each, the one taken filled), to take in one go. Bassim can change one or leave it
+// for later on its page first; nothing goes until Take all. Wider than tall, the rows run in two
+// columns, read across; with two columns the pick opens beside the list (under it open like a laptop).
 use Viewport, Asks, Ask, Words, Media from "./shapes.contract"
-use Mark, Note, Row, Primary, whenOf, Prose from "./parts.contract"
+use Mark, Note, Primary, RowTap, whenOf, Prose from "./parts.contract"
 use Pictures from "./media.contract"
 use AnswerRow from "./ask.contract"
-use Room, Chrome from "./room.contract"
-use PageTitle from "./calls.contract"
+use Room, Chrome, stacked from "./room.contract"
 use Said from "./said.contract"
 use picksOf from "./inbox.contract"
 
 fn pickOf(a: Ask): string = match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
 // What Bassim left a question at here: hex's pick until he chose otherwise; "" is for later.
 fn choiceOf(picked: string[], a: Ask): string = match picked.filter(l => l.startsWith(`${a.id}\t`)).at(-1) { case some(l) => l.slice(a.id.length + 1), case none => pickOf(a) }
+fn unblocks(a: Ask): bool = a.tag.startsWith("unblocks")
 
 component Picks
+  inject
+    haptics: bool
   props
     entry: Entry
     viewport: Viewport
+    // Home's room: open like a laptop the list is above the hinge and the pick below it.
     room: Room
     needsYou: number
     working: number
@@ -35,12 +40,20 @@ component Picks
   derive picks = picksOf(asks.asks, said)
   derive taking = picks.filter(a => choiceOf(picked, a) != "")
   derive later = picks.length - taking.length
-  // Open like a book: the list on the left of the fold, the pick it shows on the right.
+  derive sends = picks.filter(a => a.sends).length
+  derive unblocking = picks.filter(a => unblocks(a)).length
   state shown = ""
   derive two = room.columns == 2
+  derive across = stacked(room)
   derive beside = match picks.filter(a => a.id == shown).at(0) { case some(a) => a.id, case none => match picks.at(0) { case some(a) => a.id, case none => "" } }
-  derive left = two ? room.first.x : room.clear.x
-  derive right = two ? room.width - room.first.x - room.first.width : max(room.width - room.clear.x - room.clear.width, 0)
+  derive colX = two ? room.first.x : room.clear.x
+  derive colW = two ? room.first.width : room.clear.width
+  derive colH = across ? room.across : room.height
+  derive right = two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)
+  // Wider than tall the room is short: Take all sits by the counts instead of over the rows.
+  derive wide = colW >= 520 and colW > colH
+  derive floating = picks.length > 0 and not wide
+  derive takeW = min(colW - 32, 360)
   action takeAll
     answerAll(taking.map(a => a.id), taking.map(a => choiceOf(picked, a)))
     back()
@@ -54,25 +67,88 @@ component Picks
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="picks"
       Chrome(room=room, on="picks", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
-      // The list ends at Answer's top and fades out over the 24 above it.
-      scroll id="picks" position="absolute" top=room.below bottom=(picks.length > 0 ? room.foot + 8 + 50 : 0) left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(picks.length > 0 ? 24 : room.foot + 24) box-sizing="border-box" mask-image=(picks.length > 0 ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
-        PageTitle(text="hex’s picks", room=room, left=(two ? 20 : left + 20), id="picks-title")
-        column padding=(two ? "0 10px" : `0 ${right + 10}px 0 ${left + 10}px`) gap=2
-          text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""} · nothing goes until you tap Answer` font="-exact-subheadline" color="-exact-secondary-label" padding="2px 10px 14px"
+      scroll id="picks" position="absolute" top=room.below bottom=(across ? room.height - room.across : 0) left=colX width=colW box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
+        column padding=`0 ${right + 6}px ${floating ? room.foot + 8 + 50 + 20 : room.foot + 24}px 6px` box-sizing="border-box"
+          column min-height=(two ? 0 : max(0, room.headBottom - room.below))
+            row gap=10 align-items="baseline" padding="0 10px 4px" testId="picks-title"
+              text "hex’s picks" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"
+              text `${picks.length}` font="-exact-title1" font-weight=400 color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+          row gap=16 align-items="center" min-height=(wide ? 44 : 0) padding="0 10px 8px" flex-wrap="wrap" testId="picks-counts"
+            if sends > 0
+              row gap=5 align-items="center"
+                image "symbol:sf/paperplane.fill" width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                text `${sends}` font="-exact-footnote" font-weight=600 color="-exact-label" font-variant-numeric="tabular-nums"
+                text "send in your name" font="-exact-footnote" color="-exact-secondary-label"
+            if unblocking > 0
+              row gap=5 align-items="center"
+                image "symbol:sf/arrow.triangle.branch" width=12 height=12 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+                text `${unblocking}` font="-exact-footnote" font-weight=600 color="-exact-label" font-variant-numeric="tabular-nums"
+                text "unblock other work" font="-exact-footnote" color="-exact-secondary-label"
+            if later > 0
+              row gap=5 align-items="center"
+                text `${later}` font="-exact-footnote" font-weight=600 color="-exact-label" font-variant-numeric="tabular-nums"
+                text "for later" font="-exact-footnote" color="-exact-secondary-label"
+            if wide and picks.length > 0
+              box flex=1
+              button press=takeAll class=Primary disabled=(taking.length == 0) min-height=34 padding="0 14px" testId="picks-answer"
+                text `Take all ${taking.length}` font="-exact-subheadline" font-weight=600 color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background")
           if picks.length == 0
             Note(kind="empty", text="Nothing left to take", pad="24px 12px", id="picks-empty")
-          for a in picks key=a.id
-            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, agents=0, selected=(two and beside == a.id), href="", label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=show(a.id))
-      if picks.length > 0
-        button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(room.columns == 2 ? room.first.x + 16 : left + 16 + max(room.clear.width - 32 - 480, 0) / 2) width=(room.columns == 2 ? room.first.width - 32 : min(room.clear.width - 32, 480)) min-height=50 testId="picks-answer"
-          text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}` color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600
-
-// One pick's page: the question, what it's about, why hex picks what it does, every answer as the
-// same row, and where it came from. On its own page (folded) or beside the list (open like a book).
+          // Two columns read across, in rank order, so the first rows of both are the top of the list.
+          row gap=4 align-items="flex-start"
+            for side in (wide ? [0, 1] : [0]) key=side
+              column flex=1 min-width=0
+                for a, i in picks.filter((x, n) => not wide or n % 2 == side) key=a.id
+                  if i > 0
+                    box height=0.5 margin="5px 0 5px 42px" background-color="-exact-separator"
+                  PickRow(ask=a, choice=choiceOf(picked, a), now=now, offset=offset, selected=(two and beside == a.id), press=show(a.id))
+      if floating
+        button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(colX + (colW - takeW) / 2) width=takeW min-height=50 box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" testId="picks-answer"
+          text `Take all ${taking.length}` font="-exact-headline" color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background")
       if two
         scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`8px 20px ${room.foot + 24}px` box-sizing="border-box" testId="picks-beside"
           for a in picks.filter(x => x.id == beside) key=a.id
             PickBody(ask=a, width=(room.second.width - 40), now=now, offset=offset, picked=picked, words=words, wordsAsk=wordsAsk, choose=choose)
+
+// One pick: hex's mark, the topic with its tags, when, the question in full-strength type, then the
+// answer it goes with (hex's in mint, his own change in ink, or "Decide later") and a dot per answer,
+// the one taken filled.
+component PickRow
+  inject
+    haptics: bool
+  props
+    ask: Ask
+    choice: string
+    now: number
+    offset: number
+    selected: bool
+    press: action
+  derive a = ask
+  derive hexs = choice != "" and a.options.filter(o => o.label == choice and o.pick).length > 0
+  view
+    button press=press class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${a.topic}: ${a.question}. ${choice == "" ? "Decide later" : choice}` testId=`pick-${a.id}`
+      box padding-top=1 flex-shrink=0
+        Mark(state="decided", size=22)
+      column flex=1 min-width=0 gap=2
+        row gap=8 align-items="baseline"
+          text a.topic font="-exact-headline" color="-exact-label" line-clamp=1 flex-shrink=1 min-width=0
+          if a.tag != ""
+            text a.tag font-size=12 line-height="18px" font-weight=600 color="-exact-secondary-label" padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" white-space="nowrap" flex-shrink=0
+          if a.sends
+            row gap=3 align-items="center" align-self="center" height=18 padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" flex-shrink=0 aria-label="sends in your name"
+              image "symbol:sf/paperplane.fill" width=9 height=9 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              text "sends" font-size=12 line-height="18px" font-weight=600 color="-exact-secondary-label"
+          box flex=1
+          text whenOf(a.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+        text a.question font="-exact-subheadline" color="-exact-label" line-clamp=2
+        row gap=10 align-items="center" margin-top=4
+          row gap=4 align-items="center" flex-shrink=1 min-width=0
+            if choice != ""
+              image (hexs ? "symbol:icon.pick" : "symbol:icon.done") width=12 height=12 object-fit="contain" color=(hexs ? "hex.accent" : "-exact-label") aria-hidden=true
+            text (choice == "" ? "Decide later" : choice) font="-exact-subheadline" font-weight=600 color=(choice == "" ? "-exact-tertiary-label" : hexs ? "hex.accent" : "-exact-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+          row gap=4 flex-shrink=0 aria-hidden=true
+            for o in a.options key=o.label
+              box width=7 height=7 border-radius=3.5 box-sizing="border-box" background-color=(o.label == choice ? (hexs ? "hex.accent" : "-exact-label") : "transparent") border=(o.label == choice ? "none" : "1.25px solid -exact-tertiary-label")
 
 component PickBody
   props

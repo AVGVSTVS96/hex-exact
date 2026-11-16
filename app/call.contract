@@ -285,7 +285,7 @@ component Home
       if homeMode
         row position="absolute" left=room.tabs.x width=room.tabs.width top=room.tabs.top height=callSize justify-content="center" align-items="center" z-index=4 testId="controls"
           if tabbed
-            HexTabs(current=page, fresh=feedFresh, pick=pickPage)
+            HexTabs(pages=pages, current=page, fresh=feedFresh, pick=pickPage)
               CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
           else
             if two and talking

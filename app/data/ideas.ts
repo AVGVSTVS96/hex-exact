@@ -8,6 +8,7 @@ import { at, bool, list, num, str, type Json } from './parse.ts';
 const LINKS = /https?:\/\/[^\s)]*[^\s).,;:!?'"]/gu;
 const words = (finding: string) =>
   finding
+    .replace(/\s*(?:Links|Sources?):\s*(?:https?:\/\/\S+[\s·,;]*)+$/u, '')
     .replaceAll(/\s*\((?:see\s+)?https?:\/\/[^\s)]+\)/gu, '')
     .replaceAll(LINKS, (url) => url.replace(/^https?:\/\/(?:www\.)?/u, '').replace(/[:/].*$/u, ''))
     .trim();

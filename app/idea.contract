@@ -85,6 +85,8 @@ component IdeaBody
     offset: number
     // The last thing done with this idea here.
     act: IdeaAct
+    // How far the title stays off the column's trailing edge, clear of the status icons beside it.
+    inset: number
     // do(id, verb), redo(id), undo(id, verb).
     do: action
     redo: action
@@ -110,13 +112,13 @@ component IdeaBody
         else
           Note(kind="loading", text="Opening the idea", pad="24px 0", id="idea-loading")
       else
-        column gap=4
+        column gap=4 padding-right=inset
           text idea.title font="-exact-title1" font-weight=700 color="-exact-label" line-clamp=2 testId="idea-title"
           text `Idea${idea.topic != "" ? ` · ${idea.topic}` : ""} · floated ${dayWord(idea.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
         if idea.said != ""
           button press=toggleSaid class=Tap display="flex" flex-direction="column" align-items="stretch" gap=4 padding="2px 0 2px 14px" border-left="2.5px solid -exact-separator" text-align="left" aria-expanded=saidWhole aria-label=`You said: ${idea.said}` testId="idea-said"
             text "You said" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-            text idea.said font="-exact-body" color="-exact-label" line-clamp=(saidWhole ? 0 : 3)
+            text idea.said font="-exact-body" color="-exact-label" line-clamp=(saidWhole ? 0 : 2)
         match last
           case some(c)
             column gap=8
@@ -127,7 +129,7 @@ component IdeaBody
                     text `${older.length} earlier ${older.length == 1 ? "check" : "checks"}` font="-exact-subheadline" color="-exact-secondary-label"
                     image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-secondary-label" rotate=(earlier ? "90deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
               button press=toggleFound class=Tap display="flex" flex-direction="column" align-items="stretch" text-align="left" aria-expanded=foundWhole testId="idea-found"
-                CheckWords(check=c, lines=(foundWhole ? 0 : 4), id="idea-found")
+                CheckWords(check=c, lines=(foundWhole ? 0 : 3), id="idea-found")
               if earlier
                 for o, n in older key=n
                   column gap=6 padding="10px 0 0 14px" border-left="2.5px solid -exact-separator" testId=`idea-check-${n}`
@@ -194,6 +196,7 @@ component IdeaPane
     now: number
     offset: number
     act: IdeaAct
+    inset: number
     draft: string
     sent: string
     error: string
@@ -206,7 +209,7 @@ component IdeaPane
   view
     column flex=1 min-height=0 padding-bottom=bottom testId="idea-pane"
       scroll flex=1 min-height=0 padding="4px 16px 24px" box-sizing="border-box" testId="idea-scroll"
-        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, do=do, redo=redo, undo=undo)
+        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=inset, do=do, redo=redo, undo=undo)
       if idea.id != ""
         column margin-top=-24 padding="24px 16px 0" background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 position="relative" testId="idea-foot"
           AddToIdea(idea=idea, draft=draft, sent=sent, error=error, keep=keep, add=add)
@@ -219,6 +222,8 @@ component IdeaScreen
     room: Room
     needsYou: number
     working: number
+    // A call docked at the foot lifts the composer over it.
+    callOn: bool
     idea: Idea
     loading: bool
     failed: bool
@@ -240,4 +245,4 @@ component IdeaScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="idea-screen"
       Chrome(room=room, on="idea", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="idea-column"
-        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? viewport.keyboardHeight + 8 : room.foot + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)
+        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)

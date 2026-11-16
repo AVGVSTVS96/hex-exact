@@ -300,6 +300,8 @@ component HexTabs
     haptics: bool
     still: bool
   props
+    // The pages that are built, so a tab never leads to an empty list.
+    pages: string[]
     current: string
     fresh: bool
     pick: action
@@ -307,7 +309,7 @@ component HexTabs
   view
     row glassGroup=12 gap=10 align-items="center" justify-content="center" testId="hex-tabs"
       row backgroundMaterial="glass" border-radius=999 padding=4 gap=0 role="tablist" aria-label="hex" flex-shrink=0
-        for t in hexTabs() key=t.id
+        for t in hexTabs().filter(t => pages.filter(p => p == t.id).length > 0) key=t.id
           button press=pick(t.id) class=TabTap background-color=(current == t.id ? "-exact-tertiary-fill" : "transparent") transition=springOf(still, "background-color") role="tab" aria-selected=(current == t.id) aria-label=(t.id == "feed" and fresh ? "Feed, new" : t.label) -exact-press-haptic=(haptics ? "selection" : "none") testId=`hex-tab-${t.id}`
             image t.icon width=22 height=22 object-fit="contain" color=(current == t.id ? "-exact-label" : "-exact-secondary-label") aria-hidden=true
             text t.label font="-exact-caption2" font-weight=(current == t.id ? 600 : 500) color=(current == t.id ? "-exact-label" : "-exact-secondary-label") white-space="nowrap"

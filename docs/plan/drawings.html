@@ -223,12 +223,11 @@ svg{display:block}
 .pic{flex:1;height:92px;border-radius:12px;position:relative;overflow:hidden;background:linear-gradient(170deg,#e8e4dc,#cfc8bb 60%,#b9b0a0)}
 .pic svg{position:absolute;inset:0;width:100%;height:100%}
 .pic.b{background:linear-gradient(200deg,#dfe3e7,#c3cad1 55%,#a7b0b9)}
-.ticket{margin-top:10px;border-radius:12px;background:var(--fill2);border:.5px solid var(--sep);padding:11px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;align-items:center;max-width:300px}
-.ticket b{font-size:20px;line-height:24px;font-weight:700;letter-spacing:.3px}
-.ticket i{height:0;border-top:1.5px dashed var(--ter);display:block}
-.ticket span{font-size:13px;line-height:18px;color:var(--sec);font-variant-numeric:tabular-nums}
-.ticket span:nth-of-type(2){grid-column:3;text-align:right}
-.ticket em{grid-column:1/-1;font-style:normal;font-size:13px;line-height:18px;color:var(--sec);border-top:.5px solid var(--sep);margin-top:7px;padding-top:7px}
+/* a screenshot hex kept as proof: someone else's page, so its own paper and type in light and dark */
+.ticket{margin-top:10px;border-radius:12px;overflow:hidden;background:#f6f4ee;color:#23303f;font-family:Georgia,serif;padding:0 14px 9px;display:grid;grid-template-columns:auto 1fr;gap:3px 14px;align-items:baseline;max-width:300px;font-size:13px;line-height:18px;font-variant-numeric:tabular-nums}
+.ticket u{grid-column:1/-1;text-decoration:none;background:#1f5f8b;color:#fff;margin:0 -14px 6px;padding:5px 14px;font-size:12px;line-height:16px;letter-spacing:.2px}
+.ticket b{font-weight:700}
+.ticket em{grid-column:1/-1;font-style:normal;color:#5d6875;border-top:1px solid #dcd8cd;margin-top:5px;padding-top:5px}
 .gp{display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:12px;font-weight:600}
 .gp .cv{width:22px;height:22px;display:grid;place-items:center;flex:none;color:var(--sec)}.gp .cv svg{width:8px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .gp.open .cv svg{transform:rotate(90deg)}
@@ -239,8 +238,9 @@ svg{display:block}
 .kids{margin-left:34px}
 .say{margin:10px 0 0;padding:2px 0 2px 12px;border-left:2px solid var(--sep);font-size:15px;line-height:21px;color:var(--text)}
 .say .who2{color:var(--sec);font-weight:600;font-size:13px;line-height:18px;margin-bottom:2px}
-.find{padding:8px 0 10px;border-bottom:.5px solid var(--sep)}
-.find .d{color:var(--sec);font-size:13px;line-height:18px;font-variant-numeric:tabular-nums}
+.find{padding:0 0 4px}
+.sec.when{display:flex;justify-content:space-between;align-items:center}
+.sec.when .link{margin:0;font-size:13px;line-height:18px;font-weight:500;color:var(--sec);text-transform:none;letter-spacing:0}
 .find p{margin:2px 0 0;font-size:17px;line-height:23px;text-wrap:pretty}
 .links{display:flex;gap:20px;margin-top:8px}.links .link{margin:0}
 .link svg.o{width:10px;height:10px}
@@ -376,6 +376,8 @@ const question=({why=false,beside=false}={})=>`${beside?'':'<div class="ptitle">
 // The end button: the mic to talk, Stop while the task runs and the field is empty, send once there's text.
 const dock=(l,r,b=16,{text='Reply in your own words',end='mic'}={})=>`<div class="dock" style="left:${l}px;right:${r}px;bottom:${b}px"><span class="plus" aria-label="Add a photo">${I.plus}</span><span>${text}</span><span class="mic" aria-label="${{mic:'Talk',stop:'Stop the task',send:'Send'}[end]}">${{mic:I.mic,stop:I.stop,send:I.up}[end]}</span></div>`;
 
+// Above a composer a page fades over 24pt and is solid by the composer's top, so nothing shows behind it.
+const dockFade=b=>`<div class="fade" style="height:${b+72}px;background:linear-gradient(to bottom,transparent,var(--bg) 24px)"></div>`;
 // Tasks.
 // Sections are Needs you, Working and Done. What hex decided is its own list: one row opens it.
 const DONE=[['Newsletter','Sent issue 13 to 412 readers','Nov 14'],['Bike repair','Ordered a chain, €24','Nov 13']];
@@ -480,10 +482,10 @@ const feedNew=sel=>`<div class="dayh">This afternoon</div>
 const feedEarlier=`<div class="earlier">Earlier</div>
  <div class="dayh" style="padding-top:8px">This morning</div>
  ${FE(MD,'Took the Saturday slot at the bike shop','It was Saturday at 10 or a ten-day wait, and you ride on Sunday.','Bike repair · 9:12 AM',{end:'<span class="pill">Undo</span>'})}
+ ${FE(MF,'No rail strike is called for the 22nd','The union vote was put off to December.','Lisbon trip · 9:00 AM')}
  ${FE(MDone,'Issue 13 went out to 412 readers','Opened by 61% in the first hour. Two replies are waiting in the topic.','Newsletter · 8:30 AM')}
  <div class="dayh">Yesterday</div>
- ${FE(MF,'No rail strike is called for the 22nd','The union vote was put off to December.','Lisbon trip · 6:00 PM')}
- ${FE(MDone,'Found a 3‑day transit pass for €22','It covers the trams, the metro and the train to Sintra.','Lisbon trip · 2:15 PM')}`;
+ ${FE(MDone,'Booked the installer for the 22nd','Stonecraft comes at 9 AM and needs the counters cleared.','Kitchen remodel · 2:15 PM')}`;
 const feed=({sel='',scrolled=false}={})=>scrolled?feedEarlier:feedNew(sel)+feedEarlier;
 // Ideas: what you floated for later. What hex found reads at full strength; your own words wait in grey.
 const ideas=({sel=''}={})=>`<div class="dayh">hex found something<span class="n">2</span></div>
@@ -495,16 +497,16 @@ const ideas=({sel=''}={})=>`<div class="dayh">hex found something<span class="n"
  ${more(5)}`;
 // A page's head keeps clear of the status icons: inset is the room they take beside it.
 const pageHead=(title,meta,inset=0,minH=0)=>`<div style="margin-right:${inset}px;min-height:${minH}px"><div class="ptitle">${title}</div><div class="meta" style="margin-top:6px">${meta}</div></div>`;
+const HEAD2=80;
 const said=(who,words,inset=0)=>`<div class="say" style="margin-right:${inset}px"><div class="who2">${who}</div>${words}</div>`;
-const ideaPage=({inset=0,minH=0}={})=>`${pageHead('A pot rail over the island','Idea · Kitchen remodel · floated Nov 9',inset,minH)}
- ${said('You said','what about a rail over the island for the pans, at some point')}
- <div class="sec">What hex found</div>
- <div class="find"><div class="d">Today 1:40 PM</div><p>Two makers cut a brass rail to length. Forge &amp; Co: €64, a week. Atelier Laiton: €92, three weeks. Nobody stocks 90 cm.</p>
-  ${pics(72)}<div class="links">${out('Forge &amp; Co')}${out('Atelier Laiton')}</div></div>
- <div class="why" style="margin-top:10px"><b>Earlier checks</b>· 2, since Nov 9${I.chev}</div>
+const ideaPage=({inset=0,minH=0,pich=72}={})=>`${pageHead('A pot rail over the island','Idea · Kitchen remodel · floated Nov 1',inset,minH)}
+ ${said('You said','what about a rail over the island for the pans')}
+ <div class="sec when">Found today, 1:40 PM${go('2 earlier checks')}</div>
+ <div class="find"><p>Two makers cut brass to 90 cm. Forge &amp; Co: €64, a week. Atelier Laiton: €92, three weeks.</p>
+  ${pics(pich)}<div class="links">${out('Forge &amp; Co')}${out('Atelier Laiton')}</div></div>
  <div class="ans">
   <div class="a"><span class="r"></span><div class="l">Start it<div class="s">Becomes a goal hex works on</div></div></div>
-  <div class="a"><span class="r"></span><div class="l">Stop looking into it<div class="s">hex stops its Friday check</div></div></div>
+  <div class="a"><span class="r"></span><div class="l">Stop looking into it<div class="s">hex stops its Sunday check</div></div></div>
   <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">Take it off your ideas</div></div></div>
  </div>`;
 // Goals: what hex keeps watch on, then what you asked for, by project, each part coloured by where it stands.
@@ -513,7 +515,7 @@ const goals=({sel='',watch=1}={})=>`<div class="dayh">Watching<span class="n">3<
  ${R(MC,'Rail strike on the 22nd','No strike called. Checks again tomorrow','')}
  ${watch>1?R(MC,'Passport renewal','Reminds you Dec 6, when the form opens',''):''}
  ${more(3-watch)}
- <div class="dayh">Goals<span class="n">9</span></div>
+ <div class="dayh">Goals<span class="n">7 to go</span></div>
  ${GP('Lisbon trip','dwq-','1 of 4',true)}
  <div class="kids">
   ${R(MW,'A hotel near Alfama under €180','Checking three that have a lift','3:28 PM',sel=='hotel')}
@@ -524,20 +526,21 @@ const goals=({sel='',watch=1}={})=>`<div class="dayh">Watching<span class="n">3<
  ${GP('Kitchen remodel','dddw-','3 of 5',false)}
  ${GP('Newsletter','d-','1 of 2',false)}
  ${R(MT,'Fix the squeaky front brake','Bike repair · the shop has it Saturday','')}`;
-const ticket=`<div class="ticket" role="img" aria-label="The booking: Dublin to Lisbon and back"><b>DUB</b><i></i><b>LIS</b><span>Fri 9:05</span><span>Sun 7:05</span><em>2 seats, aisle · €296 · ref. K7QM2A</em></div>`;
+const ticket=`<div class="ticket" role="img" aria-label="Screenshot: the airline's booking confirmation"><u>Booking confirmed · K7QM2A</u>
+ <b>Fri 20 Nov</b><span>DUB 9:05 → LIS 11:55</span><b>Sun 22 Nov</b><span>LIS 7:05 → DUB 9:50</span><em>2 passengers · seats 14C, 14D · €296.00</em></div>`;
 const goalPage=({inset=0,minH=0,reached=false}={})=>reached?`${pageHead('Flights, aisle seats','Goal · Lisbon trip · asked Nov 12',inset,minH)}
  ${said('You asked','book us both ways, direct if you can, and i want the aisle')}
  <div class="sec">Done when</div><div style="font-size:17px;line-height:23px">Both flights are booked, with an aisle seat each way.</div>
  <div class="sec">Reached today, 3:10 PM</div>
  <div class="now">${MDone}<div><div class="tx">Out Friday 9:05, back Sunday 7:05, both direct. €296 for the two of you.</div>
-  ${ticket}<div class="links">${out('Confirmation')}${go('Steps')}${go('Lisbon trip')}</div></div></div>
+  ${ticket}<div class="links">${out('Confirmation')}${go('Steps')}${go('Topic')}</div></div></div>
  <div class="ans">
   <div class="a"><span class="r"></span><div class="l">Not what I asked<div class="s">hex picks it up again</div></div></div>
  </div>`:`${pageHead('A hotel near Alfama under €180','Goal · Lisbon trip · asked Nov 12',inset,minH)}
  ${said('You asked','find us somewhere in alfama, not over 180 a night, and it needs a lift')}
  <div class="sec">Done when</div><div style="font-size:17px;line-height:23px">A room is booked in Alfama, under €180 a night, with a lift.</div>
  <div class="sec" style="color:var(--prog)">Where it stands</div>
- <div class="now">${MW}<div><div class="tx">Checking three that have a lift. Two have rooms for both nights.</div><div class="links">${go('Steps')}${go('Lisbon trip')}</div></div></div>
+ <div class="now">${MW}<div><div class="tx">Checking three that have a lift. Two have rooms for both nights.</div><div class="links">${go('Steps')}${go('Topic')}</div></div></div>
  <div class="ans">
   <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">hex stops and takes it off your goals</div></div></div>
  </div>`;
@@ -545,9 +548,8 @@ const watchPage=({inset=0}={})=>`${pageHead('Rail strike on the 22nd','Watching 
  ${said('You asked','keep an eye on whether the trains strike that weekend')}
  <div class="sec">Next</div>
  <div class="now">${MC}<div class="tx">Tomorrow, 9 AM. It stops by itself after the 22nd.</div></div>
- <div class="sec">What it found</div>
- <div class="find"><div class="d">Today 9:00 AM</div><p>No strike called. The union vote was put off to December.</p><div class="links">${out('Rail notice')}</div></div>
- <div class="why" style="margin-top:10px"><b>Earlier checks</b>· 5, since Nov 12${I.chev}</div>
+ <div class="sec when">Found today, 9:00 AM${go('2 earlier checks')}</div>
+ <div class="find"><p>No strike called. The union vote was put off to December.</p><div class="links">${out('Rail notice')}</div></div>
  <div class="ans">
   <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Stop watching<div class="s">hex won’t check this again</div></div></div>
  </div>`;
@@ -663,32 +665,32 @@ const D={
  'feed-cover-up':()=>dev('cover-up',`${hexCol('cover-up','feed',feed())}${toolbar('cover-up')}`),
  'feed-scrolled-cover-up':()=>dev('cover-up',`${hexCol('cover-up','feed',feed({scrolled:true}),true)}${toolbar('cover-up')}`),
  'feed-cover-side':()=>dev('cover-side',`${hexCol('cover-side','feed',feed({sel:'flights'}))}
-  <div class="pane" style="left:360px;right:0;border-left:.5px solid var(--sep)"><div class="abs" style="left:20px;right:20px;top:80px">${goalPage({reached:true})}</div><div class="fade" style="height:150px"></div>${dock(20,20,22,{text:'Add to this goal'})}</div>
+  <div class="pane" style="left:360px;right:0;border-left:.5px solid var(--sep)"><div class="abs" style="left:20px;right:20px;top:80px">${goalPage({reached:true})}</div>${dockFade(22)}${dock(20,20,22,{text:'Add to this goal'})}</div>
   ${toolbar('cover-side')}`),
  'feed-open-up':()=>dev('open-up',`${hexCol('open-up','feed',feed({sel:'flights'}))}
-  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${goalPage({reached:true,inset:220,minH:62})}</div><div class="fade" style="height:100px"></div>${dock(24,24,26,{text:'Add to this goal'})}</div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${goalPage({reached:true,inset:220,minH:HEAD2})}</div>${dockFade(26)}${dock(24,24,26,{text:'Add to this goal'})}</div>
   ${toolbar('open-up')}`),
  // 12. Ideas
  'ideas-cover-up':()=>dev('cover-up',`${hexCol('cover-up','ideas',ideas())}${toolbar('cover-up')}`),
  'idea-cover-up':()=>dev('cover-up',`
-  <div class="abs" style="left:22px;right:22px;top:84px">${ideaPage({inset:64})}</div>
-  <div class="fade" style="height:150px"></div>${dock(16,16,18,{text:'Add to this idea'})}${toolbar('cover-up',{back:true})}`),
+  <div class="abs" style="left:22px;right:22px;top:84px">${ideaPage({inset:64,pich:46})}</div>
+  ${dockFade(18)}${dock(16,16,18,{text:'Add to this idea'})}${toolbar('cover-up',{back:true})}`),
  'ideas-open-up':()=>dev('open-up',`${hexCol('open-up','ideas',ideas({sel:'rail'}))}
-  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${ideaPage({inset:220,minH:62})}</div><div class="fade" style="height:150px"></div>${dock(24,24,26,{text:'Add to this idea'})}</div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${ideaPage({inset:220,minH:HEAD2,pich:60})}</div>${dockFade(26)}${dock(24,24,26,{text:'Add to this idea'})}</div>
   ${toolbar('open-up')}`),
  // 13. Goals
  'goals-cover-up':()=>dev('cover-up',`${hexCol('cover-up','goals',goals())}${toolbar('cover-up')}`),
  'goal-cover-up':()=>dev('cover-up',`
   <div class="abs" style="left:22px;right:22px;top:84px">${goalPage({inset:64})}</div>
-  <div class="fade" style="height:100px"></div>${dock(16,16,18,{text:'Add to this goal'})}${toolbar('cover-up',{back:true})}`),
+  ${dockFade(18)}${dock(16,16,18,{text:'Add to this goal'})}${toolbar('cover-up',{back:true})}`),
  'goal-reached-cover-up':()=>dev('cover-up',`
   <div class="abs" style="left:22px;right:22px;top:84px">${goalPage({inset:64,reached:true})}</div>
-  <div class="fade" style="height:100px"></div>${dock(16,16,18,{text:'Add to this goal'})}${toolbar('cover-up',{back:true})}`),
+  ${dockFade(18)}${dock(16,16,18,{text:'Add to this goal'})}${toolbar('cover-up',{back:true})}`),
  'watch-cover-up':()=>dev('cover-up',`
   <div class="abs" style="left:22px;right:22px;top:84px">${watchPage({inset:64})}</div>
   ${toolbar('cover-up',{back:true})}`),
  'goals-open-up':()=>dev('open-up',`${hexCol('open-up','goals',goals({sel:'hotel',watch:2}))}
-  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${goalPage({inset:220,minH:62})}</div><div class="fade" style="height:100px"></div>${dock(24,24,26,{text:'Add to this goal'})}</div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${goalPage({inset:220,minH:HEAD2})}</div>${dockFade(26)}${dock(24,24,26,{text:'Add to this goal'})}</div>
   ${toolbar('open-up')}`),
 };
 // The frames to draw: [screen, pose, themes, what it shows].
@@ -715,12 +717,12 @@ const F=[
  ['feed','open-up',['dark'],'Book: Feed on the left, the entry you tapped beside it. A finished entry opens the goal it reached: what you asked, what done meant, the proof.'],
  ['feed','cover-side',['dark'],'Folded on its side: the same two columns, tabs and Call at the foot of hex’s.'],
  ['ideas','cover-up',['dark','light'],'Ideas: what you floated for later. The ones hex found something on come first, with the lens and the finding in full-strength text; the rest wait with your own words in grey.'],
- ['idea','cover-up',['dark'],'An idea: what you said, what hex found and when, and three rows: start it, stop its checks, or drop it. Your own words dock at the foot.'],
+ ['idea','cover-up',['dark'],'An idea: what you said, what hex found and when, and three rows: start it, stop its checks, or drop it, all three in view. Your own words dock at the foot.'],
  ['ideas','open-up',['dark'],'Book: Ideas beside the idea you picked.'],
- ['goals','cover-up',['dark','light'],'Goals: what hex keeps watch on, then what you asked for, by project. Each bar segment is one goal, coloured by where it stands: reached, working, waiting on you, not started.'],
+ ['goals','cover-up',['dark','light'],'Goals: what hex keeps watch on, then what you asked for, by project. Each bar segment is one goal, coloured by where it stands: reached, working, waiting on you, not started. The count beside Goals is how many are still to go.'],
  ['goal','cover-up',['dark'],'A goal hex is working on: what you asked in your words, what done means, where it stands, and its steps and topic one tap away.'],
- ['goal-reached','cover-up',['dark'],'A goal reached: the proof under what done meant, and one row to send it back.'],
- ['watch','cover-up',['dark'],'Something hex watches: what you asked, when it runs next, what the last run found, and one row to stop it.'],
+ ['goal-reached','cover-up',['dark'],'A goal reached: the proof under what done meant, here the booking page hex kept a picture of, and one row to send it back.'],
+ ['watch','cover-up',['dark'],'Something hex watches: what you asked, when it runs next, what it last found and when, the earlier checks one tap away, and one row to stop it.'],
  ['goals','open-up',['dark'],'Book: Goals beside the goal you picked.'],
 ];
 const q=new URLSearchParams(location.search);

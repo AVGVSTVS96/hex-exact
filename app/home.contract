@@ -160,6 +160,8 @@ fn decidedWeek(decided: Ask[], now: number, offset: number): number[] = range(7)
 // 7.4pt a character in a column `width` wide less the row's insets and mark (64).
 fn linesOf(text: string, width: number, most: number): number = max(1, min(most, ceil(text.length * 7.4 / max(width - 64, 60))))
 fn needH(e: Item, width: number): number = 40 + 20 * linesOf(lineFor(e), width, 2)
+// A row on Needs you with what this phone said on it: folded beside Undo, or a failed line under it.
+fn shelfH(e: Item, said: Said[], width: number): number = foldedOf(e, said) ? 40 + 22 * linesOf(`${wordOf(said, e.id).label} → ${wordOf(said, e.id).detail != "" ? wordOf(said, e.id).detail : e.topic}`, width - 70, 2) + (wordOf(said, e.id).missed > 0 ? 40 : 0) : needH(e, width) + (wordOf(said, e.id).status == "failed" ? 20 : 0)
 // A working row: its title, one line, and the ribbon under it.
 fn workH(): number = 80
 // How many of rows `heights` fit in `room`, at least `least` (when there are that many).
@@ -202,8 +204,8 @@ component NowList
   // Wide, each column is half the width, and Needs you ends above hex decided.
   derive colW = wide ? (width - 4) / 2 : width
   derive needsRoom = (wide ? height - 62 : round(height * 0.62)) - headH() - moreH() - (picks.length > 0 ? picksH() : 0)
-  derive shownNeeds = shelf.slice(0, fitting(shelf.map(e => needH(e, colW)), needsRoom, 2))
-  derive needsUsed = headH() + sum(shownNeeds.map(e => needH(e, colW))) + (shelf.length > shownNeeds.length ? moreH() : 0) + (picks.length > 0 ? picksH() : 0)
+  derive shownNeeds = shelf.slice(0, fitting(shelf.map(e => shelfH(e, said, colW)), needsRoom, 2))
+  derive needsUsed = headH() + sum(shownNeeds.map(e => shelfH(e, said, colW))) + (shelf.length > shownNeeds.length ? moreH() : 0) + (picks.length > 0 ? picksH() : 0)
   // `height` ends above Call. In one column hex decided is last, beside Call in its band, so
   // Working on has the rest down to Call; in two, Working on ends above Call, as `height` does.
   derive workRoom = (wide ? height : height - needsUsed - 22) - headH() - moreH()

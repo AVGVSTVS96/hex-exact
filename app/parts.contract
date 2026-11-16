@@ -265,7 +265,7 @@ component RowLines
         box flex=1
         text stamp font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
       if line != "" and line != title
-        text line font="-exact-subheadline" color=(failed ? "hex.danger" : mark == "asks" ? "-exact-label" : "-exact-secondary-label") line-clamp=lines
+        text line font="-exact-subheadline" color=(failed ? "hex.danger" : mark == "asks" or mark == "needs" ? "-exact-label" : "-exact-secondary-label") line-clamp=lines
       children
 
 // A task's last day, an hour a cell, oldest first: blue where hex worked in it, amber where it

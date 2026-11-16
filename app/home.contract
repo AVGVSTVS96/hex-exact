@@ -38,7 +38,9 @@ fn firstNeed(tasks: Tasks, asks: Asks, said: Said[], now: number): string = matc
 fn liveOf(tasks: Tasks): option<TaskRow> = sortBy(tasks.tasks.filter(t => t.state == "working" and t.running), t => t.at, "desc").at(0)
 // A row's mark, as Tasks draws its topic's.
 fn markOf(e: Item): string = e.stage == "needs" ? (e.kind == "task" ? "needs" : e.mark) : problemOf(e.title) != "" ? "failed" : e.mark
-fn lineFor(e: Item): string = problemOf(e.title) != "" ? problemOf(e.title) : e.title
+// The row's title already says its topic, so a line that opens with it ("Burn: move…") drops it.
+fn lineFor(e: Item): string = problemOf(e.title) != "" ? problemOf(e.title) : unsaid(e.title, e.topic)
+fn unsaid(text: string, topic: string): string = topic != "" and text.toLowerCase().startsWith(`${topic.toLowerCase()}: `) ? text.slice(topic.length + 2) : text
 
 keyframes liveDot
   50% opacity=0.25
@@ -156,21 +158,26 @@ fn agentsIn(e: Item, tasks: TaskRow[]): number = match tasks.filter(t => t.id ==
 fn trackOf(e: Item, tasks: TaskRow[]): Track[] = match tasks.filter(t => t.id == e.id).at(0) { case some(t) => t.track, case none => [] }
 // The last seven days, oldest first: how many hex decided on each.
 fn decidedWeek(decided: Ask[], now: number, offset: number): number[] = range(7).map(i => decided.filter(d => dayOf(d.decided, offset) == dayOf(now, offset) - 6 + i).length)
-// A row's height: its padding and title (40), then 20 a line of its 15pt text, which runs about
-// 7.4pt a character in a column `width` wide less the row's insets and mark (64).
-fn linesOf(text: string, width: number, most: number): number = max(1, min(most, ceil(text.length * 7.4 / max(width - 64, 60))))
-fn needH(e: Item, width: number): number = 40 + 20 * linesOf(lineFor(e), width, 2)
+// A row's height, as measured: its padding and title (40), then 18 a line of its 15pt text, which
+// runs about 7.2pt a character in a column `width` wide less the row's insets and mark (52).
+fn linesOf(text: string, width: number, most: number): number = max(1, min(most, ceil(text.length * 7.2 / max(width - 52, 60))))
+fn needH(e: Item, width: number): number = 40 + 18 * linesOf(lineFor(e), width, 2)
 // A row on Needs you with what this phone said on it: folded beside Undo, or a failed line under it.
 fn shelfH(e: Item, said: Said[], width: number): number = foldedOf(e, said) ? 40 + 22 * linesOf(`${wordOf(said, e.id).label} → ${wordOf(said, e.id).detail != "" ? wordOf(said, e.id).detail : e.topic}`, width - 70, 2) + (wordOf(said, e.id).missed > 0 ? 40 : 0) : needH(e, width) + (wordOf(said, e.id).status == "failed" ? 20 : 0)
 // A working row: its title, one line, and the ribbon under it.
-fn workH(): number = 80
+fn workH(): number = 72
 // How many of rows `heights` fit in `room`, at least `least` (when there are that many).
 fn fitting(heights: number[], room: number, least: number): number = max(min(least, heights.length), range(heights.length).filter(i => sum(heights.slice(0, i + 1)) <= room).length)
-// What the room's parts take: a head (40), "Show N more" (38), the picks row (46), a rule (11),
-// and hex decided (62).
+// How many rows a list shows in `room`: all when they fit, else as many as fit above its "Show N more".
+fn shownIn(heights: number[], room: number, least: number): number = sum(heights) <= room ? heights.length : fitting(heights, room - moreH(), least)
+fn usedBy(heights: number[], shown: number): number = sum(heights.slice(0, shown)) + (shown < heights.length ? moreH() : 0)
+// What the room's parts take, as measured: a head (40), "Show N more" (36), the picks row (46), a
+// rule (11) and hex decided (58).
 fn headH(): number = 40
-fn moreH(): number = 38
+fn moreH(): number = 36
 fn picksH(): number = 46
+fn ruleH(): number = 11
+fn decidedH(): number = 58
 
 component NowList
   inject
@@ -201,15 +208,17 @@ component NowList
     answerAll: action
     undo: action
     again: action
-  // Wide, each column is half the width, and Needs you ends above hex decided.
+  // Rows fill `height`, which ends above Call. Wide, each column is half the width, Needs you ends
+  // above hex decided and Working on has its column. In one column Needs you takes about 60% when
+  // both lists run over, less when Working on fits in the rest, and hex decided goes last.
   derive colW = wide ? (width - 4) / 2 : width
-  derive needsRoom = (wide ? height - 62 : round(height * 0.62)) - headH() - moreH() - (picks.length > 0 ? picksH() : 0)
-  derive shownNeeds = shelf.slice(0, fitting(shelf.map(e => shelfH(e, said, colW)), needsRoom, 2))
-  derive needsUsed = headH() + sum(shownNeeds.map(e => shelfH(e, said, colW))) + (shelf.length > shownNeeds.length ? moreH() : 0) + (picks.length > 0 ? picksH() : 0)
-  // `height` ends above Call. In one column hex decided is last, beside Call in its band, so
-  // Working on has the rest down to Call; in two, Working on ends above Call, as `height` does.
-  derive workRoom = (wide ? height : height - needsUsed - 22) - headH() - moreH()
-  derive shownWork = working.slice(0, fitting(working.map(e => workH()), workRoom, 1))
+  derive needHs = shelf.map(e => shelfH(e, said, colW))
+  derive workHs = working.map(e => workH())
+  derive base = height - 2 * headH() - 2 * ruleH() - decidedH() - (picks.length > 0 ? picksH() : 0)
+  derive needsRoom = wide ? height - headH() - decidedH() - (picks.length > 0 ? picksH() : 0) : sum(needHs) + sum(workHs) <= base ? base : max(round(base * 0.6), base - sum(workHs) - moreH())
+  derive shownNeeds = shelf.slice(0, shownIn(needHs, needsRoom, 2))
+  derive workRoom = wide ? height - headH() : base - usedBy(needHs, shownNeeds.length)
+  derive shownWork = working.slice(0, shownIn(workHs, workRoom, 1))
   derive week = decidedWeek(decided, now, offset)
   derive most = match sortBy(week, n => n, "desc").at(0) { case some(n) => max(1, n), case none => 1 }
   // Questions of one topic open the same page beside; only one of its rows is marked: the one
@@ -254,7 +263,7 @@ component NowList
                 box class=PillFace height=32 box-sizing="border-box" padding="0 12px" background-color="hex.accent.wash"
                   text "Take all" font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap"
           if wide
-            Decided(n=sum(week), week=week, most=most, clear=0, open=open(path("decided")))
+            Decided(n=sum(week), week=week, most=most, open=open(path("decided")))
         if not wide
           box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
         column flex=(wide ? 1 : 0) min-width=0 testId="home-working"
@@ -268,10 +277,10 @@ component NowList
             ShowMore(n=working.length - shownWork.length, shown=false, pad="8px 10px 10px", id="home-more-working", press=openTasks("working"))
         if not wide
           box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
-          Decided(n=sum(week), week=week, most=most, clear=70, open=open(path("decided")))
+          Decided(n=sum(week), week=week, most=most, open=open(path("decided")))
 
 // What hex decided itself this week, as a row: its count under it, a bar a day trailing (a day with
-// none a faint dot), and a chevron to the list. `clear` keeps it clear of Call when it's last.
+// none a faint dot), and a chevron to the list.
 component Decided
   inject
     haptics: bool
@@ -279,10 +288,9 @@ component Decided
     n: number
     week: number[]
     most: number
-    clear: number
     open: action
   view
-    button press=open class=RowTap gap=10 align-items="center" margin-right=clear width="auto" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${n} this week` testId="home-decided"
+    button press=open class=RowTap gap=10 align-items="center" width="auto" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${n} this week` testId="home-decided"
       Mark(state="decided", size=22)
       column flex=1 min-width=0 gap=2
         text "hex decided" font="-exact-headline" color="-exact-label" white-space="nowrap"

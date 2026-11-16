@@ -3,7 +3,7 @@
 // on the folded Duo; and "Add to this idea" docked at the foot. Over Home when folded (IdeaScreen),
 // beside hex's column with two (IdeaBody in Home's slot).
 use Viewport from "./shapes.contract"
-use Tap, PillTap, PillFace, Composer, ComposerField, Send, Note, springOf, whenOf from "./parts.contract"
+use Tap, PillTap, PillFace, Composer, ComposerField, Send, Note, springOf, whenOf, FieldHint from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use AnswerRow from "./ask.contract"
 use Idea, IdeaCheck, dayWord from "./ideas.contract"
@@ -185,7 +185,9 @@ component AddToIdea
   view
     column position="relative" testId="idea-add"
       row class=Composer
-        textarea id="idea-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=120 placeholder="Add to this idea" aria-label=`Add to this idea; goes to ${idea.topic != "" ? idea.topic : "its topic"}` testId="idea-field"
+        if words == ""
+          FieldHint(text="Add to this idea")
+        textarea id="idea-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=120 aria-label=`Add to this idea; goes to ${idea.topic != "" ? idea.topic : "its topic"}` testId="idea-field"
         button press=submit disabled=empty class=Send retainFocus=true aria-label="Send" testId="idea-send"
           image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")
       if sent != ""

@@ -6,7 +6,7 @@
 // words go in the reply box docked at the page's foot (ReplyComposer).
 use Ask, Words, Media, Place from "./shapes.contract"
 use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
-use Mark, PlaceTile, whenOf, springOf, PillTap, Tap, PillFace, Composer, ComposerField, Primary, Send, Prose from "./parts.contract"
+use Mark, PlaceTile, whenOf, springOf, PillTap, Tap, PillFace, Composer, ComposerField, Primary, Send, Prose, FieldHint from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
 fn questionWord(n: number, of: number): string = of > 1 ? `Question ${n} of ${of}` : "Question"
@@ -287,6 +287,8 @@ component ReplyComposer
       row gap=8 align-items="flex-end"
         AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=44, disabled=(attached.length >= 4), add=add)
         row class=Composer flex=1 min-width=0
-          textarea id="reply-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=130 placeholder=(answered ? "Add a note to it" : "Reply in your own words") aria-label=`Your answer to ${ask.question}` testId="reply-field"
+          if words == ""
+            FieldHint(text=(answered ? "Add a note to it" : "Reply in your own words"))
+          textarea id="reply-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=130 aria-label=`Your answer to ${ask.question}` testId="reply-field"
           button press=send disabled=empty class=Send retainFocus=true aria-label=(answered ? "Send this note" : "Answer with these words") testId="reply-answer"
             image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")

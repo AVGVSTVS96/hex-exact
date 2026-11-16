@@ -17,7 +17,15 @@ style Pill
 // Where Bassim writes (a thread's message, his own answer to a question): one filled capsule with
 // the field and its send inside, the same in both, visible in light mode without a border.
 style Composer
-  flex-direction="row" align-items="flex-end" gap=4 padding="0 4px 0 14px" min-height=44 border-radius=22 background-color="-exact-tertiary-fill"
+  flex-direction="row" align-items="flex-end" gap=4 padding="0 4px 0 14px" min-height=44 border-radius=22 background-color="-exact-tertiary-fill" position="relative"
+
+// A composer's words while it's empty, drawn as page text: iOS draws a field's own placeholder once
+// and stretches that drawing when the Duo turns.
+component FieldHint
+  props
+    text: string
+  view
+    text text position="absolute" left=14 top=11 right=48 font="-exact-body" color="-exact-placeholder" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" pointer-events="none" aria-hidden=true
 
 // The field inside a Composer.
 style ComposerField
@@ -342,7 +350,7 @@ shape HexTab
 fn hexTabs(): HexTab[] = [HexTab(id="now", label="Now", icon="symbol:icon.now"), HexTab(id="feed", label="Feed", icon="symbol:icon.feed"), HexTab(id="ideas", label="Ideas", icon="symbol:icon.ideas"), HexTab(id="goals", label="Goals", icon="symbol:icon.goals")]
 
 style TabTap
-  appearance="none" display="flex" flex-direction="column" align-items="center" justify-content="center" gap=2 width=62 height=48 border-radius=24 position="relative"
+  appearance="none" display="flex" flex-direction="column" align-items="center" justify-content="center" gap=2 width=54 height=48 border-radius=24 position="relative"
   :active
     -exact-press-scale=0.92
 
@@ -365,9 +373,10 @@ component HexTabs
         for t in hexTabs().filter(t => pages.filter(p => p == t.id).length > 0) key=t.id
           button press=pick(t.id) class=TabTap background-color=(current == t.id ? "-exact-tertiary-fill" : "transparent") transition=springOf(still, "background-color") aria-current=(current == t.id) aria-label=(t.id == "feed" and fresh ? "Feed, new" : t.label) -exact-press-haptic=(haptics ? "selection" : "none") testId=`hex-tab-${t.id}`
             image t.icon width=22 height=22 object-fit="contain" color=(current == t.id ? "-exact-label" : "-exact-secondary-label") aria-hidden=true
-            text t.label font-size=10 line-height=12 font-weight=(current == t.id ? 600 : 500) color=(current == t.id ? "-exact-label" : "-exact-secondary-label") white-space="nowrap"
+            // In points: a bare 12 is twelve times the font, a 120pt line that pushed the icon out of the capsule.
+            text t.label font-size=10 line-height="12px" font-weight=(current == t.id ? 600 : 500) color=(current == t.id ? "-exact-label" : "-exact-secondary-label") white-space="nowrap"
             if t.id == "feed" and fresh
-              box position="absolute" top=6 right=13 width=7 height=7 border-radius=4 background-color="-exact-label" aria-hidden=true
+              box position="absolute" top=6 right=9 width=7 height=7 border-radius=4 background-color="-exact-label" aria-hidden=true
       children
 
 // Under which day something happened, as Feed sorts it: This morning, This afternoon, This
@@ -422,16 +431,17 @@ component Story
     column gap=0 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") testId=id
       // The whole entry opens it, its pictures and its topic and time too; only Discuss or Undo
       // are targets of their own, so no part of an entry is dead under a thumb.
-      button press=open class=RowTap padding="10px 10px 4px" aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${title}. ${body}` testId=`${id}-open`
+      button press=open class=RowTap padding="10px 10px 0" aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${title}. ${body}` testId=`${id}-open`
         box padding-top=1 flex-shrink=0
           Mark(state=mark, size=22)
         column flex=1 min-width=0 gap=4
-          text title font="-exact-headline" color="-exact-label" line-clamp=2
+          text title font="-exact-headline" color="-exact-label" line-clamp=2 overflow-wrap="anywhere"
           if body != ""
-            text (quoted ? `“${body}”` : body) font="-exact-body" color=(quoted ? "-exact-secondary-label" : "-exact-label")
+            text (quoted ? `“${body}”` : body) font="-exact-body" color=(quoted ? "-exact-secondary-label" : "-exact-label") overflow-wrap="anywhere"
           column gap=8 testId=`${id}-slot`
             children
-      row gap=12 align-items="center" padding="0 10px 0 0"
+      // Up under the words: its line keeps a thumb's height, but its text sits right below them.
+      row gap=12 align-items="center" padding="0 10px 0 0" margin-top=-9
         button press=open class=Tap flex=1 min-width=0 min-height=44 display="flex" align-items="center" padding="0 0 4px 44px" text-align="left" aria-hidden=true testId=`${id}-meta`
           text meta font="-exact-footnote" color="-exact-secondary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
         if offer == "discuss"
@@ -451,7 +461,7 @@ component Discuss
     press: action
   view
     button press=press class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Discuss ${title} with hex` testId=id
-      box class=PillFace padding="0 14px" gap=6
+      box class=PillFace padding="0 14px" height=28 box-sizing="border-box" gap=6
         image "symbol:waveform" width=15 height=15 object-fit="contain" color="-exact-label" aria-hidden=true
         text "Discuss" font="-exact-subheadline" font-weight=600 color="-exact-label"
 

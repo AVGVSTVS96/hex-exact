@@ -432,6 +432,8 @@ component App
       besidePage(`done:${e.opens}`)
     else if e.kind == "done"
       openTask(`done:${e.opens}`)
+    else if e.kind == "found"
+      openIdea(e.opens)
     else if e.kind == "decided"
       open(decidedPath(e.opens))
   // Discuss: a call that opens on this entry, or the entry brought into the call that's on.

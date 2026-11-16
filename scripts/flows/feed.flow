@@ -1,6 +1,6 @@
-# Feed: the tab, its days, scrolling to the last entry above the tabs and Call, the oldest entry
-# (loaded as the list reaches its end) clear of the tabs, an entry opened and Back. The stand-in
-# answers /feed with made-up days.
+# Feed with his real entries (the stand-in passes /feed through to his hex): the tab, its days,
+# scrolling down the list with the tabs and Call held still, Feed keeping its place across tabs, back
+# at the top a finished entry opened and Back, and a decided entry opening hex decided at that row.
 launch /
 shoot now
 tap hex-tab-feed
@@ -11,13 +11,26 @@ shoot scrolled
 scroll home-list-feed
 scroll home-list-feed
 scroll home-list-feed
-shoot end
+scroll home-list-feed
+scroll home-list-feed
+shoot further
 still hex-tabs
-apart feed-done:t-7 hex-tabs
 tap hex-tab-now
 tap hex-tab-feed
 shoot again
-tap feed-done:t-1-open
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+shoot top
+tap feed-done:*
 shoot opened
 tap chrome-back
 shoot back
+tap feed-decided:*
+shoot decided
+tap chrome-back
+shoot back-decided

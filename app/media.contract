@@ -56,7 +56,8 @@ component AddMedia
   view
     row
       button popovertarget=menu disabled=disabled appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial=(glass ? "glass" : "none") background-color=(glass ? "transparent" : "-exact-tertiary-fill") display="flex" align-items="center" justify-content="center" aria-label=label -exact-press-haptic=(haptics ? "selection" : "none") testId=menu
-        image "symbol:sf/plus" width=(size * 0.38) height=(size * 0.38) object-fit="contain" color="-exact-label"
+        // On glass it's the call's Camera control, so it draws a camera; in a composer, a plus.
+        image (glass ? "symbol:sf/camera" : "symbol:sf/plus") width=(size * 0.38) height=(size * 0.38) object-fit="contain" color="-exact-label"
       column id=menu popover="auto" role="menu"
         button press=add("camera") popovertarget=menu popovertargetaction="hide" testId=`${menu}-camera`
           image "symbol:sf/camera"

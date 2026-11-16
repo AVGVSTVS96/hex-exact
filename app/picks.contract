@@ -1,7 +1,9 @@
 // hex's picks (§9.6): the questions where hex already knows what it would choose. Bassim takes its
 // picks, changes one, or leaves one for later, then answers them all at once.
-use Viewport, Asks, Ask from "./shapes.contract"
-use Mark, Note, Row, Primary from "./parts.contract"
+use Viewport, Asks, Ask, Words, Media from "./shapes.contract"
+use Mark, Note, Row, Primary, whenOf, Prose from "./parts.contract"
+use Pictures from "./media.contract"
+use AnswerRow from "./ask.contract"
 use Room, Chrome from "./room.contract"
 use PageTitle from "./calls.contract"
 use Said from "./said.contract"
@@ -21,6 +23,11 @@ component Picks
     asks: Asks
     said: Said[]
     picked: string[]
+    now: number
+    offset: number
+    words: Words
+    wordsAsk: string
+    pick: action
     open: action
     openTasks: action
     answerAll: action
@@ -28,23 +35,84 @@ component Picks
   derive picks = picksOf(asks.asks, said)
   derive taking = picks.filter(a => choiceOf(picked, a) != "")
   derive later = picks.length - taking.length
-  derive left = room.clear.x
-  derive right = max(room.width - room.clear.x - room.clear.width, 0)
+  // Open like a book: the list on the left of the fold, the pick it shows on the right.
+  state shown = ""
+  derive two = room.columns == 2
+  derive beside = match picks.filter(a => a.id == shown).at(0) { case some(a) => a.id, case none => match picks.at(0) { case some(a) => a.id, case none => "" } }
+  derive left = two ? room.first.x : room.clear.x
+  derive right = two ? room.width - room.first.x - room.first.width : max(room.width - room.clear.x - room.clear.width, 0)
   action takeAll
     answerAll(taking.map(a => a.id), taking.map(a => choiceOf(picked, a)))
     back()
+  action show(id: string)
+    if two
+      shown = id
+    else
+      open(path("pick", id))
+  action choose(label: string)
+    pick(beside, label)
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="picks"
       Chrome(room=room, on="picks", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       // The list ends at Answer's top and fades out over the 24 above it.
-      scroll id="picks" position="absolute" top=room.below bottom=(picks.length > 0 ? room.foot + 8 + 50 : 0) left=0 width=room.width padding-bottom=(picks.length > 0 ? 24 : room.foot + 24) box-sizing="border-box" mask-image=(picks.length > 0 ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
-        PageTitle(text="hex’s picks", room=room, left=(left + 20), id="picks-title")
-        column padding=`0 ${right + 10}px 0 ${left + 10}px` gap=2
+      scroll id="picks" position="absolute" top=room.below bottom=(picks.length > 0 ? room.foot + 8 + 50 : 0) left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(picks.length > 0 ? 24 : room.foot + 24) box-sizing="border-box" mask-image=(picks.length > 0 ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
+        PageTitle(text="hex’s picks", room=room, left=(two ? 20 : left + 20), id="picks-title")
+        column padding=(two ? "0 10px" : `0 ${right + 10}px 0 ${left + 10}px`) gap=2
           text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""} · nothing goes until you tap Answer` font="-exact-subheadline" color="-exact-secondary-label" padding="2px 10px 14px"
           if picks.length == 0
             Note(kind="empty", text="Nothing left to take", pad="24px 12px", id="picks-empty")
           for a in picks key=a.id
-            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, selected=false, href="", label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=open(path("pick", a.id)))
+            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, selected=(two and beside == a.id), href="", label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=show(a.id))
       if picks.length > 0
         button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(room.columns == 2 ? room.first.x + 16 : left + 16 + max(room.clear.width - 32 - 480, 0) / 2) width=(room.columns == 2 ? room.first.width - 32 : min(room.clear.width - 32, 480)) min-height=50 testId="picks-answer"
           text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}` color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600
+
+// One pick's page: the question, what it's about, why hex picks what it does, every answer as the
+// same row, and where it came from. On its own page (folded) or beside the list (open like a book).
+      if two
+        scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`8px 20px ${room.foot + 24}px` box-sizing="border-box" testId="picks-beside"
+          for a in picks.filter(x => x.id == beside) key=a.id
+            PickBody(ask=a, width=(room.second.width - 40), now=now, offset=offset, picked=picked, words=words, wordsAsk=wordsAsk, choose=choose)
+
+component PickBody
+  props
+    ask: Ask
+    // The column's width less its margins, for pictures.
+    width: number
+    now: number
+    offset: number
+    picked: string[]
+    words: Words
+    wordsAsk: string
+    choose: action
+  derive a = ask
+  view
+    column gap=10
+      text a.topic font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
+      text a.question font="-exact-title2" font-weight=700 role="heading" aria-level=1 user-select="text"
+      if a.context != ""
+        Prose(text=a.context, font="-exact-body", color="-exact-label")
+      if a.why != ""
+        column gap=2
+          text `✦ Why hex picks ${pickOf(a)}` font="-exact-subheadline" font-weight=600 color="hex.accent"
+          text a.why font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+      // Its answers' screenshots, else hex's pictures, at their own shapes.
+      if a.options.filter(o => o.shot >= 0).length > 0 or a.pictures.length > 0
+        Pictures(media=(a.options.filter(o => o.shot >= 0).length > 0 ? a.options.filter(o => o.shot >= 0).map(o => Media(id=`/asks/${encodeURIComponent(a.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect)) : a.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect))), width=width, height=300)
+      column border-top="0.5px solid -exact-separator" margin-top=4 role="radiogroup" aria-label="Your answer"
+        for o in a.options key=o.label
+          AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=(choiceOf(picked, a) == o.label), role="radio", disabled=false, id=`pick-option-${o.label}`, press=choose(o.label))
+        AnswerRow(label="Decide later", detail="Stays in Needs you, unanswered.", pick=false, chosen=(choiceOf(picked, a) == ""), role="radio", disabled=false, id="pick-later", press=choose(""))
+      text "Sent when you tap Answer on hex’s picks" font="-exact-footnote" color="-exact-secondary-label"
+      column gap=6 padding-top=14
+        text (wordsAsk == a.id and words.place != "" ? `From ${words.place} · ${whenOf(words.at, now, offset)}` : `From ${a.topic} · ${whenOf(a.at, now, offset)}`) font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
+        if wordsAsk == a.id and words.text != ""
+          Prose(text=words.text, font="-exact-subheadline", color="-exact-secondary-label")
+        for l in a.links key=l.url
+          link href=l.url min-height=44 display="flex" flex-direction="row" gap=4 align-items="center"
+            text l.label font="-exact-subheadline" font-weight=600
+            image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-secondary-label"
+        for p in a.places.filter(p => p.link != "").slice(0, 2) key=p.link
+          link href=p.link min-height=44 display="flex" flex-direction="row" gap=4 align-items="center"
+            text `Open ${p.place}` font="-exact-subheadline" font-weight=600
+            image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-secondary-label"

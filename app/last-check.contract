@@ -20,12 +20,14 @@ component LastCheck
     open: action
     openTasks: action
     back: action
-  derive inner = `0 ${max(room.width - room.clear.x - room.clear.width, 0) + 20}px 0 ${room.clear.x + 20}px`
+  derive two = room.columns == 2
+  derive inner = two ? "0 20px" : `0 ${max(room.width - room.clear.x - room.clear.width, 0) + 20}px 0 ${room.clear.x + 20}px`
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="last-check"
       Chrome(room=room, on="check", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
-      scroll id="last-check" position="absolute" top=room.below bottom=0 left=0 width=room.width padding-bottom=(room.foot + 24) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
-        PageTitle(text="Last check", room=room, left=(room.clear.x + 20), id="check-title")
+      // Open like a book: what it read and flagged on the left of the fold, what it fixed on the right.
+      scroll id="last-check" position="absolute" top=room.below bottom=0 left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(room.foot + 24) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
+        PageTitle(text="Last check", room=room, left=(two ? 20 : room.clear.x + 20), id="check-title")
         column padding=inner gap=12
           if check.at > 0
             text `${whenOf(check.at, now, offset)}${check.why != "" ? ` · ${check.why}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
@@ -49,11 +51,23 @@ component LastCheck
                   text n.text font="-exact-subheadline" color="-exact-secondary-label"
                   if n.did != ""
                     text n.did font="-exact-footnote" color="-exact-tertiary-label"
-          if check.fixed.length > 0
-            text "Fixed on its own" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" role="heading" aria-level=2 padding-top=8
-            for n in check.fixed key=`${n.title}${n.text}`
-              row gap=12 align-items="flex-start"
-                Mark(state="done", size=22)
-                column flex=1 gap=2
-                  text n.title font="-exact-headline"
-                  text (n.did != "" ? `${n.text} ${n.did}.` : n.text) font="-exact-subheadline" color="-exact-secondary-label"
+          if not two
+            Fixed(check=check)
+      if two
+        scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`0 20px ${room.foot + 24}px` box-sizing="border-box" testId="check-beside"
+          Fixed(check=check)
+
+// What hex fixed on its own: a heading, then each with a done mark.
+component Fixed
+  props
+    check: Check
+  view
+    column gap=12
+      if check.fixed.length > 0
+        text "Fixed on its own" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" role="heading" aria-level=2 padding-top=8
+        for n in check.fixed key=`${n.title}${n.text}`
+          row gap=12 align-items="flex-start"
+            Mark(state="done", size=22)
+            column flex=1 gap=2
+              text n.title font="-exact-headline"
+              text (n.did != "" ? `${n.text} ${n.did}.` : n.text) font="-exact-subheadline" color="-exact-secondary-label"

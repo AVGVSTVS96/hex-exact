@@ -47,6 +47,8 @@ component Steps
     open: action
     openTasks: action
     back: action
+  // With two columns, the task page this belongs to, on the left of the fold.
+  slot
   state opened = [""].slice(0, 0)
   state showTries = false
   derive done = task.plan.filter(p => p.state == "done").length
@@ -55,6 +57,7 @@ component Steps
   derive tries = task.agents.filter(a => retried(task.agents, a))
   derive agentWords = ["working", "done", "failed", "stopped"].filter(s => task.agents.filter(a => a.state == s).length > 0).map(s => `${task.agents.filter(a => a.state == s).length} ${s}`).join(" · ")
   derive subtitle = `${task.place != "" ? task.place : task.name}${task.plan.length > 0 ? ` · ${done} of ${task.plan.length} done` : task.running ? ` · working for ${lengthOf((now - task.since) / 1000)}` : ""}`
+  derive two = room.columns == 2
   derive foot = callOn ? room.foot + 64 + 12 : room.foot
   action flip(id: string)
     opened = opened.includes(id) ? opened.filter(o => o != id) : opened.concat([id])
@@ -65,8 +68,11 @@ component Steps
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="steps" position="absolute" inset=0 background-color="-exact-background" testId="steps"
       Chrome(room=room, on="steps", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
-      column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        PageHead(room=room, clearTop=clearTop, pane=false, title="Steps", line=subtitle, id="steps-head")
+      if two
+        column position="absolute" top=room.firstTop bottom=0 left=room.first.x width=room.first.width testId="steps-task"
+          children
+      column position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=(two ? room.second.x : room.clear.x) width=(two ? room.second.width : room.clear.width)
+        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, title="Steps", line=subtitle, id="steps-head")
         scroll id="steps" flex=1 min-height=0 overflow-y="auto"
           column padding="0 10px" padding-bottom=(foot + 24)
             if task.id == "" and loading

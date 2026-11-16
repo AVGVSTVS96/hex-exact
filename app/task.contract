@@ -213,7 +213,8 @@ component TaskBody
   derive door = kind == "task" ? match places.filter(t => t.place == row.place and t.link != "").at(0) { case some(t) => Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), case none => Place(app="", place="", task="", call="", link="") } : kind == "done" ? Place(app=finished.app, place="", task="", call="", link=finished.link) : match pageAsks.map(a => a.places).flat().filter(p => p.link != "").at(0) { case some(p) => p, case none => Place(app="", place="", task="", call="", link="") }
   derive width = pane ? room.second.width : room.clear.width
   // A composer docked at the foot: the page scrolls to its top edge and fades over the 24 above it.
-  derive docked = replyAsk.length == 0 and kind == "task" and chat.sends
+  // Beside its own thread (open like a book) the thread's composer is the one.
+  derive docked = replyAsk.length == 0 and kind == "task" and chat.sends and entry.name != "thread"
   action reply(askId: string)
     replying = askId
   action closeReply
@@ -279,12 +280,12 @@ component TaskBody
                 Happened(mark="working", text=(row.line != "" ? row.line : "Working"), stamp=lengthOf((now - row.since) / 1000), failed=false)
               for t in working key=t.id
                 Row(mark="working", title=t.place, line=t.line, lines=2, failed=false, stamp=whenOf(t.at, now, offset), n=0, selected=false, href="", label=`${t.place}, working: ${t.line}`, id=`working-${t.id}`, press=openTask(t.id))
-            if kind == "task" and (task.steps.length > 0 or task.agents.length > 0)
+            if kind == "task" and entry.name != "steps" and (task.steps.length > 0 or task.agents.length > 0)
               Further(label="Steps", line=(task.agents.length > 0 ? `${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : match sortBy(task.steps, s => s.at, "desc").at(0) { case some(s) => `${kindWord(s.kind)}: ${s.text}`, case none => "" }), id="task-steps", press=toSteps)
             if kind == "task"
               for p, i in task.pins key=`${p.title}${i}`
                 Pinned(section=p, first=(i == 0))
-            if kind == "task" and chat.turns.length > 0
+            if kind == "task" and entry.name != "thread" and chat.turns.length > 0
               Head(label="Messages", n=chat.total, pad="18px 10px 4px", id="head-messages")
               for t in chat.turns.slice(-2) key=t.id
                 row justify-content=(t.source == "me" ? "flex-end" : "flex-start") padding="3px 10px"

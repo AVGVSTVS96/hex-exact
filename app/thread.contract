@@ -67,6 +67,8 @@ component Thread
     open: action
     openTasks: action
     back: action
+  // With two columns, the task page this belongs to, on the left of the fold.
+  slot
   state typed = ""
   state started = false
   derive key = `thread:${task.id}`
@@ -78,6 +80,7 @@ component Thread
   derive mine = sends.filter(s => s.task == task.id and chat.waiting.map(w => w.key).filter(k => k.endsWith(`:${s.key}`) or k == s.key).length == 0 and not (s.status == "sent" and chat.turns.slice(-6).filter(t => t.source == "me" and t.text == s.text and t.media.length == s.media.length).length > 0))
   derive subtitle = task.running ? `Working · started ${lengthOf((now - task.since) / 1000)} ago` : `${appName(task.app)}${task.at > 0 ? ` · ${whenOf(task.at, now, offset)}` : ""}`
   // The composer's foot: over the home indicator, or the call docked there, or just above the keyboard.
+  derive two = room.columns == 2
   derive foot = viewport.keyboardHeight > 0 ? 8 : callOn ? room.foot + 64 + 12 : room.foot + 4
   derive noMedia = [Media(id="", kind="", aspect=0)].slice(0, 0)
   derive lines = (chat.total > chat.turns.length ? [Line(id="earlier", kind="earlier", source="", text="", media=noMedia, status="", error="", key="")] : []).concat(chat.turns.map(t => Line(id=`t${t.id}`, kind="turn", source=t.source, text=t.text, media=t.media, status="", error="", key=""))).concat(chat.waiting.map(w => Line(id=`w${w.key}`, kind="waiting", source="me", text=w.text, media=noMedia, status="", error="", key=w.key))).concat(mine.map(m => Line(id=`s${m.key}`, kind="sending", source="me", text=m.text, media=m.media, status=m.status, error=m.error, key=m.key))).concat(task.running ? [Line(id="working", kind="working", source="", text=task.line, media=noMedia, status="", error="", key="")] : [])
@@ -101,8 +104,11 @@ component Thread
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="thread" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="thread"
       Chrome(room=room, on="thread", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
-      column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        PageHead(room=room, clearTop=clearTop, pane=false, title=title, line=(missing.includes(task.app) ? `${appName(task.app)} isn’t on this iPhone` : subtitle), id="thread-head")
+      if two
+        column position="absolute" top=room.firstTop bottom=0 left=room.first.x width=room.first.width testId="thread-task"
+          children
+      column position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=(two ? room.second.x : room.clear.x) width=(two ? room.second.width : room.clear.width)
+        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, title=title, line=(missing.includes(task.app) ? `${appName(task.app)} isn’t on this iPhone` : subtitle), id="thread-head")
           if task.link != ""
             button press=openOut(task.link, task.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(task.app)}` testId="thread-door"
               box class=PillFace gap=8 padding="5px 12px 5px 6px"

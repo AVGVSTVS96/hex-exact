@@ -242,7 +242,7 @@ component SettingRows
             Icon(symbol="symbol:waveform")
             text "Voice" font="-exact-body" color="-exact-label" flex=1
             text voiceLine font="-exact-body" color="-exact-secondary-label" line-clamp=1
-        button press=preview(voice) class=PillTap margin="0 -6px" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Hear ${voiceName(voice)}` testId="hear-voice"
+        button press=preview(voice) class=PillTap margin="0 -6px" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Hear ${voiceName(voice)}` testId="hear-voice-row"
           box width=32 height=32 border-radius=16 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
             image "symbol:sf/play.fill" width=13 height=13 object-fit="contain" color="-exact-label"
         if not voiceBeside

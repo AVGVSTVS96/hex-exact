@@ -5,6 +5,7 @@
 use Ask, AskOption, Asks, Tasks from "./shapes.contract"
 use Mark, Note, RowTap, PillTap, PillFace, Tap, whenOf, springOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
+use PageTitle from "./calls.contract"
 use Said, failedWords from "./said.contract"
 use homeOf from "./inbox.contract"
 
@@ -36,8 +37,7 @@ component DecidedPage
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="decided"
       Chrome(room=room, on="decided", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
-      column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        DecidedList(opened=searchParam(entry, "open"), foot=room.foot, now=now, offset=offset, asks=asks, tasks=tasks, said=said, loading=loading, failed=failed, undo=undo, openTask=openTask)
+      DecidedList(room=room, opened=searchParam(entry, "open"), now=now, offset=offset, asks=asks, tasks=tasks, said=said, loading=loading, failed=failed, undo=undo, openTask=openTask)
 
 component DecidedList
   inject
@@ -45,7 +45,7 @@ component DecidedList
   props
     // The one to open first and bring into view ("" for none).
     opened: string
-    foot: number
+    room: Room
     now: number
     offset: number
     asks: Asks
@@ -63,18 +63,18 @@ component DecidedList
   action toggle(id: string)
     toggled = shown == id ? "-" : id
   view
-    scroll flex=1 min-height=0 padding=`0 6px ${foot + 16}px` testId="decided-list"
-      column gap=2 padding="0 10px 14px" id="decided-top"
-        text "hex decided" font="-exact-large-title" font-weight=700 role="heading" aria-level=1
-        text (known ? `${decided.length} this week · Undo puts it back to you` : " ") font="-exact-subheadline" color="-exact-secondary-label"
-      if known and decided.length == 0
-        Note(kind="empty", text="Nothing this week. What hex decides for you shows here.", pad="24px 10px", id="decided-empty")
-      if failed and not known
-        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="decided-offline")
-      if loading and not known and not failed
-        Note(kind="loading", text="Loading what hex decided", pad="24px 10px", id="decided-loading")
-      for a in decided key=a.id
-        DecidedStory(ask=a, open=(shown == a.id), now=now, offset=offset, failure=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, toggle=toggle(a.id), undo=undo(a.id), openTopic=openTask(homeOf(a.task, tasks.tasks)))
+    scroll id="decided-list" position="absolute" top=room.below bottom=0 left=0 width=room.width padding-bottom=(room.foot + 24) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="decided-list"
+      PageTitle(text="hex decided", room=room, left=(room.clear.x + 20), id="decided-title")
+      column padding=`0 ${max(room.width - room.clear.x - room.clear.width, 0) + 8}px 0 ${room.clear.x + 8}px`
+        text (known ? `${decided.length} this week · Undo puts it back to you` : " ") font="-exact-subheadline" color="-exact-secondary-label" padding="2px 12px 14px"
+        if known and decided.length == 0
+          Note(kind="empty", text="Nothing this week. What hex decides for you shows here.", pad="24px 12px", id="decided-empty")
+        if failed and not known
+          Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="decided-offline")
+        if loading and not known and not failed
+          Note(kind="loading", text="Loading what hex decided", pad="24px 10px", id="decided-loading")
+        for a in decided key=a.id
+          DecidedStory(ask=a, open=(shown == a.id), now=now, offset=offset, failure=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, toggle=toggle(a.id), undo=undo(a.id), openTopic=openTask(homeOf(a.task, tasks.tasks)))
 
 // One thing hex decided: its topic and question, Undo, and a chevron that says it opens in place;
 // open, the whole story under it.

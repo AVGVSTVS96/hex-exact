@@ -1,7 +1,9 @@
 // hex's picks (§9.6): the questions where hex already knows what it would choose. Bassim takes its
 // picks, changes one, or leaves one for later, then answers them all at once.
 use Viewport, Asks, Ask from "./shapes.contract"
-use Mark from "./parts.contract"
+use Mark, Note, Row from "./parts.contract"
+use Room, Chrome from "./room.contract"
+use PageTitle from "./calls.contract"
 use Said from "./said.contract"
 use picksOf from "./inbox.contract"
 
@@ -13,40 +15,35 @@ component Picks
   props
     entry: Entry
     viewport: Viewport
+    room: Room
+    needsYou: number
+    working: number
     asks: Asks
     said: Said[]
     picked: string[]
     open: action
+    openTasks: action
     answerAll: action
     back: action
   derive picks = picksOf(asks.asks, said)
   derive taking = picks.filter(a => choiceOf(picked, a) != "")
   derive later = picks.length - taking.length
+  derive left = room.clear.x
+  derive right = max(room.width - room.clear.x - room.clear.width, 0)
   action takeAll
     answerAll(taking.map(a => a.id), taking.map(a => choiceOf(picked, a)))
     back()
   view
-    column navigationKey=`${entry.id}` navigationScroll="picks" position="absolute" inset=0 testId="picks"
-      header display="flex" align-items="center"
-        text "hex’s picks" role="heading" aria-level=2
-        text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""}`
-      list id="picks" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        if picks.length == 0
-          section
-            text "Nothing left to take" color="-exact-secondary-label" testId="picks-empty"
-        else
-          section
-            for a in picks key=a.id
-              link href=path("pick", a.id) testId=`pick-${a.id}`
-                column flex=1 min-width=0 gap=3
-                  text `${a.topic}${a.tag != "" ? ` · ${a.tag}` : ""}` font="-exact-footnote" color="-exact-secondary-label"
-                  text a.question font="-exact-body" color="-exact-label" line-clamp=3
-                  if choiceOf(picked, a) == ""
-                    text "Decide later" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-                  else if choiceOf(picked, a) == pickOf(a)
-                    text `✦ ${pickOf(a)}` font="-exact-subheadline" font-weight=600 color="hex.accent"
-                  else
-                    text `✓ ${choiceOf(picked, a)}` font="-exact-subheadline" font-weight=600
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="picks"
+      Chrome(room=room, on="picks", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
+      scroll id="picks" position="absolute" top=room.below bottom=0 left=0 width=room.width padding-bottom=(room.foot + (picks.length > 0 ? 88 : 24)) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
+        PageTitle(text="hex’s picks", room=room, left=(left + 20), id="picks-title")
+        column padding=`0 ${right + 8}px 0 ${left + 8}px` gap=2
+          text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""} · nothing goes until you tap Answer` font="-exact-subheadline" color="-exact-secondary-label" padding="2px 12px 14px"
+          if picks.length == 0
+            Note(kind="empty", text="Nothing left to take", pad="24px 12px", id="picks-empty")
+          for a in picks key=a.id
+            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, selected=false, href=path("pick", a.id), label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=open(path("pick", a.id)))
       if picks.length > 0
-        button press=takeAll buttonStyle=(taking.length > 0 ? "filled" : "bordered") disabled=(taking.length == 0) margin="8px 16px 12px" testId="picks-answer"
+        button press=takeAll buttonStyle=(taking.length > 0 ? "filled" : "bordered") disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(left + 16) right=(right + 16) min-height=50 testId="picks-answer"
           text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}`

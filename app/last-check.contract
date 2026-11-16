@@ -1,56 +1,59 @@
 // The last check (§9.9): when hex last went through everything, what it read, what it fixed on its
 // own and what it flagged for Bassim.
 use Viewport, Check from "./shapes.contract"
-use Mark, whenOf from "./parts.contract"
+use Mark, Note, whenOf from "./parts.contract"
+use Room, Chrome from "./room.contract"
+use PageTitle from "./calls.contract"
 
 component LastCheck
   props
     entry: Entry
     viewport: Viewport
+    room: Room
+    needsYou: number
+    working: number
     now: number
     offset: number
     check: Check
     loading: bool
     failed: bool
+    open: action
+    openTasks: action
     back: action
+  derive inner = `0 ${max(room.width - room.clear.x - room.clear.width, 0) + 20}px 0 ${room.clear.x + 20}px`
   view
-    column navigationKey=`${entry.id}` navigationScroll="last-check" position="absolute" inset=0 testId="last-check"
-      header display="flex" align-items="center"
-        text "Last check" role="heading" aria-level=2
-        text (check.at > 0 ? `${whenOf(check.at, now, offset)} · ${check.why}` : "")
-      list id="last-check" appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        if loading and check.at == 0
-          section
-            progress aria-label="Loading"
-        if failed and check.at == 0
-          section
-            text "hex hasn't checked yet, or can't be reached." color="-exact-secondary-label"
-        if check.read.length > 0
-          section
-            row gap=8 flex-wrap="wrap" padding="4px 0"
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="last-check"
+      Chrome(room=room, on="check", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
+      scroll id="last-check" position="absolute" top=room.below bottom=0 left=0 width=room.width padding-bottom=(room.foot + 24) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
+        PageTitle(text="Last check", room=room, left=(room.clear.x + 20), id="check-title")
+        column padding=inner gap=12
+          if check.at > 0
+            text `${whenOf(check.at, now, offset)}${check.why != "" ? ` · ${check.why}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
+          if loading and check.at == 0
+            Note(kind="loading", text="Loading the last check", pad="24px 0", id="check-loading")
+          if failed and check.at == 0
+            Note(kind="failed", text="hex hasn't checked yet, or can't be reached.", pad="24px 0", id="check-failed")
+          if check.read.length > 0
+            row gap=8 flex-wrap="wrap"
               for r in check.read key=r.label
                 column gap=0 padding="8px 12px" border-radius=14 background-color="-exact-tertiary-fill" min-width="4.5rem"
                   text `${r.n}` font="-exact-title2" font-weight=700 font-variant-numeric="tabular-nums"
                   text r.label font="-exact-caption1" color="-exact-secondary-label"
-        if check.flagged.length > 0
-          section
-            header
-              text "For you to look at"
+          if check.flagged.length > 0
+            text "For you to look at" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" role="heading" aria-level=2 padding-top=8
             for n in check.flagged key=`${n.title}${n.text}`
               row gap=12 align-items="flex-start"
                 Mark(state="asks", size=22)
                 column flex=1 gap=2
-                  text n.title font-weight=600
+                  text n.title font="-exact-headline"
                   text n.text font="-exact-subheadline" color="-exact-secondary-label"
                   if n.did != ""
                     text n.did font="-exact-footnote" color="-exact-tertiary-label"
-        if check.fixed.length > 0
-          section
-            header
-              text "Fixed on its own"
+          if check.fixed.length > 0
+            text "Fixed on its own" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" role="heading" aria-level=2 padding-top=8
             for n in check.fixed key=`${n.title}${n.text}`
               row gap=12 align-items="flex-start"
                 Mark(state="done", size=22)
                 column flex=1 gap=2
-                  text n.title font-weight=600
+                  text n.title font="-exact-headline"
                   text (n.did != "" ? `${n.text} ${n.did}.` : n.text) font="-exact-subheadline" color="-exact-secondary-label"

@@ -614,11 +614,11 @@ component App
         if e.name == "steps"
           Steps(entry=e, room=room, clearTop=belowIn(viewport, pose, room.first), counts=counts, callOn=callOn, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), open=open, openTasks=openTasks, back=back)
         if e.name == "picks"
-          Picks(entry=e, viewport=viewport, asks=asks, said=saids, picked=picked, open=open, answerAll=answerAll, back=back)
+          Picks(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, openTasks=openTasks, asks=asks, said=saids, picked=picked, open=open, answerAll=answerAll, back=back)
         if e.name == "pick"
-          Pick(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, asks=asks, picked=picked, words=words, wordsAsk=wordsId, showWords=showWords, pick=pick, open=open, back=back)
+          Pick(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, openTasks=openTasks, now=now, offset=clock.utcOffset, asks=asks, picked=picked, words=words, wordsAsk=wordsId, showWords=showWords, pick=pick, open=open, back=back)
         if e.name == "check"
-          LastCheck(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
+          LastCheck(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, now=now, offset=clock.utcOffset, check=check, loading=(not current(check)), failed=failed(check), back=back)
         if e.name == "settings"
           SettingsScreen(entry=e, room=room, settings=settings, counts=counts, voice=voice, persona=persona, personaColor=personaColor, opalPalette=opalPalette, reaction=reaction, sounds=sounds, still=still, docked=callOn, setPersona=setPersona, setPersonaColor=setPersonaColor, setOpalPalette=setOpalPalette, setReaction=setReaction, setSounds=setSounds, setHaptics=setHaptics, preview=previewVoice, open=open, openTasks=openTasks, back=back)
         if e.name == "voice"

@@ -3,7 +3,7 @@
 // the other answers gave up. Undo puts it back in Needs you. A page over Home, or with two columns
 // the page beside it; `/decided?open=<id>` opens with that one open and in view.
 use Ask, AskOption, Asks, Tasks from "./shapes.contract"
-use Mark, Note, RowTap, PillTap, PillFace, Tap, whenOf, springOf from "./parts.contract"
+use Mark, Note, RowTap, PillTap, PillFace, Tap, whenOf, springOf, Prose from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use PageTitle from "./calls.contract"
 use Said, failedWords from "./said.contract"
@@ -144,7 +144,7 @@ component DecidedBody
   view
     column gap=14 testId=`decided-body-${ask.id}`
       if ask.context != ""
-        text ask.context markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+        Prose(text=ask.context, font="-exact-subheadline", color="-exact-secondary-label")
       if took != ""
         column gap=4
           Label(text="hex picked")

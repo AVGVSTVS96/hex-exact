@@ -2,7 +2,7 @@
 // what it does, every answer as the same row with what it means, and where the question came from.
 // Choosing one sets it on hex's picks; nothing is sent until Bassim answers them all there.
 use Viewport, Asks, Words, Media from "./shapes.contract"
-use whenOf, Tap from "./parts.contract"
+use whenOf, Tap, Prose from "./parts.contract"
 use Pictures from "./media.contract"
 use Room, Chrome from "./room.contract"
 use PageTitle from "./calls.contract"
@@ -43,7 +43,7 @@ component Pick
             text a.topic font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
             text a.question font="-exact-title2" font-weight=700 role="heading" aria-level=1 user-select="text"
             if a.context != ""
-              text a.context markup="markdown" font="-exact-body" color="-exact-label" user-select="text"
+              Prose(text=a.context, font="-exact-body", color="-exact-label")
             if a.why != ""
               column gap=2
                 text `✦ Why hex picks ${pickOf(a)}` font="-exact-subheadline" font-weight=600 color="hex.accent"
@@ -59,7 +59,7 @@ component Pick
             column gap=6 padding-top=14
               text (wordsAsk == a.id and words.place != "" ? `From ${words.place} · ${whenOf(words.at, now, offset)}` : `From ${a.topic} · ${whenOf(a.at, now, offset)}`) font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
               if wordsAsk == a.id and words.text != ""
-                text words.text markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+                Prose(text=words.text, font="-exact-subheadline", color="-exact-secondary-label")
               for l in a.links key=l.url
                 link href=l.url min-height=44 display="flex" flex-direction="row" gap=4 align-items="center"
                   text l.label font="-exact-subheadline" font-weight=600

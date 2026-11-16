@@ -6,7 +6,7 @@
 // words go in the reply box docked at the page's foot (ReplyComposer).
 use Ask, Words, Media, Place from "./shapes.contract"
 use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
-use Mark, PlaceTile, whenOf, springOf, PillTap, Tap, PillFace, Composer, ComposerField, Primary, Send from "./parts.contract"
+use Mark, PlaceTile, whenOf, springOf, PillTap, Tap, PillFace, Composer, ComposerField, Primary, Send, Prose from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
 fn questionWord(n: number, of: number): string = of > 1 ? `Question ${n} of ${of}` : "Question"
@@ -96,7 +96,7 @@ component AskCard
           text `· ${ask.tag}` font="-exact-subheadline" font-weight=600 color="hex.ask" white-space="nowrap"
       text ask.question font="-exact-title2" font-weight=700 role="heading" aria-level=2 user-select="text"
       if ask.context != ""
-        text ask.context markup="markdown" font="-exact-body" color="-exact-label" user-select="text"
+        Prose(text=ask.context, font="-exact-body", color="-exact-label")
       if ask.pictures.length > 0
         Pictures(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=width, height=300)
       button press=showWords(ask.id) class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-expanded=wordsOpen aria-label=(wordsOpen ? "Why: hide the background" : `Why: the message from ${from}${pickLabel != "" and ask.why != "" ? " and why hex picks it" : ""}`) testId=`ask-from-${ask.id}`
@@ -113,7 +113,7 @@ component AskCard
           if words.text == ""
             progress aria-label="Loading the message"
           else
-            text words.text markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+            Prose(text=words.text, font="-exact-subheadline", color="-exact-secondary-label")
           if ask.why != "" and pickLabel != ""
             column gap=2
               text `✦ Why hex picks ${pickLabel}` font="-exact-subheadline" font-weight=600 color="hex.accent"

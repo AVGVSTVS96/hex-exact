@@ -2,7 +2,7 @@
 // pinned post, its messages, every place it lives, its week and its history. The same route opens
 // a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
 use Viewport, Counts, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
-use Mark, PlaceTile, Row, Head, Note, Discuss, ShowMore, RowTap, PillTap, PillFace, Composer, whenOf, appName, lengthOf, Tap from "./parts.contract"
+use Mark, PlaceTile, Row, Head, Note, Discuss, ShowMore, RowTap, PillTap, PillFace, Composer, whenOf, appName, lengthOf, Tap, inlineOf, plainOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
@@ -288,7 +288,7 @@ component TaskBody
               Head(label="Messages", n=chat.total, pad="18px 10px 4px", id="head-messages")
               for t in chat.turns.slice(-2) key=t.id
                 row justify-content=(t.source == "me" ? "flex-end" : "flex-start") padding="3px 10px"
-                  text (eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-body" line-clamp=4 max-width=(t.source == "me" ? "85%" : "100%") padding=(t.source == "me" ? "8px 14px" : "0") border-radius=18 background-color=(t.source == "me" ? "-exact-tertiary-fill" : "transparent")
+                  text plainOf(eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-body" line-clamp=4 max-width=(t.source == "me" ? "85%" : "100%") padding=(t.source == "me" ? "8px 14px" : "0") border-radius=18 background-color=(t.source == "me" ? "-exact-tertiary-fill" : "transparent")
               Further(label="All messages", line="", id="task-messages", press=toMessages)
             if kind == "task" and weekly.length > 0
               Head(label="This week", n=-1, pad="18px 10px 6px", id="head-week")
@@ -363,10 +363,10 @@ component Pinned
             link href=l.url class=RowTap align-items="flex-start" padding="6px 10px"
               if l.kind == "item"
                 Mark(state=l.mark, size=20)
-              text l.text markup="markdown" font="-exact-body" color="-exact-label" flex=1
+              text inlineOf(l.text) font="-exact-body" color="-exact-label" flex=1
               image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" margin-top=5
           else
             row gap=12 align-items="flex-start" padding="6px 10px"
               if l.kind == "item"
                 Mark(state=l.mark, size=20)
-              text l.text markup="markdown" font="-exact-body" color="-exact-label" flex=1 user-select="text"
+              text inlineOf(l.text) font="-exact-body" color="-exact-label" flex=1 user-select="text"

@@ -2,7 +2,7 @@
 // topic's page. Every row swipes as the stable app's do: from the left to do the obvious thing (take
 // hex's pick, act, mark read), from the right to say "Not needed" or open where it lives.
 use Ask, Place from "./shapes.contract"
-use Mark, Chip, PlaceTile, Row, PillTap, RowTap, whenOf, appName, appTint, appSymbol, PillFace from "./parts.contract"
+use Mark, Chip, PlaceTile, Row, PillTap, RowTap, whenOf, appName, appTint, appSymbol, PillFace, plainOf from "./parts.contract"
 use Item, Topic, problemOf, pageOf from "./inbox.contract"
 use Said, unreached, failedWords from "./said.contract"
 
@@ -97,7 +97,7 @@ component EntryRow
                 for t, i in entry.tiles key=`${t.app}${i}`
                   PlaceTile(place=t, size=14)
             if why != ""
-              text why markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+              text plainOf(why) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
             if (entry.kind == "stuck" or entry.kind == "finished") and entry.line != ""
               text entry.line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
             match ask

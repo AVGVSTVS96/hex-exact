@@ -2,7 +2,7 @@
 // the run, newest first, grouped into turns that each end where hex said something. A tap opens a
 // step's detail and result, or an agent's result and its own steps.
 use Viewport, Counts, TaskPage, Step, Agent from "./shapes.contract"
-use Mark, Head, Note, ShowMore, RowTap, whenOf, appName, lengthOf, Tap from "./parts.contract"
+use Mark, Head, Note, ShowMore, RowTap, whenOf, appName, lengthOf, Tap, Prose from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use PageHead from "./task.contract"
 
@@ -128,7 +128,7 @@ component StepRow
           if step.detail != ""
             text step.detail font-family="ui-monospace" font="-exact-caption1" color="-exact-secondary-label" user-select="text"
           if step.result != ""
-            text step.result markup="markdown" font="-exact-subheadline" color=(step.state == "failed" ? "hex.danger" : "-exact-label") user-select="text"
+            Prose(text=step.result, font="-exact-subheadline", color=(step.state == "failed" ? "hex.danger" : "-exact-label"))
 
 // An agent hex started: a tile, its name and "agent", how it stands on the right; a tap opens its
 // result and its own steps in place.
@@ -155,7 +155,8 @@ component AgentRow
       if open
         column gap=8 padding="0 0 8px 52px"
           if agent.result != ""
-            text agent.result markup="markdown" font="-exact-subheadline" padding="10px 12px" border-radius=14 background-color="-exact-secondary-background" color=(agent.state == "failed" ? "hex.danger" : "-exact-label") user-select="text"
+            box padding="10px 12px" border-radius=14 background-color="-exact-secondary-background"
+              Prose(text=agent.result, font="-exact-subheadline", color=(agent.state == "failed" ? "hex.danger" : "-exact-label"))
           for s in sortBy(agent.steps, s => s.at, "desc").slice(0, 30) key=s.id
             row gap=8 align-items="baseline"
               box width=6 height=6 border-radius=3 background-color="-exact-tertiary-label" flex-shrink=0 aria-hidden=true

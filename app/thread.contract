@@ -108,7 +108,7 @@ component Thread
         column position="absolute" top=room.firstTop bottom=0 left=room.first.x width=room.first.width testId="thread-task"
           children
       column position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=(two ? room.second.x : room.clear.x) width=(two ? room.second.width : room.clear.width)
-        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, title=title, line=(missing.includes(task.app) ? `${appName(task.app)} isn’t on this iPhone` : subtitle), id="thread-head")
+        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, end=0, head=0, title=title, line=(missing.includes(task.app) ? `${appName(task.app)} isn’t on this iPhone` : subtitle), id="thread-head")
           if task.link != ""
             button press=openOut(task.link, task.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(task.app)}` testId="thread-door"
               box class=PillFace gap=8 padding="5px 12px 5px 6px"

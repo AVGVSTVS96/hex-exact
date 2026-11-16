@@ -78,7 +78,7 @@ component TaskScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="task"
       Chrome(room=room, on="task", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, end=0, head=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
 
 // A page's head: its title (two lines at most) and where it stands, clear of the status icons beside
 // it, then what it offers (its children: a way out to where it lives, a call about it). Whatever
@@ -89,14 +89,19 @@ component PageHead
     // Where the column is clear of the status icons (0: it already is, as beside hex's column).
     clearTop: number
     pane: bool
+    // Beside Home with its heading on the chrome row: how far in from the pane's trailing edge the
+    // heading ends, clear of the capsule, and its least height, so what follows starts below the
+    // status icons. 0 and 0 elsewhere.
+    end: number
+    head: number
     title: string
     line: string
     id: string
   slot
   derive inset = pane or room.columns == 2 ? 20 : max(20, room.clear.x + room.clear.width - room.bar.end)
   view
-    column flex-shrink=0 gap=4 padding-left=20 padding-right=inset padding-top=(pane ? 6 : 0) padding-bottom=10 min-height=(pane ? 0 : max(0, clearTop - room.below)) box-sizing="border-box" testId=id
-      text title role="heading" aria-level=1 font="-exact-title1" font-weight=700 color="-exact-label" line-clamp=2
+    column flex-shrink=0 gap=4 padding-left=20 padding-right=max(inset, end) padding-top=(pane ? 6 : 0) padding-bottom=10 min-height=(pane ? head : max(0, clearTop - room.below)) box-sizing="border-box" testId=id
+      text title role="heading" aria-level=1 font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=2
       if line != ""
         text line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
       row gap=8 flex-wrap="wrap" align-items="center" margin-left=-4
@@ -142,6 +147,9 @@ component TaskBody
     pane: bool
     room: Room
     clearTop: number
+    // The heading's end inset and least height beside Home (PageHead).
+    end: number
+    head: number
     // How far the page's foot stands off the window's bottom (the call docked there, the home indicator).
     foot: number
     // The route this shows on (a pane beside the list shows on the list's).
@@ -231,7 +239,7 @@ component TaskBody
     column flex=1 min-height=0 height="100%"
       scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked or replyAsk.length > 0 ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
         // The head scrolls with the page, so a question opens with its answers in view.
-        PageHead(room=room, clearTop=clearTop, pane=pane, title=title, line=subtitle, id=(pane ? "pane-head" : "task-head"))
+        PageHead(room=room, clearTop=clearTop, pane=pane, end=end, head=head, title=title, line=subtitle, id=(pane ? "pane-head" : "task-head"))
           if door.link != ""
             button press=openOut(door.link, door.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(door.app)}` testId=(pane ? "pane-door" : "task-door-bar")
               box class=PillFace gap=8 padding="5px 12px 5px 6px"

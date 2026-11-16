@@ -21,7 +21,7 @@ shape Face
   y: number
   size: number
 
-fn faceOf(width: number, compact: bool): Face = compact ? Face(compact=true, height=88, x=44, y=44, size=56) : Face(compact=false, height=140, x=width / 2, y=40, size=72)
+fn faceOf(width: number, compact: bool): Face = compact ? Face(compact=true, height=72, x=44, y=36, size=56) : Face(compact=false, height=140, x=width / 2, y=40, size=72)
 
 // What Bassim put away here leaves at once, as in Tasks.
 fn awayOf(said: Said[]): string[] = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
@@ -250,15 +250,23 @@ component NowList
   // What's working, newest first; the one on the live line isn't listed twice.
   derive listed = working.filter(e => e.id != liveId)
   derive fit = rowsFit(height)
+  // Too short for two rows and both "Show N more" (folded on its side): Working on drops its own, as
+  // its head already counts them, so hex decided stays in view above the tabs.
+  derive tight = height < 216 + 2 * 58
   // Needs you takes the rows that fit but one, which Working on keeps; Working on takes what Needs
   // you leaves. Each counts the other from hex's summary (`needing`, `workingOn`), so neither list
   // walks the other's.
   derive shownNeeds = needs.slice(0, max(1, fit - (workingOn > 0 ? 1 : 0)))
   derive shownWork = listed.slice(0, max(1, fit - min(needing, max(1, fit - 1))))
+  // Questions of one topic open the same page beside; only one of its rows is marked: the one
+  // tapped, else the first.
+  state tapped = ""
+  derive lit = split and beside != "" ? match sortBy(shownNeeds.concat(shownWork).filter(e => pageFor(e, tasks) == beside), e => (e.id == tapped ? 0 : 1)).at(0) { case some(e) => e.id, case none => "" } : ""
   action go(e: Item)
     if pageFor(e, tasks) == ""
       openTasks(e.stage)
     else if split
+      tapped = e.id
       select(pageFor(e, tasks))
     else
       openTask(pageFor(e, tasks))
@@ -268,17 +276,17 @@ component NowList
         Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
       StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="8px 10px 4px", id="home-head-asks")
       for e in shownNeeds key=e.id
-        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
       if known and needs.length == 0
         Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 44px", id="home-empty-needs")
       if needs.length > shownNeeds.length
         ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="6px 10px", id="home-more-needs", press=openTasks("needs"))
       StageHead(state="working", label="Working on", n=working.length, known=known, pad="14px 10px 4px", id="home-head-working")
       for e in shownWork key=e.id
-        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
       if known and working.length == 0
         Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 44px", id="home-empty-working")
-      if listed.length > shownWork.length
+      if listed.length > shownWork.length and not tight
         ShowMore(n=listed.length - shownWork.length, shown=false, pad="6px 10px", id="home-more-working", press=openTasks("working"))
       if decided > 0
         box height=0 margin="10px 10px 4px" border-top="0.5px solid -exact-separator"

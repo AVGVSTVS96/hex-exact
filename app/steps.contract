@@ -72,7 +72,7 @@ component Steps
         column position="absolute" top=room.firstTop bottom=0 left=room.first.x width=room.first.width testId="steps-task"
           children
       column position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=(two ? room.second.x : room.clear.x) width=(two ? room.second.width : room.clear.width)
-        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, title="Steps", line=subtitle, id="steps-head")
+        PageHead(room=room, clearTop=(two ? 0 : clearTop), pane=two, end=0, head=0, title="Steps", line=subtitle, id="steps-head")
         scroll id="steps" flex=1 min-height=0 overflow-y="auto"
           column padding="0 10px" padding-bottom=(foot + 24)
             if task.id == "" and loading

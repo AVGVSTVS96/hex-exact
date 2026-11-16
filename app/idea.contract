@@ -116,7 +116,7 @@ component IdeaBody
           Note(kind="loading", text="Opening the idea", pad="24px 0", id="idea-loading")
       else
         column gap=4 padding-right=inset min-height=head box-sizing="border-box"
-          text idea.title font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=(head > 0 ? 3 : 2) testId="idea-title"
+          text idea.title font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=2 testId="idea-title"
           text `Idea${idea.topic != "" ? ` · ${idea.topic}` : ""} · floated ${dayWord(idea.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
         if idea.said != ""
           button press=toggleSaid class=Tap display="flex" flex-direction="column" align-items="stretch" gap=4 padding="2px 0 2px 14px" border-left="2.5px solid -exact-separator" text-align="left" aria-expanded=saidWhole aria-label=`You said: ${idea.said}` testId="idea-said"

@@ -253,8 +253,8 @@ component Home
               box padding="0 10px" display="flex" justify-content="center" width="100%" box-sizing="border-box"
                 WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
       if two and homeMode and not wordsShown
-        // A goal, watch or idea heads on the chrome row, left of the capsule, as drawn.
-        column position="absolute" top=(beside.startsWith("goal:") or beside.startsWith("watch:") or beside.startsWith("idea:") ? room.secondTop : room.secondBelow) bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
+        // The page beside heads on the chrome row, left of the capsule, as drawn.
+        column position="absolute" top=room.secondTop bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
           children
 
       // The orb: hex's face at rest on Now (Feed, Ideas and Goals scroll their own), grown into the call.

@@ -105,8 +105,8 @@ component Steps
                 image "symbol:icon.open" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" rotate=(opened.includes(`turn${t.n}`) ? "-90deg" : "0deg") aria-hidden=true
               if not opened.includes(`turn${t.n}`)
                 column border-left="1.5px solid -exact-separator" margin-left=21
-                  for s in t.steps key=s.id
-                    StepRow(step=s, now=now, offset=offset, open=opened.includes(s.id), flip=flip)
+                  for s, i in t.steps key=s.id
+                    StepRow(step=s, now=now, offset=offset, open=opened.includes(s.id), flip=flip, same=(i > 0 and s.ended <= s.at and match t.steps.at(i - 1) { case some(p) => p.ended <= p.at and whenOf(p.at, now, offset) == whenOf(s.at, now, offset), case none => false }))
 
 // One step: a dot on the run's line, what it did in grey, when. One with more to it has a chevron
 // that points right, and down once its detail and result are open in place.
@@ -119,6 +119,8 @@ component StepRow
     offset: number
     open: bool
     flip: action
+    // The step above it said the same time, so this one leaves it out.
+    same: bool
   derive more = step.detail != "" or step.result != "" or step.text.length > 90
   view
     column gap=6 padding="0 0 0 10px" testId=`step-${step.id}`
@@ -128,7 +130,7 @@ component StepRow
           if more
             image "symbol:icon.open" width=11 height=11 object-fit="contain" color="-exact-secondary-label" rotate=(open ? "0deg" : "-90deg")
         text step.text font="-exact-subheadline" line-clamp=(open ? 0 : 2) flex=1 min-width=0 color=(step.state == "failed" ? "hex.danger" : open ? "-exact-label" : "-exact-secondary-label")
-        text (step.state == "running" ? "now" : stepTime(step, now, offset)) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums" padding-top=2
+        text (step.state == "running" ? "now" : same ? "" : stepTime(step, now, offset)) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums" padding-top=2
       if open and (step.detail != "" or step.result != "")
         column gap=6 margin="0 0 6px 14px" padding="10px 12px" border-radius=14 background-color="-exact-secondary-background"
           if step.detail != ""

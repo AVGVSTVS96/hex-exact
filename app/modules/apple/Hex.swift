@@ -199,7 +199,13 @@ final class OrbView: UIView {
     if previous?.userInterfaceStyle != traitCollection.userInterfaceStyle { paint() }
   }
 
+  /// The screen sends props again whenever it redraws around the orb (the call's words arrive many
+  /// times a second), so an unchanged set leaves the persona and its motion alone.
   func configure(status: String, silenced: Bool, persona: String, tint: String, palette: Int?, reaction: CGFloat, still: Bool) {
+    let still = still || UIAccessibility.isReduceMotionEnabled
+    guard status != self.status || silenced != self.silenced || persona != self.persona || tint != self.tint
+      || palette != self.palette || reaction != self.reaction || still != self.still
+    else { return }
     let woke = status != self.status
     let swapped = persona != self.persona
     self.status = status
@@ -207,7 +213,7 @@ final class OrbView: UIView {
     self.tint = tint
     self.palette = palette
     self.reaction = reaction
-    self.still = still || UIAccessibility.isReduceMotionEnabled
+    self.still = still
     if swapped {
       self.persona = persona
       load()

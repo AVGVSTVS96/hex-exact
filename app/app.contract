@@ -54,6 +54,9 @@ component App
   // The Tasks tab: all | needs | working | done | quiet ("" until Bassim picks one: Needs if anything
   // needs him, else Working).
   state tab = ""
+  // hex's own page under its face: now | feed | ideas | goals (room.contract's tabs). It holds
+  // through a fold, a turn and a page opened over Home, so Back returns to it.
+  state hexPage = "now"
   // The answer on its way from a question: `${askId}|${label}`.
   state answering = ""
   // The page beside the Tasks list when it's wide; "" until Bassim picks one (the first topic).
@@ -100,6 +103,8 @@ component App
   resource clock = exactTime() as shape Time
   // Where everything sits: the window's size and what covers it, worked out once (room.contract).
   derive room = roomOf(viewport, pose)
+  // hex's own pages that are built: Now until Feed, Ideas and Goals join it. With one, no tabs show.
+  derive hexPages = ["now"]
 
   // The live call, as the shell holds it, and its words. These follow the shell, not a timer.
   resource call = callState() as shape CallState else empty()
@@ -288,6 +293,8 @@ component App
     tab = t
     if haptics
       haptic("selection")
+  action pickPage(page: string)
+    hexPage = page
 
   // The call
   action startCall(about: string)
@@ -515,7 +522,7 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
             if besideId != ""
               TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "calls"

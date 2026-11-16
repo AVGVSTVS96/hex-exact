@@ -6,7 +6,7 @@
 // It follows the room: with two columns the orb and controls take the first and the words the
 // second; with one, the orb rises to make room for the words.
 use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
-use endingOf, badEnding, lengthOf, Tap from "./parts.contract"
+use endingOf, badEnding, lengthOf, Tap, HexTabs from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
@@ -71,6 +71,10 @@ component Home
     room: Room
     reading: bool
     setReading: action
+    // hex's own pages (room.contract's tabs), the one under its face, and the switch.
+    pages: string[]
+    page: string
+    pickPage: action
     // hex as the home whenever no call is on: what needs Bassim and what hex is doing; with two columns
     // the page a row opens shows beside (the slot), `beside` its id.
     offset: number
@@ -145,8 +149,10 @@ component Home
   derive hexRight = W - room.first.x - room.first.width
   derive secondLeft = room.second.x
   derive below = room.below
+  // With more than one of hex's pages, its tabs take the foot at rest and Call stands beside them.
+  derive tabbed = pages.length > 1 and status == "idle" and homeMode
   // The foot of hex's column: Call and its neighbours, and where the list above them stops.
-  derive footTop = bottom + 12 + callSize + 16
+  derive footTop = tabbed ? H - room.tabs.top + 6 : bottom + 12 + callSize + 16
 
   // Phone and cover screen: the orb at rest, or docked as the words are read (pull 0 to 1).
   derive restSize = min(min(hexW * 0.62, H * 0.34), 280)
@@ -274,18 +280,24 @@ component Home
             text agentWhere font="-exact-caption1" font-variant-numeric="tabular-nums" color=(agent.state == "failed" ? "hex.danger" : agent.state == "done" ? "-exact-label" : "-exact-tertiary-label") white-space="nowrap"
 
       // The call's buttons, at the foot of hex's column: mute and the photo menu either side of Call.
-      row position="absolute" bottom=(bottom + 12) left=left width=hexW justify-content="center" align-items="center" gap=28 z-index=2 testId="controls"
-        if status == "idle" and homeMode and talking and not single
-          WordsButton(size=muteSize, shown=wordsShown, single=false, show=showTranscript)
-        else if status == "idle"
-          box width=muteSize height=muteSize
-        else
-          MuteButton(size=muteSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
-        CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
-        if here and call.shell
-          AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=muteSize, disabled=false, add=share)
-        else
-          box width=muteSize height=muteSize
+      // At rest with hex's pages: the tabs, Call beside them (room.contract places the pair).
+      if tabbed
+        row position="absolute" left=room.tabs.x width=room.tabs.width top=room.tabs.top height=64 justify-content="center" align-items="center" z-index=2 testId="controls"
+          HexTabs(current=page, fresh=false, pick=pickPage)
+            CallButton(size=64, status=status, busy=busy, retry=(call.error != ""), primary=primary)
+      else
+        row position="absolute" bottom=(bottom + 12) left=left width=hexW justify-content="center" align-items="center" gap=28 z-index=2 testId="controls"
+          if status == "idle" and homeMode and talking and not single
+            WordsButton(size=muteSize, shown=wordsShown, single=false, show=showTranscript)
+          else if status == "idle"
+            box width=muteSize height=muteSize
+          else
+            MuteButton(size=muteSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
+          CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
+          if here and call.shell
+            AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=muteSize, disabled=false, add=share)
+          else
+            box width=muteSize height=muteSize
 
 // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
 fn isElsewhere(call: CallState, activity: Activity, liveRecord: CallRecord): bool = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0

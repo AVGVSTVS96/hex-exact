@@ -20,10 +20,11 @@ shape Bar
   start: number
   end: number
 
-// hex's tabs (Now, Feed, Ideas, Goals) and Call: one row at the foot of hex's column, the capsule
-// of tabs at `x`, Call beside it, the pair centred in the column; `top` is the row's top.
+// hex's tabs (Now, Feed, Ideas, Goals) and Call: one row at the foot of hex's column (`x`, `width`),
+// the pair centred in it; `top` is the row's top. How they look is System's (parts.contract HexTabs).
 shape Foot
   x: number
+  width: number
   top: number
 
 shape Room
@@ -49,11 +50,8 @@ shape Room
 // A chrome row is 44 tall; the capsule of three is 140 wide.
 fn barHeight(): number = 44
 fn capsuleWidth(): number = 140
-// The tabs: four of 54 in a capsule padded 4 each side; Call, 64 round, 12 to its right.
-fn tabWidth(): number = 54
-fn tabsWidth(): number = 4 * tabWidth() + 8
+// The row of tabs and Call is as tall as Call.
 fn callSize(): number = 64
-fn footWidth(): number = tabsWidth() + 12 + callSize()
 
 fn clearOf(v: Viewport): Rect = Rect(x=v.safeAreaLeft, y=v.safeAreaTop, width=v.width - v.safeAreaLeft - v.safeAreaRight, height=v.height - v.safeAreaTop - v.safeAreaBottom)
 // The status icons and cameras near the top of the window. iOS needn't count them in the safe area
@@ -79,7 +77,7 @@ fn foldOf(v: Viewport, p: Pose): Span = v.horizontalViewportSegments == 2 ? matc
 fn firstOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=clearOf(v).x, width=foldOf(v, p).x - clearOf(v).x) : Span(x=clearOf(v).x, width=clearOf(v).width)
 fn secondOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=foldOf(v, p).x + foldOf(v, p).width, width=clearOf(v).x + clearOf(v).width - foldOf(v, p).x - foldOf(v, p).width) : Span(x=v.width, width=0)
 
-fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x + max((firstOf(v, p).width - footWidth()) / 2, 8), top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()))
+fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()))
 
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()
@@ -113,3 +111,4 @@ component Chrome
           image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
         if needsYou > 0 and on != "tasks"
           box position="absolute" top=4 left=76 width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
+

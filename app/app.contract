@@ -252,7 +252,7 @@ component App
   resource task = watchTask(threadId) when threadId != "" as shape TaskPage else empty()
   resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
   resource check = loadCheck() when names.includes("check") or names.includes("needs") as shape Check else empty()
-  resource settings = loadSettings() when names.includes("settings") as shape Settings else empty()
+  resource settings = loadSettings() when names.includes("settings") or names.includes("voice") or names.includes("words") as shape Settings else empty()
   // The message an ask came from: the pick on top of the screen, else the one opened on a card.
   derive pickId = match stack(nav).filter(e => e.name == "pick").at(-1) { case some(e) => e.params.id, case none => "" }
   derive wordsId = top(nav).name == "pick" ? pickId : wordsAsk

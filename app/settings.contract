@@ -5,7 +5,7 @@
 // into two columns of its own.
 use Settings, Counts, Tasks, Asks, Choice from "./shapes.contract"
 use Option, personas, paletteColor, Tap, PillTap from "./parts.contract"
-use Room, Chrome, stacked, homeRoomOf from "./room.contract"
+use Room, Chrome, stacked, homeRoomOf, callSize from "./room.contract"
 use VoiceBody, Seg, voiceName from "./voice.contract"
 use WordsBody from "./words.contract"
 use liveOf from "./home.contract"
@@ -73,7 +73,8 @@ component SettingsPages
   derive lay = homeRoomOf(room)
   // Open like a laptop, the list is the window above the hinge and the page the window below.
   derive firstHeight = stacked(room) ? room.across - lay.below : room.height - lay.below
-  derive endPad = room.foot + (docked ? 88 : 24)
+  // Open like a laptop the system's tabs float over the lower window's foot, outside its safe area.
+  derive endPad = room.foot + (docked ? 88 : 24) + (stacked(room) ? callSize() + 8 : 0)
   derive panes = two ? [Pane(page=(at == "words" ? "voice" : "settings"), x=lay.first.x, top=lay.below, width=lay.first.width, height=firstHeight, pad=(stacked(room) ? 12 : endPad)), Pane(page=(at == "words" ? "words" : "voice"), x=lay.second.x, top=lay.secondBelow, width=lay.second.width, height=room.height - lay.secondBelow, pad=endPad)] : [Pane(page=at, x=room.clear.x, top=room.below, width=room.clear.width, height=room.height - room.below, pad=endPad)]
   derive tint = personaColor == "" ? "#FFFFFF" : personaColor
   derive palette = opalPalette == "original" ? "" : opalPalette
@@ -247,7 +248,8 @@ component SettingRows
             image "symbol:sf/play.fill" width=13 height=13 object-fit="contain" color="-exact-label"
         if not voiceBeside
           image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
-      Hair()
+      if not voiceBeside
+        Hair()
       if width < 360
         Line(symbol="symbol:microphone", title="Reacts to you", line="How much hex’s face moves when you talk", id="setting-reaction")
         box padding="0 16px 10px 50px" margin-top=-6

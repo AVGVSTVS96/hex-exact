@@ -152,7 +152,8 @@ component VoiceTop
         column flex=1 min-width=0
           text "Your words" font="-exact-body" color="-exact-label"
           text (settings.words == "" ? "Tell hex how to talk, in your own words" : `“${settings.words}”`) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=3
-        image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" align-self="center" flex-shrink=0 aria-hidden=true
+        if sel != "words"
+          image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" align-self="center" flex-shrink=0 aria-hidden=true
       text (failed ? "Can't reach hex right now." : unsaved ? "hex didn't save that. Try again." : "For every call, phone calls too.") font="-exact-footnote" color=(failed or unsaved ? "hex.danger" : "-exact-tertiary-label") padding="0 16px 6px 50px" testId="voice-note"
 
 // Every voice as a chip: those without an accent together, then a row per accent.

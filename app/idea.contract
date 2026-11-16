@@ -25,8 +25,8 @@ fn undoOf(verb: string): string = verb == "start" or verb == "drop" ? "keep" : v
 fn weekdayNumber(now: number, offset: number): number = (floor((now + offset * 60000) / 86400000) + 4) % 7
 fn weekdayName(n: number): string = match ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].at(n) { case some(d) => d, case none => "" }
 fn checkName(day: string): string = day == "daily" ? "daily check" : day != "" ? `${day} check` : "checks"
-// The head over a check: "Found today, 1:40 PM" when it was news, else "Checked …"; past yesterday the date alone.
-fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}${now - c.at < 172800000 ? `, ${formatTime(c.at, offset, "short")}` : ""}`
+// The head over a check: "Found today, 1:40 PM" when it was news, else "Checked …"; the time only today.
+fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}${dayWord(c.at, now, offset) == "today" ? `, ${formatTime(c.at, offset, "short")}` : ""}`
 
 // One check: its words, its links (each leaves the app, so its arrow says so).
 component CheckWords
@@ -105,7 +105,7 @@ component IdeaBody
   action toggleFound
     foundWhole = not foundWhole
   view
-    column gap=16 padding="0 4px" testId="idea"
+    column gap=12 padding="0 4px" testId="idea"
       if idea.id == ""
         if failed
           Note(kind="failed", text="Can't reach hex, so this idea can't open. Trying again…", pad="24px 0", id="idea-offline")
@@ -141,9 +141,10 @@ component IdeaBody
           if acted and act.verb == "start"
             IdeaDoneRow(label="Started", detail="It's a goal now; hex is on it", act=act, id="idea-start", undo=undo(idea.id, "keep"), again=redo(idea.id))
           else
-            AnswerRow(label="Start it", detail="Becomes a goal hex works on", pick=false, chosen=false, role="", disabled=(acted and act.verb == "drop"), id="idea-start", press=do(idea.id, "start"))
+            box opacity=(acted and act.verb == "drop" ? 0.4 : 1)
+              AnswerRow(label="Start it", detail="Becomes a goal hex works on", pick=false, chosen=false, role="", disabled=(acted and act.verb == "drop"), id="idea-start", press=do(idea.id, "start"))
           if acted and (act.verb == "stop" or act.verb == "look")
-            IdeaDoneRow(label=(act.verb == "stop" ? "hex stopped looking into it" : "hex looks into it every week"), detail=(act.verb == "stop" ? `Its ${checkName(idea.day)} is off` : `Each ${weekdayName(today)}`), act=act, id="idea-look", undo=undo(idea.id, undoOf(act.verb)), again=redo(idea.id))
+            IdeaDoneRow(label=(act.verb == "stop" ? "Stopped looking" : "Looking into it weekly"), detail=(act.verb == "stop" ? `Its ${checkName(idea.day)} is off` : `Each ${weekdayName(today)}`), act=act, id="idea-look", undo=undo(idea.id, undoOf(act.verb)), again=redo(idea.id))
           else if idea.looking
             AnswerRow(label="Stop looking into it", detail=`hex stops its ${checkName(idea.day)}`, pick=false, chosen=false, role="", disabled=false, id="idea-look", press=do(idea.id, "stop"))
           else
@@ -151,7 +152,8 @@ component IdeaBody
           if acted and act.verb == "drop"
             IdeaDoneRow(label="Not needed", detail="Off your ideas", act=act, id="idea-drop", undo=undo(idea.id, "keep"), again=redo(idea.id))
           else
-            AnswerRow(label="Not needed", detail="Take it off your ideas", pick=false, chosen=false, role="", disabled=(acted and act.verb == "start"), id="idea-drop", press=do(idea.id, "drop"))
+            box opacity=(acted and act.verb == "start" ? 0.4 : 1)
+              AnswerRow(label="Not needed", detail="Take it off your ideas", pick=false, chosen=false, role="", disabled=(acted and act.verb == "start"), id="idea-drop", press=do(idea.id, "drop"))
 
 // "Add to this idea", docked at the page's foot: Bassim's words go to the idea's topic. The
 // keyboard stays up through a send, and the draft is kept if he leaves.
@@ -178,13 +180,13 @@ component AddToIdea
       text = ""
       started = true
   view
-    column gap=4 testId="idea-add"
+    column position="relative" testId="idea-add"
       row class=Composer
         textarea id="idea-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=120 placeholder="Add to this idea" aria-label=`Add to this idea; goes to ${idea.topic != "" ? idea.topic : "its topic"}` testId="idea-field"
         button press=submit disabled=empty class=Send retainFocus=true aria-label="Send" testId="idea-send"
           image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")
       if sent != ""
-        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="0 14px" aria-live="polite" testId="idea-sent"
+        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="0 14px 4px" position="absolute" bottom="100%" left=0 aria-live="polite" testId="idea-sent"
 
 // The page itself: the idea scrolling, the composer at its foot with what scrolls fading out
 // behind it. `bottom` is how far the foot stands off the window's edge (the keyboard when it's up).
@@ -197,6 +199,8 @@ component IdeaPane
     offset: number
     act: IdeaAct
     inset: number
+    // How far the composer stands off the column's trailing edge, clear of a camera in that corner.
+    end: number
     draft: string
     sent: string
     error: string
@@ -211,7 +215,7 @@ component IdeaPane
       scroll flex=1 min-height=0 padding="4px 16px 24px" box-sizing="border-box" testId="idea-scroll"
         IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=inset, do=do, redo=redo, undo=undo)
       if idea.id != ""
-        column margin-top=-24 padding="24px 16px 0" background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 position="relative" testId="idea-foot"
+        column margin-top=-24 padding="24px 16px 0" padding-right=max(16, end) background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 position="relative" testId="idea-foot"
           AddToIdea(idea=idea, draft=draft, sent=sent, error=error, keep=keep, add=add)
 
 // The idea over Home, folded: the chrome with Back, and the page under it.
@@ -245,4 +249,4 @@ component IdeaScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="idea-screen"
       Chrome(room=room, on="idea", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="idea-column"
-        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)
+        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), end=(room.clear.x + room.clear.width - room.footEnd), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)

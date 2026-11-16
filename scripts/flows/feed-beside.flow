@@ -1,0 +1,34 @@
+# Feed beside its pages (any two-column pose) with his real entries (the stand-in passes /feed through to his hex): the tab, its days,
+# scrolling down the list with the tabs and Call held still, Feed keeping its place across tabs, back
+# at the top a finished entry opening its goal beside Feed, marked, and a decided entry opening hex decided at that row, and Back.
+launch /
+shoot now
+tap hex-tab-feed
+shoot feed
+mark hex-tabs
+scroll home-list-feed
+shoot scrolled
+scroll home-list-feed
+scroll home-list-feed
+scroll home-list-feed
+scroll home-list-feed
+scroll home-list-feed
+shoot further
+still hex-tabs
+tap hex-tab-now
+tap hex-tab-feed
+shoot again
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+scroll-back home-list-feed
+shoot top
+tap feed-done:*
+shoot opened
+tap feed-decided:*
+shoot decided
+tap chrome-back
+shoot back-decided

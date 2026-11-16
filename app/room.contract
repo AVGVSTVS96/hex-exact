@@ -65,6 +65,9 @@ shape Room
   // What covers the window's top (the status icons, the cameras): pages scroll under them, so
   // the app lays the page's background over them.
   covers: Rect[]
+  // Where a hinge across the window starts (open like a laptop), so nothing fixed sits on it; the
+  // window's height when there's none.
+  across: number
 
 // A chrome row is 44 tall; the capsule of three is 140 wide.
 fn barHeight(): number = 44
@@ -91,6 +94,7 @@ fn belowIn(v: Viewport, p: Pose, column: Span): number = max(belowOf(v), match s
 
 // Two columns only when both read well: each at least 300 wide. They part at the hinge when the
 // window has one down its middle, else at the middle of the window, where a book's fold lies.
+fn acrossOf(v: Viewport, p: Pose): number = v.verticalViewportSegments == 2 ? match v.segments.at(0) { case some(s) => s.y + s.height, case none => v.height } : p.fold.width >= v.width / 2 and p.fold.height < v.height / 4 ? p.fold.y : v.height
 fn twoOf(v: Viewport): bool = clearOf(v).width >= 600
 fn foldOf(v: Viewport, p: Pose): Span = v.horizontalViewportSegments == 2 ? match v.segments.at(0) { case some(s) => Span(x=s.x + s.width, width=match v.segments.at(1) { case some(t) => max(t.x - s.x - s.width, 0), case none => 0 }), case none => Span(x=v.width / 2, width=0) } : p.fold.height >= v.height / 2 and p.fold.width < v.width / 4 ? Span(x=p.fold.x, width=p.fold.width) : Span(x=v.width / 2, width=0)
 fn firstOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=clearOf(v).x, width=foldOf(v, p).x - clearOf(v).x) : Span(x=clearOf(v).x, width=clearOf(v).width)
@@ -109,7 +113,7 @@ fn footEndOf(v: Viewport, p: Pose): number = min(clearOf(v).x + clearOf(v).width
 // With two columns and the capsule over the second, a page beside hex's column heads on the
 // chrome row, left of the capsule.
 fn besideHigh(v: Viewport, p: Pose): bool = twoOf(v) and barEnd(v, p) - capsuleWidth() >= secondOf(v, p).x + 120
-fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), firstTop=((twoOf(v) and barEnd(v, p) - capsuleWidth() >= firstOf(v, p).x + firstOf(v, p).width) or sideOf(v) ? barTop(v) : belowOf(v)), secondTop=(besideHigh(v, p) ? barTop(v) : belowIn(v, p, secondOf(v, p))), secondHeadEnd=(besideHigh(v, p) ? barEnd(v, p) - capsuleWidth() - 12 : clearOf(v).x + clearOf(v).width), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p), covers=topCovers(v, p))
+fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), firstTop=((twoOf(v) and barEnd(v, p) - capsuleWidth() >= firstOf(v, p).x + firstOf(v, p).width) or sideOf(v) ? barTop(v) : belowOf(v)), secondTop=(besideHigh(v, p) ? barTop(v) : belowIn(v, p, secondOf(v, p))), secondHeadEnd=(besideHigh(v, p) ? barEnd(v, p) - capsuleWidth() - 12 : clearOf(v).x + clearOf(v).width), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p), covers=topCovers(v, p), across=acrossOf(v, p))
 
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()

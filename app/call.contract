@@ -192,7 +192,7 @@ component Home
   // first (two), its name, clock and agent line under it.
   derive agentShown = live and agent.id != ""
   // Open like a laptop the fold runs across the window: the orb and its lines stay above it.
-  derive foldTop = viewport.verticalViewportSegments == 2 ? match viewport.segments.at(0) { case some(s) => s.y + s.height, case none => H } : H
+  derive foldTop = room.across
   derive stackBottom = min(controlsTop, foldTop - 16)
   derive bigOrb = round(single ? max(min(min(hexW * 0.42, H * 0.2), 150), 60) : max(min(min(hexW - 96, (stackBottom - below) * 0.5), 260), 80))
   derive under = 8 + 24 + 22 + (agentShown ? 36 : 0) + 8

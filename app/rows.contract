@@ -78,7 +78,7 @@ component EntryRow
       markRead(entry.id)
   view
     if folded
-      Folded(said=word, question=entry.title, topic=entry.topic, undo=undo, again=again)
+      Folded(said=word, question=entry.title, topic=entry.topic, pad="10px 16px", undo=undo, again=again)
     else
       scroll swipeContent=`${entry.id}-row` swipeLeading=(lead != "" ? `${entry.id}-lead` : "") swipeTrailing=`${entry.kind == "ask" ? `${entry.id}-away ` : ""}${range(opens.length).map(i => `${entry.id}-tile-${i}`).join(" ")}` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" padding-right=0 testId=`entry-${entry.id}`
         if lead != ""
@@ -127,7 +127,8 @@ component EntryRow
             image appSymbol(t.app)
             text tileLabel(t)
 
-// An ask put away here: what was said, where it went, and Undo.
+// An ask put away here: the question, quiet, over what was said → where it went, and Undo. On its
+// way it is dimmed with a turning ring; a place out of reach says so in amber, with Send again.
 component Folded
   inject
     haptics: bool
@@ -135,23 +136,33 @@ component Folded
     said: Said
     question: string
     topic: string
+    // Its padding, as the list's rows have it.
+    pad: string
     undo: action
     again: action
+  derive where = said.detail != "" ? said.detail : said.topic != "" ? said.topic : topic
   view
-    row gap=12 align-items="flex-start" padding="10px 16px" testId=`folded-${said.id}`
-      Mark(state="done", size=22)
-      column flex=1 min-width=0 gap=2
-        text (said.question != "" ? said.question : question) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
-        text `${said.label} → ${said.detail != "" ? said.detail : said.topic != "" ? said.topic : topic}` font="-exact-body" line-clamp=2 opacity=(said.status == "sending" ? 0.6 : 1)
+    row gap=10 align-items="center" padding=pad testId=`folded-${said.id}`
+      box align-self="flex-start" padding-top=1 flex-shrink=0
+        Mark(state="done", size=22)
+      column flex=1 min-width=0 gap=1
+        text (said.question != "" ? said.question : question) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+        row gap=6 align-items="center" opacity=(said.status == "sending" ? 0.6 : 1) aria-label=`${said.label}, ${said.status == "sending" ? "sending to" : "sent to"} ${where}`
+          text font="-exact-headline" color="-exact-label" line-clamp=2 min-width=0 flex-shrink=1
+            text said.label
+            text " → " font-weight=400 color="-exact-tertiary-label"
+            text where
+          if said.status == "sending"
+            progress width=14 height=14 flex-shrink=0 aria-label="Sending"
         if said.missed > 0
-          row gap=8 align-items="center" flex-wrap="wrap"
+          row gap=8 align-items="center" flex-wrap="wrap" margin-top=4
             text unreached(said.missed) font="-exact-footnote" color="hex.ask"
-            button press=again(said.id) class=PillTap testId=`again-${said.id}`
+            button press=again(said.id) class=PillTap min-height=32 testId=`again-${said.id}`
               box class=PillFace padding="4px 10px"
-                text "Send again" font="-exact-footnote" font-weight=600
+                text "Send again" font="-exact-footnote" font-weight=600 color="-exact-label"
       button press=undo(said.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
         box class=PillFace
-          text "Undo" font="-exact-subheadline" font-weight=600
+          text "Undo" font="-exact-subheadline" font-weight=600 color="-exact-label"
 
 // What hex took off Bassim's list to decide itself: its topic, the question, and Undo, which puts it
 // back on his list. A tap opens the thread hex decides it in.

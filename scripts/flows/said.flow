@@ -1,0 +1,13 @@
+# What he just said, on Now: a question answered from its page folds on Now to "answer → topic"
+# with Undo while hex has it; Undo puts it back. The stand-in keeps every write from reaching hex.
+launch /
+tap home-row-*
+tap ask-option-*
+open /
+shoot now-said
+tap undo-*
+shoot now-undone
+launch /?update=demo
+shoot toast
+tap update-install
+shoot toast-installing

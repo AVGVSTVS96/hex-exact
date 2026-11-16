@@ -46,9 +46,9 @@ shape Room
   // icons too when they're above it.
   below: number
   secondBelow: number
-  // Where hex's column may start while nothing of the chrome row sits over it (no update notice,
-  // and two columns with the capsule over the second, or one column wider than tall with the
-  // capsule at its end): at the row's own top.
+  // Where hex's column may start while nothing of the chrome row sits over it (two columns with
+  // the capsule over the second, or one column wider than tall with the capsule at its end): at
+  // the row's own top.
   firstTop: number
   // Where a page beside hex's column may start, its heading on the chrome row left of the capsule
   // as drawn (two columns, the capsule over the second; else secondBelow), and where that heading

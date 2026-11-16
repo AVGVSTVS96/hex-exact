@@ -1,22 +1,40 @@
-// hex decided: what hex took off Bassim's list in the last week to decide itself. Each row is the
-// topic and the question; a tap opens its whole story in place: what hex picked, why, and what
-// the other answers gave up. Undo puts it back in Needs you. A page over Home, or with two columns
-// the page beside it; `/decided?open=<id>` opens with that one open and in view.
-use Ask, AskOption, Asks, Tasks from "./shapes.contract"
-use Mark, Note, RowTap, PillTap, PillFace, Tap, whenOf, springOf, Prose from "./parts.contract"
-use Room, Chrome from "./room.contract"
-use PageTitle from "./calls.contract"
+// hex decided: what hex took off Bassim's list in the last week to decide itself. The page is its
+// week as a bar a day, then each one by day: its topic, the question, the answer hex gave, and Undo,
+// which puts it back in Needs you. A room wider than tall adds where it decided most, by topic, beside
+// the list. A row opens its whole story: the question, how long it waited, every answer with the one
+// hex took and why, and Undo floating at the foot. With two columns the story is beside the list
+// (open like a laptop, under the hinge); with one it is its own page, `/decided?open=<id>`.
+use Ask, Asks, Tasks from "./shapes.contract"
+use Mark, Note, RowTap, PillTap, PillFace, Tap, whenOf, dayOf, Prose, appName, appSymbol from "./parts.contract"
+use Room, Chrome, stacked from "./room.contract"
 use Said, failedWords from "./said.contract"
-use homeOf from "./inbox.contract"
+use homeOf, unique from "./inbox.contract"
 
-// The answer hex took, as the question words it: hex names it short ("Send it") where the answer
-// runs on ("Send it: asks for your free months back"), so the one it starts is the answer.
-fn tookOf(a: Ask): string = a.took != "" ? match a.options.filter(o => o.label == a.took or o.label.startsWith(a.took)).at(0) { case some(o) => o.label, case none => a.took } : match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
-fn tookDetail(a: Ask): string = match a.options.filter(o => o.label == tookOf(a)).at(0) { case some(o) => o.detail, case none => "" }
-fn othersOf(a: Ask): AskOption[] = a.options.filter(o => o.label != tookOf(a))
+// The answers hex took, as the question words them: hex may name one short ("Send it" for "Send
+// it: asks for your free months back") or several, "; " between; else its pick.
+fn tooksOf(a: Ask): string[] = a.took != "" ? a.took.split("; ").map(t => match a.options.filter(o => o.label == t or o.label.startsWith(t)).at(0) { case some(o) => o.label, case none => t }) : a.options.filter(o => o.pick).map(o => o.label)
 fn decidedPath(id: string): string = id == "" ? path("decided") : `${path("decided")}?open=${encodeURIComponent(id)}`
 
+// The last seven days, oldest first: how many hex decided on each, and each day's initial.
+fn weekOf(decided: Ask[], now: number, offset: number): number[] = range(7).map(i => decided.filter(d => dayOf(d.decided, offset) == dayOf(now, offset) - 6 + i).length)
+fn initialOf(day: number): string = match ["T", "F", "S", "S", "M", "T", "W"].at(day % 7) { case some(d) => d, case none => "" }
+fn longDayOf(day: number): string = match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(day % 7) { case some(d) => d, case none => "" }
+fn monthDayOf(at: number, offset: number): string = match formatDate(at, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }
+// A day's head: Today, Yesterday, its weekday this week, else its date.
+fn dayHead(at: number, now: number, offset: number): string = dayOf(at, offset) == dayOf(now, offset) ? "Today" : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : dayOf(at, offset) > dayOf(now, offset) - 7 ? longDayOf(dayOf(at, offset)) : monthDayOf(at, offset)
+// How long a question waited on Bassim before hex took it.
+fn waitedOf(a: Ask, offset: number): string = dayOf(a.decided, offset) - dayOf(a.at, offset) < 1 ? "same day" : dayOf(a.decided, offset) - dayOf(a.at, offset) == 1 ? "1 day" : `${dayOf(a.decided, offset) - dayOf(a.at, offset)} days`
+
+// Where hex decided most: its topics by how many.
+shape TopicCount
+  name: string
+  n: number
+fn topicsOf(decided: Ask[]): TopicCount[] = sortBy(unique(decided.map(a => a.topic)).map(t => TopicCount(name=t, n=decided.filter(a => a.topic == t).length)), c => c.n, "desc")
+fn failureOf(said: Said[], id: string): string = match said.filter(s => s.id == id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }
+
 component DecidedPage
+  inject
+    haptics: bool
   props
     entry: Entry
     room: Room
@@ -34,59 +52,243 @@ component DecidedPage
     open: action
     openTasks: action
     back: action
+  derive decided = sortBy(asks.decided, a => a.decided, "desc")
+  derive known = asks.version > 0
+  derive opened = searchParam(entry, "open")
+  derive two = room.columns == 2
+  // Open like a laptop: the list above the hinge, the story under it, each the window's width.
+  derive across = stacked(room)
+  // One column with a row opened: this entry is that one's story.
+  derive story = not two and opened != ""
+  // With two columns, the one beside: the one tapped, else the one linked to, else the newest.
+  state chosen = ""
+  derive beside = match decided.filter(a => a.id == (chosen != "" ? chosen : opened)).at(0) { case some(a) => a.id, case none => match decided.at(0) { case some(a) => a.id, case none => "" } }
+  action choose(id: string)
+    if two
+      chosen = id
+    else
+      open(decidedPath(id))
+
+  derive listX = two and not across ? room.first.x : room.clear.x
+  derive listW = two and not across ? room.first.width : room.clear.width
+  derive listEnd = across ? room.height - room.across : 0
+  derive listH = room.height - listEnd - room.below
+  // Wider than tall: the week and its topics on the left, the days on the right.
+  derive wide = listW >= 520 and listW > listH
+  derive half = round(listW / 2)
+  derive listFoot = across ? 16 : room.foot + 24
+
+  derive storyX = story ? room.clear.x : across ? room.clear.x : room.second.x
+  derive storyW = story ? room.clear.width : across ? room.clear.width : room.second.width
+  derive storyTop = story ? room.below : across ? room.across + 12 : room.secondBelow
+  derive storyWide = storyW >= 520
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="decided"
       Chrome(room=room, on="decided", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
-      DecidedList(room=room, opened=searchParam(entry, "open"), now=now, offset=offset, asks=asks, tasks=tasks, said=said, loading=loading, failed=failed, undo=undo, openTask=openTask)
+      if not story
+        if wide
+          scroll position="absolute" top=room.below bottom=listEnd left=listX width=half padding-bottom=listFoot box-sizing="border-box" testId="decided-week-side"
+            DecidedTop(decided=decided, known=known, now=now, offset=offset, height=64, topics=true)
+          scroll id="decided-list" position="absolute" top=room.below bottom=listEnd left=(listX + half) width=(listW - half) padding=`0 0 ${listFoot}px` box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 10px)" testId="decided-list"
+            DecidedDays(decided=decided, known=known, loading=loading, failed=failed, selected=(two ? beside : ""), now=now, offset=offset, said=said, choose=choose, undo=undo)
+        else
+          scroll id="decided-list" position="absolute" top=room.below bottom=listEnd left=listX width=listW padding=`0 0 ${listFoot}px` box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 10px)" testId="decided-list"
+            DecidedTop(decided=decided, known=known, now=now, offset=offset, height=52, topics=false)
+            DecidedDays(decided=decided, known=known, loading=loading, failed=failed, selected=(two ? beside : ""), now=now, offset=offset, said=said, choose=choose, undo=undo)
+      if story or two
+        for a in decided.filter(x => x.id == (story ? opened : beside)) key=a.id
+          scroll position="absolute" top=storyTop bottom=0 left=storyX width=storyW padding=`0 0 ${room.foot + 80}px` box-sizing="border-box" testId="decided-beside"
+            DecidedStory(ask=a, wide=storyWide, now=now, offset=offset, failure=failureOf(said, a.id), openTopic=openTask(homeOf(a.task, tasks.tasks)))
+          row position="absolute" left=(storyWide ? storyX + storyW / 2 : storyX) width=(storyWide ? storyW / 2 : storyW) bottom=(room.foot + 8) justify-content="center" pointer-events="none" z-index=5
+            button press=undo(a.id) class=Tap pointer-events="auto" display="flex" flex-direction="row" align-items="center" gap=6 height=48 padding="0 20px" border-radius=24 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${a.question}” back in Needs you` testId=`decided-story-undo-${a.id}`
+              image "symbol:sf/arrow.uturn.backward" width=16 height=16 object-fit="contain" color="-exact-label" aria-hidden=true
+              text font="-exact-body" white-space="nowrap"
+                text "Undo" font-weight=600 color="-exact-label"
+                text " · back to you" color="-exact-secondary-label"
+        if story and known and decided.filter(x => x.id == opened).length == 0
+          Note(kind="empty", text="Put back to you. It's in Needs you.", pad=`${room.below + 24}px ${room.clear.x + 16}px`, id="decided-gone")
 
-component DecidedList
+// The page's head: its title and count, the week as a bar a day, and (wide) its topics by count.
+component DecidedTop
+  props
+    decided: Ask[]
+    known: bool
+    now: number
+    offset: number
+    height: number
+    topics: bool
+  derive week = weekOf(decided, now, offset)
+  derive most = max(1, match sortBy(week, n => n, "desc").at(0) { case some(n) => n, case none => 1 })
+  derive today = dayOf(now, offset)
+  derive byTopic = topicsOf(decided).slice(0, 6)
+  derive topN = match byTopic.at(0) { case some(c) => max(1, c.n), case none => 1 }
+  view
+    column testId="decided-top"
+      row gap=10 align-items="baseline" padding="0 16px 10px"
+        text "hex decided" role="heading" aria-level=1 font="-exact-title1" font-weight=700 color="-exact-label" white-space="nowrap"
+        if known
+          text `${decided.length}` font="-exact-title1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" testId="decided-count"
+      if known and decided.length > 0
+        row gap=6 align-items="flex-end" padding="0 16px 4px" height=(height + 40) box-sizing="border-box" aria-label=`${sum(week)} this week` testId="decided-week"
+          for n, i in week key=i
+            column flex=1 align-items="center" gap=4 aria-hidden=true
+              text (n > 0 ? `${n}` : " ") font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="-exact-label"
+              box width="100%" max-width=34 height=(n > 0 ? max(4, round(n / most * height)) : 2) border-radius=(n > 0 ? 5 : 1) background-color=(n > 0 ? "hex.accent" : "-exact-tertiary-label") opacity=(n > 0 ? (i == 6 ? 1 : 0.5) : 0.5)
+              text initialOf(today - 6 + i) font-size=12 line-height="16px" font-weight=(i == 6 ? 600 : 400) color=(i == 6 ? "-exact-label" : "-exact-tertiary-label")
+      if topics and byTopic.length > 0
+        DayHead(label="By topic", n=topicsOf(decided).length)
+        column gap=7 padding="8px 16px 0" testId="decided-topics"
+          for c in byTopic key=c.name
+            row gap=10 align-items="center"
+              text c.name font="-exact-subheadline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" width="34%" flex-shrink=0
+              box flex=1 min-width=0
+                box width=`${c.n / topN * 100}%` height=6 border-radius=3 background-color="hex.accent" opacity=0.55
+              text `${c.n}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" min-width=18 text-align="right"
+
+// A quiet grey head: a day, or the topics.
+component DayHead
+  props
+    label: string
+    n: number
+  view
+    row align-items="flex-end" height=32 padding="0 16px 6px" box-sizing="border-box"
+      text label font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" flex=1
+      text `${n}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+
+// What hex decided, a day at a time, newest first.
+component DecidedDays
+  props
+    decided: Ask[]
+    known: bool
+    loading: bool
+    failed: bool
+    // The one open beside (two columns), "" for none.
+    selected: string
+    now: number
+    offset: number
+    said: Said[]
+    choose: action
+    undo: action
+  derive days = unique(decided.map(a => `${dayOf(a.decided, offset)}`))
+  view
+    column testId="decided-days"
+      if known and decided.length == 0
+        Note(kind="empty", text="Nothing this week. What hex decides for you shows here.", pad="16px", id="decided-empty")
+      if failed and not known
+        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 16px", id="decided-offline")
+      if loading and not known and not failed
+        Note(kind="loading", text="Loading what hex decided", pad="24px 16px", id="decided-loading")
+      for d in days key=d
+        column testId=`decided-day-${d}`
+          for a, i in decided.filter(x => `${dayOf(x.decided, offset)}` == d) key=a.id
+            if i == 0
+              DayHead(label=dayHead(a.decided, now, offset), n=decided.filter(x => `${dayOf(x.decided, offset)}` == d).length)
+            else
+              box height=0 margin="5px 0 5px 48px" border-top="0.5px solid -exact-separator"
+            DecidedRow(ask=a, selected=(selected == a.id), offset=offset, failure=failureOf(said, a.id), open=choose(a.id), undo=undo(a.id))
+
+// One thing hex decided: its mark, topic and time, the question, the answer hex gave, and Undo.
+component DecidedRow
   inject
     haptics: bool
   props
-    // The one to open first and bring into view ("" for none).
-    opened: string
-    room: Room
+    ask: Ask
+    selected: bool
+    offset: number
+    failure: string
+    open: action
+    undo: action
+  derive tooks = tooksOf(ask)
+  view
+    column id=`decided-${ask.id}` margin=(selected ? "0 6px" : "0") border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") testId=`decided-story-${ask.id}`
+      row align-items="center" gap=6 padding=(selected ? "0 10px 0 0" : "0 16px 0 0")
+        button press=open class=RowTap flex=1 min-width=0 width="auto" gap=10 padding=(selected ? "9px 0 9px 10px" : "9px 0 9px 16px") border-radius=14 aria-current=selected aria-label=`hex decided, ${ask.topic}: ${ask.question}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`decided-open-${ask.id}`
+          box padding-top=1 flex-shrink=0
+            Mark(state="decided", size=22)
+          column flex=1 min-width=0 gap=2
+            row gap=8 align-items="baseline"
+              text ask.topic font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex=1 min-width=0
+              text formatTime(ask.decided, offset, "short") font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+            text ask.question font="-exact-subheadline" color="-exact-label" line-clamp=2
+            if tooks.length > 0
+              row gap=4 align-items="center" margin-top=2
+                image "symbol:sf/sparkle" width=11 height=11 object-fit="contain" color="hex.accent" flex-shrink=0 aria-hidden=true
+                text font="-exact-footnote" color="hex.accent" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+                  text match tooks.at(0) { case some(t) => t, case none => "" } font-weight=600
+                  text (tooks.length > 1 ? ` +${tooks.length - 1}` : "")
+        button press=undo class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back in Needs you` testId=`decided-undo-${ask.id}`
+          box class=PillFace padding="6px 12px"
+            text "Undo" font="-exact-subheadline" font-weight=600 color="-exact-label"
+      if failure != ""
+        row gap=8 align-items="center" padding="0 16px 8px 48px" flex-wrap="wrap"
+          text failure font="-exact-footnote" color="hex.danger" flex=1 testId=`decided-failed-${ask.id}`
+          button press=undo class=PillTap testId=`decided-retry-${ask.id}`
+            box class=PillFace padding="4px 10px"
+              text "Try again" font="-exact-footnote" font-weight=600
+
+// One whole: its topic and when, the question and what it's about, how long it waited on Bassim
+// before hex took it, where it lives, and every answer, the one hex took on mint with why.
+component DecidedStory
+  props
+    ask: Ask
+    // Wider than tall: the story on the left, its answers on the right.
+    wide: bool
     now: number
     offset: number
-    asks: Asks
-    tasks: Tasks
-    said: Said[]
-    loading: bool
-    failed: bool
-    undo: action
-    openTask: action
-  // The one open in place; "-" once Bassim has shut the one he came to.
-  state toggled = ""
-  derive shown = toggled == "" ? opened : toggled
-  derive decided = asks.decided
-  derive known = asks.version > 0
-  action choose(id: string)
-    toggled = two ? id : shown == id ? "-" : id
-  // With two columns the list is in hex's column and the story beside it, the first until he picks.
-  derive two = room.columns == 2
-  derive beside = match decided.filter(a => a.id == shown).at(0) { case some(a) => a.id, case none => match decided.at(0) { case some(a) => a.id, case none => "" } }
+    failure: string
+    openTopic: action
+  derive tooks = tooksOf(ask)
+  derive first = match tooks.at(0) { case some(t) => t, case none => "" }
   view
-    scroll id="decided-list" position="absolute" top=room.below bottom=0 left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(room.foot + 24) scroll-padding-top=max(room.headBottom + 8 - room.below, 0) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="decided-list"
-      // The title and its line stand beside the status icons; the rows start under their cover.
-      column min-height=(two ? 0 : max(0, room.headBottom + 8 - room.below))
-        PageTitle(text="hex decided", room=room, left=(two ? 20 : room.clear.x + 20), id="decided-title")
-        text (known ? `${decided.length} this week · Undo puts it back to you` : " ") font="-exact-subheadline" color="-exact-secondary-label" padding=`2px 20px 14px ${two ? 20 : room.clear.x + 20}px`
-      column padding=(two ? "0 10px" : `0 ${max(room.width - room.clear.x - room.clear.width, 0) + 10}px 0 ${room.clear.x + 10}px`)
-        if known and decided.length == 0
-          Note(kind="empty", text="Nothing this week. What hex decides for you shows here.", pad="24px 12px", id="decided-empty")
-        if failed and not known
-          Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="decided-offline")
-        if loading and not known and not failed
-          Note(kind="loading", text="Loading what hex decided", pad="24px 10px", id="decided-loading")
-        for a in decided key=a.id
-          DecidedStory(ask=a, open=(two ? beside == a.id : shown == a.id), inline=(not two), now=now, offset=offset, failure=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, toggle=choose(a.id), undo=undo(a.id), openTopic=openTask(homeOf(a.task, tasks.tasks)))
-    if two
-      scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`8px 20px ${room.foot + 24}px` box-sizing="border-box" testId="decided-beside"
-        for a in decided.filter(x => x.id == beside) key=a.id
-          column gap=10
-            text a.topic font="-exact-subheadline" color="-exact-secondary-label"
-            text a.question font="-exact-title2" font-weight=700 role="heading" aria-level=2 user-select="text"
-            DecidedBody(ask=a, openTopic=openTask(homeOf(a.task, tasks.tasks)))
+    row gap=4 align-items="flex-start" flex-direction=(wide ? "row" : "column") testId=`decided-body-${ask.id}`
+      column flex=(wide ? 1 : 0) width=(wide ? "auto" : "100%") min-width=0 padding="0 16px" box-sizing="border-box"
+        row gap=6 align-items="center" min-height=24
+          Mark(state="decided", size=22)
+          text ask.topic font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0 margin-left=4
+          text `decided ${whenOf(ask.decided, now, offset)}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+        text ask.question font="-exact-title2" font-weight=600 color="-exact-label" margin-top=6 role="heading" aria-level=1 user-select="text"
+        if ask.context != ""
+          column margin-top=8
+            Prose(text=ask.context, font="-exact-callout", color="-exact-label")
+        row gap=8 align-items="center" margin-top=14 testId=`decided-waited-${ask.id}`
+          row gap=6 align-items="center" flex-shrink=0
+            box width=7 height=7 border-radius=4 background-color="hex.ask" aria-hidden=true
+            text `Asked ${monthDayOf(ask.at, offset)}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap"
+          row flex=1 min-width=0 gap=6 align-items="center"
+            box flex=1 height=0 border-top="0.5px solid -exact-separator"
+            text waitedOf(ask, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+            box flex=1 height=0 border-top="0.5px solid -exact-separator"
+          row gap=6 align-items="center" flex-shrink=0
+            box width=7 height=7 border-radius=4 background-color="hex.accent" aria-hidden=true
+            text `hex took it ${whenOf(ask.decided, now, offset)}` font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap"
+        if first == "" and ask.why != ""
+          row gap=6 align-items="flex-start" margin-top=12
+            image "symbol:sf/sparkle" width=12 height=12 object-fit="contain" color="hex.accent" margin-top=4 flex-shrink=0 aria-hidden=true
+            column flex=1 min-width=0
+              Prose(text=ask.why, font="-exact-subheadline", color="hex.accent")
+        if failure != ""
+          text failure font="-exact-footnote" color="hex.danger" margin-top=10
+        row margin-top=8
+          button press=openTopic class=Tap display="flex" align-items="center" min-height=44 aria-label=`Open ${ask.topic}` testId=`decided-topic-${ask.id}`
+            row gap=6 align-items="center" height=30 padding="0 11px" border-radius=15 background-color="-exact-quaternary-fill"
+              image (match ask.places.at(0) { case some(p) => appSymbol(p.app), case none => "symbol:sf/arrow.up.right" }) width=12 height=12 object-fit="contain" color="-exact-label" aria-hidden=true
+              text (match ask.places.at(0) { case some(p) => (p.place != "" ? `${p.place} in ${appName(p.app)}` : appName(p.app)), case none => ask.topic }) font="-exact-footnote" font-weight=600 color="-exact-label" white-space="nowrap"
+      column flex=(wide ? 1 : 0) width=(wide ? "auto" : "100%") min-width=0 gap=8 padding=(wide ? "0 16px" : "14px 16px 0") box-sizing="border-box"
+        if first == ""
+          text "The answers it had" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" margin-bottom=-2
+        for o in ask.options key=o.label
+          column gap=2 padding="11px 10px" margin="0 -10px" border-radius=14 border=(tooks.includes(o.label) ? "1px solid hex.accent.edge" : "1px solid transparent") background-color=(tooks.includes(o.label) ? "hex.accent.soft" : "-exact-quaternary-fill") testId=`decided-option-${ask.id}-${o.label}`
+            row gap=8 align-items="baseline"
+              text o.label font="-exact-headline" color="-exact-label" flex=1 min-width=0
+              if tooks.includes(o.label)
+                row gap=3 align-items="center" flex-shrink=0
+                  image "symbol:sf/sparkle" width=11 height=11 object-fit="contain" color="hex.accent" aria-hidden=true
+                  text "hex took" font="-exact-footnote" font-weight=600 color="hex.accent" white-space="nowrap"
+            if o.detail != ""
+              text o.detail font="-exact-subheadline" color="-exact-secondary-label"
+            if o.label == first and ask.why != ""
+              column margin-top=4
+                Prose(text=ask.why, font="-exact-subheadline", color="hex.accent")
 
 // One thing hex decided, opened from Feed with two columns: beside Feed, as an idea or a goal is.
 component DecidedPane
@@ -98,118 +300,27 @@ component DecidedPane
     tasks: Tasks
     loading: bool
     failed: bool
-    // How far the heading stays off the column's trailing edge, and its least height (as IdeaBody).
-    inset: number
+    // How far under the pane's top the page beside starts its heading.
     head: number
     foot: number
+    now: number
+    offset: number
     undo: action
     openTask: action
   derive known = asks.version > 0
   view
-    scroll flex=1 min-height=0 padding=`4px 16px ${foot + 24}px` box-sizing="border-box" testId="decided-pane"
+    scroll flex=1 min-height=0 padding=`4px 0 ${foot + 24}px` box-sizing="border-box" testId="decided-pane"
       if not known and failed
-        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 0", id="decided-pane-offline")
+        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 16px", id="decided-pane-offline")
       if not known and not failed
-        Note(kind="loading", text="Loading what hex decided", pad="24px 0", id="decided-pane-loading")
+        Note(kind="loading", text="Loading what hex decided", pad="24px 16px", id="decided-pane-loading")
       if known and asks.decided.filter(a => a.id == id).length == 0
-        Note(kind="empty", text="Put back to you. It's in Needs you.", pad="24px 0", id="decided-pane-gone")
+        Note(kind="empty", text="Put back to you. It's in Needs you.", pad="24px 16px", id="decided-pane-gone")
       for a in asks.decided.filter(x => x.id == id) key=a.id
-        column gap=14
-          column gap=4 padding-right=inset min-height=head box-sizing="border-box"
-            text a.question font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=(head > 0 ? 3 : 4) overflow-wrap="break-word" role="heading" aria-level=2 user-select="text" testId="decided-pane-title"
-            text `hex decided · ${a.topic}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
-          row
+        column gap=14 padding-top=max(0, head - 40)
+          DecidedStory(ask=a, wide=false, now=now, offset=offset, failure="", openTopic=openTask(homeOf(a.task, tasks.tasks)))
+          row padding="0 16px"
             button press=undo(a.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${a.question}” back in Needs you` testId=`decided-pane-undo-${a.id}`
-              box class=PillFace
-                text "Undo" font="-exact-subheadline" font-weight=600
-          DecidedBody(ask=a, openTopic=openTask(homeOf(a.task, tasks.tasks)))
-
-// One thing hex decided: its topic and question, Undo, and a chevron that says it opens in place;
-// open, the whole story under it.
-component DecidedStory
-  inject
-    haptics: bool
-    still: bool
-  props
-    ask: Ask
-    open: bool
-    // One column: the story opens under the row. Two: it shows beside, and the row is marked.
-    inline: bool
-    now: number
-    offset: number
-    failure: string
-    toggle: action
-    undo: action
-    openTopic: action
-  derive took = tookOf(ask)
-  derive others = othersOf(ask)
-  view
-    column id=`decided-${ask.id}` border-bottom="0.5px solid -exact-separator" testId=`decided-story-${ask.id}`
-      row align-items="center" gap=0
-        button press=toggle class=RowTap flex=1 min-width=0 width="auto" background-color=(open and not inline ? "-exact-tertiary-fill" : "transparent") aria-current=(open and not inline) aria-expanded=(inline ? open : false) aria-label=`hex decided, ${ask.topic}: ${ask.question}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`decided-open-${ask.id}`
-          box padding-top=1 flex-shrink=0
-            Mark(state="decided", size=22)
-          column flex=1 min-width=0 gap=2
-            row gap=8 align-items="baseline"
-              text ask.topic font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
-              box flex=1
-              text whenOf(ask.decided, now, offset) font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
-            text (took != "" ? took : ask.question) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
-        button press=undo class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back in Needs you` testId=`decided-undo-${ask.id}`
-          box class=PillFace
-            text "Undo" font="-exact-subheadline" font-weight=600
-        button press=toggle class=Tap width=36 min-height=44 display="flex" align-items="center" justify-content="center" aria-hidden=true testId=`decided-chevron-${ask.id}`
-          image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" rotate=(open and inline ? "90deg" : "0deg") transition=springOf(still, "rotate")
-      if failure != ""
-        row gap=8 align-items="center" padding="0 10px 8px 44px" flex-wrap="wrap"
-          text failure font="-exact-footnote" color="hex.danger" flex=1 testId=`decided-failed-${ask.id}`
-          button press=undo class=PillTap testId=`decided-retry-${ask.id}`
-            box class=PillFace padding="4px 10px"
-              text "Try again" font="-exact-footnote" font-weight=600
-      if open and inline
-        column gap=14 padding="2px 10px 16px 44px"
-          // The row's line is the question when hex gave no short answer; it isn't said twice.
-          if took != ""
-            text ask.question font="-exact-headline" color="-exact-label" user-select="text"
-          DecidedBody(ask=ask, openTopic=openTopic)
-
-// The whole story of one: what it was about, what hex picked, why, what the others gave up, and
-// its topic one tap away.
-component DecidedBody
-  props
-    ask: Ask
-    openTopic: action
-  derive took = tookOf(ask)
-  derive others = othersOf(ask)
-  view
-    column gap=14 testId=`decided-body-${ask.id}`
-      if ask.context != ""
-        Prose(text=ask.context, font="-exact-subheadline", color="-exact-secondary-label")
-      if took != ""
-        column gap=4
-          Label(text="hex picked")
-          text took font="-exact-headline" color="hex.accent" user-select="text"
-          if tookDetail(ask) != ""
-            text tookDetail(ask) font="-exact-subheadline" color="-exact-secondary-label"
-      if ask.why != ""
-        column gap=4
-          Label(text="Why")
-          Prose(text=ask.why, font="-exact-body", color="-exact-label")
-      if others.length > 0
-        column gap=6
-          Label(text=(took == "" ? "The answers it had" : others.length == 1 ? "What the other answer gave up" : "What the other answers gave up"))
-          for o in others key=o.label
-            column gap=1
-              text o.label font="-exact-body" color="-exact-label"
-              if o.detail != ""
-                text o.detail font="-exact-subheadline" color="-exact-secondary-label"
-      button press=openTopic class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-label=`Open ${ask.topic}` testId=`decided-topic-${ask.id}`
-        text `Open ${ask.topic}` font="-exact-subheadline" font-weight=600 color="-exact-label"
-        image "symbol:sf/chevron.right" width=10 height=10 object-fit="contain" color="-exact-tertiary-label"
-
-// A small head inside a story.
-component Label
-  props
-    text: string
-  view
-    text text font="-exact-caption1" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.6
+              box class=PillFace gap=6 padding="8px 14px"
+                image "symbol:sf/arrow.uturn.backward" width=14 height=14 object-fit="contain" color="-exact-label" aria-hidden=true
+                text "Undo" font="-exact-subheadline" font-weight=600 color="-exact-label"

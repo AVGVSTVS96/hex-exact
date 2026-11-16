@@ -1,12 +1,12 @@
-# hex decided from Home: the list, one opened in place, Undo; then opened at a row as Tasks and
-# Feed open it.
+# hex decided from Home: the week and the days; a row opens its story (beside it with two columns),
+# Undo from the story; then opened at a row, as Feed opens it.
 launch /
 reveal home-decided
 tap home-decided
 shoot decided
 tap decided-open-*
-shoot decided-open
-tap decided-undo-*
+shoot decided-story
+tap decided-story-undo-*
 shoot decided-undone
 launch /decided
 shoot decided-link

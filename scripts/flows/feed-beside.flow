@@ -32,4 +32,4 @@ tap story-from
 shoot goal
 tap feed-decided:*
 shoot decided
-mark decided-pane-title
+mark decided-pane

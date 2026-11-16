@@ -1,10 +1,11 @@
 // The update toast (§11): a new build of hex Exact is out. Install hands it to hangar, which
 // installs it and opens the new build (ending the call first); without hangar, the install link
-// installs it. × hides it until the build after. During a call it says Install ends the call. It sits in Home's free chrome row, beside
-// the capsule and on hex's side, never over hex or a control; it waits there while a page is open.
+// installs it. × hides it until the build after. It floats at the foot of hex's room, beside Call
+// and clear of hex and every control; in a call, over the call's buttons; open like a laptop, at
+// the foot of the list above the hinge. It shows on Home only, and waits there while a page is open.
 use Build from "./shapes.contract"
 use Tap from "./parts.contract"
-use Room, capsuleX from "./room.contract"
+use Room, stacked from "./room.contract"
 
 // A new build is out that Bassim hasn't put off.
 fn noticeOf(build: Build, skipped: number): bool = build.running > 0 and build.latest > build.running and build.latest != skipped and build.install != ""
@@ -27,11 +28,18 @@ component UpdateToast
   // Where the open went: hangar first, then the install link.
   state via = ""
   derive shown = noticeOf(build, skipped)
-  // The free stretch of the chrome row: from its start to the capsule, and with two columns no
-  // further than hex's.
-  derive spanEnd = min(capsuleX(room), room.columns == 2 ? room.first.x + room.first.width : capsuleX(room)) - 10
-  // Where the stretch is short (the Duo folded upright gives about 200pt), the pill alone says it.
-  derive roomy = spanEnd - room.bar.start >= 270
+  // Its row: from 12 in at the start of hex's column to 10 short of Call at its trailing foot (as
+  // call.contract places Call, 58 wide and 12 in), or in a call of its glass group of three (184
+  // wide, 64 tall, 10 in); above the app's own tabs where the shell draws no bars; open like a
+  // laptop, at the foot of the list above the hinge. Home keeps its list and the call's words clear.
+  derive across = stacked(room)
+  derive left = (across ? room.clear.x : room.first.x) + 12
+  derive edge = room.first.x + room.first.width
+  derive spanEnd = across ? left - 24 + room.clear.width : live ? edge - 10 - 184 - 10 : not room.native ? edge - 12 : edge - 12 - 58 - 10
+  derive bottom = across ? room.height - room.across + 12 : live ? max(room.foot - 3, 9) + 10 : not room.native ? room.height - room.tabs.top + 8 : room.foot + 7
+  // Where the stretch is short, the pill alone says it.
+  derive roomy = spanEnd - left >= 270
+  derive labelled = roomy and not (live and spanEnd - left < 340)
   derive verb = step == "failed" ? "Try again" : live ? (roomy ? "Hang up & install" : "Hang up & update") : (roomy ? "Install" : "Install update")
   action install
     if step != "installing"
@@ -50,17 +58,17 @@ component UpdateToast
       step = "failed"
   view
     if shown and place == "home"
-      row position="absolute" top=room.bar.top left=room.bar.start width=(spanEnd - room.bar.start) height=44 justify-content="flex-start" z-index=3 pointer-events="none" testId="update-toast"
-        row pointer-events="auto" backgroundMaterial="glass" border-radius=22 height=44 max-width="100%" align-items="center"
-          button id="update-install" press=install change=heard class=Tap height=44 min-width=0 padding=(step == "installing" ? "0 16px" : roomy ? "0 4px 0 16px" : "0 0 0 6px") display="flex" flex-direction="row" align-items="center" gap=10 aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
+      row position="absolute" bottom=bottom left=left width=(spanEnd - left) height=44 justify-content="flex-start" z-index=6 pointer-events="none" testId="update-toast"
+        row pointer-events="auto" backgroundMaterial="glass" border-radius=22 height=44 max-width="100%" align-items="center" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
+          button id="update-install" press=install change=heard class=Tap height=44 min-width=0 padding=(step == "installing" ? "0 18px 0 14px" : labelled ? "0 0 0 16px" : "0 0 0 6px") display="flex" flex-direction="row" align-items="center" gap=(step == "installing" ? 9 : 10) aria-label=(step == "installing" ? `Installing build ${build.latest}; hex Exact closes and opens again in it` : `${live ? "End the call and install" : "Install"} the new hex Exact, build ${build.latest}`) testId="update-install"
             if step == "installing"
               progress width=16 height=16 aria-label="Installing"
               text "Installing…" font="-exact-subheadline" font-weight=600 color="-exact-label" white-space="nowrap"
             else
-              if roomy
-                text (step == "failed" ? "Didn't start" : "Update ready") font="-exact-subheadline" color="-exact-label" white-space="nowrap" flex-shrink=0
-              box padding="7px 12px" border-radius=999 background-color="-exact-label" min-width=0
+              if labelled
+                text (step == "failed" ? "Didn't start" : "Update ready") font="-exact-subheadline" color=(step == "failed" ? "hex.danger" : "-exact-label") white-space="nowrap" flex-shrink=0
+              box height=32 padding="0 13px" border-radius=16 background-color="-exact-label" display="flex" align-items="center" min-width=0
                 text verb font="-exact-subheadline" font-weight=600 color="-exact-background" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
           if step != "installing"
-            button press=skip(build.latest) class=Tap width=44 height=44 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-label="Hide until the next build" testId="update-dismiss"
-              image "symbol:close" width=12 height=12 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+            button press=skip(build.latest) class=Tap width=40 height=44 margin-left=-6 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-label="Hide until the next build" testId="update-dismiss"
+              image "symbol:close" width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true

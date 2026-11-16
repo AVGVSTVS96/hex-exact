@@ -4,7 +4,8 @@
 // Home shows it whenever no call is on; Tasks has the rest.
 use Tasks, Ask, Asks, TaskRow, Track, Goals from "./shapes.contract"
 use Mark, StageHead, ShowMore, Row, Ribbon, Note, RowTap, PillTap, PillFace, whenOf, dayOf, Tap, springOf from "./parts.contract"
-use Said from "./said.contract"
+use Said, failedWords from "./said.contract"
+use Folded from "./rows.contract"
 use FeedList, FeedView from "./feed.contract"
 use IdeasList, Ideas, Idea from "./ideas.contract"
 use GoalsList from "./goals.contract"
@@ -21,6 +22,10 @@ fn hexHeight(): number = 72
 
 // What Bassim put away here leaves at once, as in Tasks.
 fn awayOf(said: Said[]): string[] = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
+// What Bassim last said to one here, or a blank.
+fn wordOf(said: Said[], id: string): Said = match said.filter(s => s.id == id).at(-1) { case some(s) => s, case none => Said(id="", verb="", label="", status="", detail="", missed=0, question="", topic="", task="") }
+// A question he answered or put away here, folded in its row until hex lets it go.
+fn foldedOf(e: Item, said: Said[]): bool = e.kind == "ask" and wordOf(said, e.id).id != "" and wordOf(said, e.id).verb != "note" and wordOf(said, e.id).status != "failed"
 // What waits for Bassim's answer, as Tasks lists it: questions (a pick of hex's still waits on
 // him), threads that wait on him and stuck runs. A result he hasn't seen is new in Feed, not here;
 // what hex decided itself has left already (asks.decided).
@@ -76,6 +81,7 @@ component HexHome
     openFeed: action
     discuss: action
     undo: action
+    again: action
     moreFeed: action
     retryFeed: action
     ideas: Ideas
@@ -99,6 +105,8 @@ component HexHome
   derive liveId = match live { case some(t) => t.id, case none => "" }
   derive liveTopic = match live { case some(t) => t.name, case none => "" }
   derive needs = needsOf(tasks, asks, said, now)
+  // Those rows with what he put away here still among them, folded in place, so no row moves.
+  derive shelf = entriesOf(tasks, asks, now).filter(e => e.stage == "needs" and e.kind != "fresh")
   derive working = sortBy(entriesOf(tasks, asks, now).filter(e => e.stage == "working"), e => e.at, "desc")
   derive liveText = working.length > 1 ? `Working on ${liveTopic} +${working.length - 1}` : `Working on ${liveTopic}`
   derive under = top + hexHeight()
@@ -118,7 +126,7 @@ component HexHome
         scroll position="absolute" inset=0 padding=`${under}px 6px ${pad}px` box-sizing="border-box" opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
           if p == "now"
             children
-            NowList(wide=(width > height), width=(width - 12), height=(height - under - pad), now=now, offset=offset, tasks=tasks, needs=needs, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll)
+            NowList(wide=(width > height), width=(width - 12), height=(height - under - pad), now=now, offset=offset, tasks=tasks, needs=needs, shelf=shelf, said=said, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, undo=undo, again=again)
           else if p == "feed"
             FeedList(feed=feed, now=now, offset=offset, width=(width - 12), wide=(width > height), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
           else if p == "ideas"
@@ -172,7 +180,10 @@ component NowList
     now: number
     offset: number
     tasks: Tasks
+    // What waits on him (its count), and its rows: with what he put away here folded in place.
     needs: Item[]
+    shelf: Item[]
+    said: Said[]
     working: Item[]
     picks: Ask[]
     decided: Ask[]
@@ -185,11 +196,13 @@ component NowList
     openTasks: action
     open: action
     answerAll: action
+    undo: action
+    again: action
   // Wide, each column is half the width, and Needs you ends above hex decided.
   derive colW = wide ? (width - 4) / 2 : width
   derive needsRoom = (wide ? height - 62 : round(height * 0.62)) - headH() - moreH() - (picks.length > 0 ? picksH() : 0)
-  derive shownNeeds = needs.slice(0, fitting(needs.map(e => needH(e, colW)), needsRoom, 2))
-  derive needsUsed = headH() + sum(shownNeeds.map(e => needH(e, colW))) + (needs.length > shownNeeds.length ? moreH() : 0) + (picks.length > 0 ? picksH() : 0)
+  derive shownNeeds = shelf.slice(0, fitting(shelf.map(e => needH(e, colW)), needsRoom, 2))
+  derive needsUsed = headH() + sum(shownNeeds.map(e => needH(e, colW))) + (shelf.length > shownNeeds.length ? moreH() : 0) + (picks.length > 0 ? picksH() : 0)
   // `height` ends above Call. In one column hex decided is last, beside Call in its band, so
   // Working on has the rest down to Call; in two, Working on ends above Call, as `height` does.
   derive workRoom = (wide ? height : height - needsUsed - 22) - headH() - moreH()
@@ -220,11 +233,16 @@ component NowList
         column flex=(wide ? 1 : 0) min-width=0 testId="home-needs"
           StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="9px 10px", id="home-head-asks")
           for e in shownNeeds key=e.id
-            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
-          if known and needs.length == 0
+            if foldedOf(e, said)
+              Folded(said=wordOf(said, e.id), question=e.title, topic=e.topic, pad="9px 10px", undo=undo, again=again)
+            else
+              Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+              if wordOf(said, e.id).status == "failed"
+                text failedWords(wordOf(said, e.id)) font="-exact-footnote" color="hex.danger" padding="0 10px 8px 42px" margin-top=-6 testId=`home-failed-${e.id}`
+          if known and shelf.length == 0
             Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 42px", id="home-empty-needs")
-          if needs.length > shownNeeds.length
-            ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=open(path("needs")))
+          if shelf.length > shownNeeds.length
+            ShowMore(n=shelf.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=open(path("needs")))
           if picks.length > 0
             row gap=10 align-items="center" padding="1px 10px" testId="home-picks"
               Mark(state="decided", size=22)

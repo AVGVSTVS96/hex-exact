@@ -38,12 +38,14 @@ component Picks
       Chrome(room=room, on="picks", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       scroll id="picks" position="absolute" top=room.below bottom=0 left=0 width=room.width padding-bottom=(room.foot + (picks.length > 0 ? 88 : 24)) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
         PageTitle(text="hex’s picks", room=room, left=(left + 20), id="picks-title")
-        column padding=`0 ${right + 8}px 0 ${left + 8}px` gap=2
-          text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""} · nothing goes until you tap Answer` font="-exact-subheadline" color="-exact-secondary-label" padding="2px 12px 14px"
+        column padding=`0 ${right + 10}px 0 ${left + 10}px` gap=2
+          text `${picks.length} ${picks.length == 1 ? "question" : "questions"}${later > 0 ? ` · ${later} for later` : ""} · nothing goes until you tap Answer` font="-exact-subheadline" color="-exact-secondary-label" padding="2px 10px 14px"
           if picks.length == 0
             Note(kind="empty", text="Nothing left to take", pad="24px 12px", id="picks-empty")
           for a in picks key=a.id
-            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, selected=false, href=path("pick", a.id), label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=open(path("pick", a.id)))
+            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, selected=false, href="", label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=open(path("pick", a.id)))
+      // Answer stands on the page's own colour, faded over the 24 above it, as wide as a line reads.
       if picks.length > 0
-        button press=takeAll buttonStyle=(taking.length > 0 ? "filled" : "bordered") disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(left + 16) right=(right + 16) min-height=50 testId="picks-answer"
+        box position="absolute" bottom=0 left=0 right=0 height=(room.foot + 8 + 50 + 24) background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" pointer-events="none" aria-hidden=true
+        button press=takeAll buttonStyle=(taking.length > 0 ? "filled" : "bordered") disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(left + 16 + max(room.clear.width - 32 - 480, 0) / 2) width=min(room.clear.width - 32, 480) min-height=50 testId="picks-answer"
           text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}`

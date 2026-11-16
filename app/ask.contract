@@ -88,7 +88,7 @@ component AskCard
     chosen = [""].slice(0, 0)
     undo(ask.id)
   view
-    column gap=10 padding="10px 0 14px" testId=`ask-card-${ask.id}`
+    column gap=10 padding="10px 10px 14px" testId=`ask-card-${ask.id}`
       row gap=8 align-items="center" min-height=20
         box width=8 height=8 border-radius=4 background-color=(settled ? "-exact-tertiary-label" : "hex.ask") flex-shrink=0 aria-hidden=true
         text `${questionWord(n, of)}${ask.at > 0 ? ` · ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label" font-variant-numeric="tabular-nums" line-clamp=1
@@ -134,13 +134,13 @@ component AskCard
       column border-top="0.5px solid -exact-separator" role=(ask.multiple ? "group" : "radiogroup") aria-label="Answers"
         for o in ask.options key=o.label
           if mine and picks.includes(o.label)
-            Confirmed(label=o.label, detail=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-option-${ask.id}-${o.label}`, undo=takeBack, again=again(ask.id))
+            Confirmed(label=o.label, detail=o.detail, status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-option-${ask.id}-${o.label}`, undo=takeBack, again=again(ask.id))
           else
             AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=chosen.includes(o.label), role=(ask.multiple ? "check" : "radio"), disabled=settled, id=`ask-option-${ask.id}-${o.label}`, press=choose(o.label))
         if ownWords
-          Confirmed(label=said.label, detail=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-own-${ask.id}`, undo=takeBack, again=again(ask.id))
+          Confirmed(label=said.label, detail="", status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-own-${ask.id}`, undo=takeBack, again=again(ask.id))
         if mine and said.verb == "dismiss"
-          Confirmed(label="Not needed", detail=(said.status == "sending" ? "Taking it off your list…" : "Off your list"), failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-dismiss-${ask.id}`, undo=takeBack, again=again(ask.id))
+          Confirmed(label="Not needed", detail="Take it off your list", status=(said.status == "sending" ? "Sending…" : "Off your list"), failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-dismiss-${ask.id}`, undo=takeBack, again=again(ask.id))
         else
           NotNeeded(disabled=settled, id=`ask-dismiss-${ask.id}`, press=dismiss(ask.id))
       if ask.multiple and not settled
@@ -164,6 +164,8 @@ component Confirmed
   props
     label: string
     detail: string
+    // Where it went, or that it's on its way.
+    status: string
     failed: string
     missed: number
     id: string
@@ -171,14 +173,15 @@ component Confirmed
     again: action
   view
     column border-bottom="0.5px solid -exact-separator" testId=id
-      row gap=12 align-items="center" min-height=44 padding="10px 0"
+      row gap=12 align-items="center" min-height=44 padding="12px 0"
         box width=22 height=22 border-radius=11 flex-shrink=0 background-color=(failed != "" ? "hex.danger" : "-exact-label") display="flex" align-items="center" justify-content="center" aria-hidden=true
           image (failed != "" ? "symbol:sf/exclamationmark" : "symbol:checkmark") width=11 height=11 object-fit="contain" color="-exact-background"
         column flex=1 min-width=0 gap=2
           text label font="-exact-body" font-weight=600 color="-exact-label"
-          if failed == ""
-            text detail font="-exact-subheadline" color="-exact-secondary-label" aria-live="polite"
+          if detail != ""
+            text detail font="-exact-subheadline" color="-exact-secondary-label"
         if failed == ""
+          text status font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" max-width="40%" aria-live="polite"
           button press=undo class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${label}` testId=`${id}-undo`
             box class=PillFace
               text "Undo" font="-exact-subheadline" font-weight=600
@@ -251,6 +254,8 @@ component ReplyComposer
     addError: string
     attach: action
     detach: action
+    // How far it stands off the window's bottom (the call docked there, the home indicator).
+    foot: number
   state text = ""
   state started = false
   derive words = started ? text : draft
@@ -267,7 +272,7 @@ component ReplyComposer
     started = true
     keep(`ask:${ask.id}`, "")
   view
-    column gap=4 padding="6px 12px 8px" testId="reply"
+    column gap=4 padding=`6px 16px ${foot + 8}px` testId="reply"
       Waiting(media=attached, error=addError, remove=detach)
       row gap=8 align-items="flex-end"
         AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=44, disabled=(attached.length >= 4), add=add)

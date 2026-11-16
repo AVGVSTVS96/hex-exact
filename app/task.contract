@@ -204,8 +204,9 @@ component TaskBody
   derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${row.state == "needs" ? `Waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `Working · started ${lengthOf((now - row.since) / 1000)} ago` : row.state == "done" ? `Done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}${waiting > 0 ? ` · ${waiting} need you` : ""}`
   derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
   derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
-  // The reply box docked at the foot: for the question Bassim picked, else the first still open.
-  derive replyAsk = replying != "" ? pageAsks.filter(a => a.id == replying) : pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).slice(0, 1)
+  // The reply box docked at the foot: for the question Bassim picked, else the first still open, else
+  // the first on the page, so answering doesn't swap it away.
+  derive replyAsk = replying != "" ? pageAsks.filter(a => a.id == replying) : pageAsks.filter(a => said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length == 0).concat(pageAsks).slice(0, 1)
   derive weekly = places.filter(t => t.track.length > 0)
   // The door out to where this lives: the thread's own place, the finished item's, or a topic's
   // first question's.
@@ -237,8 +238,8 @@ component TaskBody
           Discuss(title=title, id=(pane ? "pane-talk" : "task-talk"), press=talk(kind == "task" ? id : "asks"))
         if missing.includes(door.app)
           text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding-left=4 width="100%" testId="door-missing"
-      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
-        column padding="0 10px" padding-bottom=(docked ? 30 : foot + 24) gap=0
+      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked or replyAsk.length > 0 ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
+        column padding="0 10px" padding-bottom=(docked or replyAsk.length > 0 ? 30 : foot + 24) gap=0
           if kind == "done"
             Happened(mark="done", text=finished.title, stamp="", failed=false)
             if finished.said != ""
@@ -325,7 +326,7 @@ component TaskBody
                 ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach)
+          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=foot)
       else if docked
         button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=16 right=16 bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
           row class=Composer flex=1 align-items="center" padding="0 16px"

@@ -4,7 +4,7 @@
 // as the last row. Once answered it folds to what he said, with Undo.
 use Ask, Words, Media from "./shapes.contract"
 use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
-use Mark, whenOf, PillTap, Tap, PillFace, Composer, ComposerField from "./parts.contract"
+use Mark, whenOf, springOf, PillTap, Tap, PillFace, Composer, ComposerField from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
 fn questionWord(n: number, of: number): string = of > 1 ? `Question ${n} of ${of}` : "Question"
@@ -39,6 +39,7 @@ component AnswerRow
 component AskCard
   inject
     haptics: bool
+    still: bool
   props
     ask: Ask
     // Which of the page's questions this is, and how many it has.
@@ -109,7 +110,7 @@ component AskCard
           button press=showWords(ask.id) class=Tap display="flex" flex-direction="row" gap=6 align-items="center" padding="2px 0" aria-expanded=wordsOpen aria-label=`Why: the message from ${from}` testId=`ask-from-${ask.id}`
             text "Why" font="-exact-subheadline" font-weight=600 color="-exact-label"
             text `· from ${from}${ask.at > 0 ? `, ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1 flex-shrink=1
-            image "symbol:forward-chevron" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" rotate=(wordsOpen ? "90deg" : "0deg") transition="rotate 200ms ease"
+            image "symbol:forward-chevron" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" rotate=(wordsOpen ? "90deg" : "0deg") transition=springOf(still, "rotate")
           if wordsOpen
             column gap=4 padding="2px 0 4px 12px" border-left="2px solid -exact-separator"
               if words.text == ""

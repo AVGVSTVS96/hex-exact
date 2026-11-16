@@ -84,8 +84,11 @@ component TasksList
   // above the list (one column), level with it when the chrome sits over the page beside (two).
   derive col = room.first
   derive headTop = two ? room.bar.top : room.below
-  derive tabsTop = max(headTop + titleHeight(), clearTop)
-  derive listTop = tabsTop + tabsHeight()
+  // The tabs stay right under the title and stop short of the status icons where those stand beside
+  // them (folded upright, a column at the trailing edge); the list starts under both.
+  derive tabsTop = headTop + titleHeight()
+  derive tabsEnd = tabsTop + tabsHeight() > clearTop ? min(room.bar.end, col.x + col.width) : col.x + col.width
+  derive listTop = max(tabsTop + tabsHeight(), clearTop)
   // The title row's search button ends where the chrome's capsule does, clear of the status icons.
   derive headEnd = two ? col.x + col.width - 16 : min(room.bar.end, col.x + col.width - 16)
   // With a call docked at the foot, the list ends above it and fades over the 26 above it.
@@ -117,7 +120,7 @@ component TasksList
         if not searchOpen
           button press=openSearch class=Tap width=44 height=44 border-radius=22 backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-label="Search Tasks" -exact-press-haptic=(haptics ? "selection" : "none") testId="tasks-search-open"
             image "symbol:search" width=18 height=18 object-fit="contain" color="-exact-label"
-      row position="absolute" top=tabsTop left=col.x width=col.width height=tabsHeight() align-items="center" testId="tasks-tabs-row"
+      row position="absolute" top=tabsTop left=col.x width=(tabsEnd - col.x) height=tabsHeight() align-items="center" testId="tasks-tabs-row"
         if searchOpen
           row flex=1 gap=4 padding="0 8px 0 16px" align-items="center"
             row flex=1 min-width=0 height=40 gap=8 padding="0 12px" border-radius=20 background-color="-exact-tertiary-fill" align-items="center"

@@ -4,8 +4,8 @@ hex Exact is finished when every tap, swipe and fold on the iPhone Duo does what
 once, on every screen, and the whole app has the care of Muse: hex in the middle, flat pages, dark
 reading text, nothing on screen that hasn't earned its place.
 
-The reference is Muse, not the stable hex voice app. `docs/parity.md` stays as a list of what that
-app does; it is no longer the bar.
+The reference is Muse, not the stable hex voice app. `docs/parity.md` lists what that app does,
+as an inventory to draw on.
 
 ## What finished means
 
@@ -44,7 +44,9 @@ Exact         pinned at 7722882 (Nov 12); upstream has moved a long way since
 
 ## Where it's going
 
-Drawn from the app's own colours and type, at the Duo's real sizes. Source: `docs/plan/drawings.html`.
+Drawn from the app's own colours and type, at the Duo's real sizes. Source:
+`docs/plan/drawings.html`. Folded on its side, where the camera and status icons sit is assumed
+until Hands photographs that pose.
 
 | | Folded | Open like a book |
 |---|---|---|
@@ -66,13 +68,13 @@ Light versions of Home and the question are in `docs/plan/`.
 ## The pieces
 
 ```
-start together                          start when Room and System
-                                        have their first commit
+start together                         start when Room and System
+                                       have their first commit
 ┌───────────────────────────────┐      ┌────────────────────────────────────┐
-│ 1 Hands        scripts/        │      │ 5 Home and the call                 │
-│ 2 Room         one layout      │ ───▶ │ 6 Questions                         │ ───▶ 9 Last look
-│ 3 System       one design      │      │ 7 Tasks and threads                 │      on the Duo
-│ 4 Call engine  shell/          │      │ 8 Calls, Settings and the update    │
+│ 1 Hands        scripts/       │      │ 5 Home and the call                │
+│ 2 Room         one layout     │ ───▶ │ 6 Questions                        │ ───▶ 9 Last look
+│ 3 System       one design     │      │ 7 Tasks and threads                │      on the Duo
+│ 4 Call engine  shell/         │      │ 8 Calls, Settings and the update   │
 └───────────────────────────────┘      └────────────────────────────────────┘
 ```
 
@@ -105,7 +107,7 @@ Done when:
   Exact moves forward only if that lifts one of them and the app's tests still pass.
 
 The stable app already drives the Duo simulator (`hex-voice/scripts/duo-taps`,
-`harness/uitests`); start there.
+`uitests/`); start there.
 
 ### 2 Room
 
@@ -130,11 +132,13 @@ On the Duo, in all four poses:
 - The clock, battery and cameras never touch a control or a word.
 - Calls, Tasks, Settings, and Back on inner pages, sit beside the status icons. No page has a
   Back in its header.
-- The update notice sits in free toolbar space: never over hex, a control or the hinge.
+- The update notice sits in Home's free toolbar space: never over hex, a control or the hinge.
+- Calls, Tasks and Settings keep one place on every page. Back appears beside them without
+  moving them.
 - Call keeps a clear spot at the foot of hex's column, or the bottom corner when that column is
   full. No row sits under it.
 - The same window size gives the same layout, folded or not. Two columns appear only when both
-  read well, and none is cut by the hinge.
+  read well. No control or fixed part sits on the hinge; a list may scroll across it.
 - Fold, unfold, rotate: you stay on the page you were on, nothing jumps, the scroll holds.
 - The keyboard comes up: the field stays in view and nothing else moves.
 - In Split View, on an iPad and on a plain iPhone the same model lays the app out.
@@ -145,8 +149,8 @@ In code: `rg 'ViewportSegments|viewport\.(width|height) *[<>]' app/*.contract` f
 ### 3 System
 
 On the Duo:
-- Mint means one thing: hex's own pick. Amber is a question, blue is work going on, red is a
-  failure or ending the call.
+- Mint means one thing: hex's own choice, its pick and what it decided. Amber is a question,
+  blue is work going on, red is a failure or ending the call.
 - Home's rows and Tasks' rows are the same part. So are section heads, answer rows, composers,
   and the empty, loading and failed states. No screen draws its own.
 - What you read is dark; grey is for side details. A live call's words are easy to read in dark
@@ -174,10 +178,10 @@ On the Duo:
 ### 5 Home and the call
 
 On the Duo:
-- Open the app: hex's face, its name, and one live line you can read whole (two lines at
-  most). A tap on the line opens that work.
-- Needs you shows three, then "Show N more". A tap opens that question: over Home when folded,
-  beside it when there's room for two columns.
+- Open the app: hex's face, its name, and one live line of two lines at most. A longer line
+  ends in an ellipsis. A tap on the line opens that work.
+- Needs you shows the few that fit without scrolling, then "Show N more". A tap opens that
+  question: over Home when folded, beside it when there's room for two columns.
 - Working on, then "hex decided N", which opens what hex decided.
 - The last row never hides under the Call button.
 - Call: one tap. The orb grows out of hex's face in one motion. Words are bright enough to
@@ -227,7 +231,7 @@ On the Duo:
 - Settings is grouped, and each setting says what it does. A voice plays on a tap, silent
   switch or not. A new persona or colour shows on hex's face as you pick it.
 - "Update ready · Install": one tap, an installing state, and the app reopens in the new
-  build. During a call it says it will end the call. "Not now" hides it until the next build.
+  build. During a call it says it will end the call. × hides it until the next build.
 - A screens-only update arrives by itself while the app is in the background, never during a
   call or while you type.
 

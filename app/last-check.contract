@@ -27,7 +27,9 @@ component LastCheck
       Chrome(room=room, on="check", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       // Open like a book: what it read and flagged on the left of the fold, what it fixed on the right.
       scroll id="last-check" position="absolute" top=room.below bottom=0 left=(two ? room.first.x : 0) width=(two ? room.first.width : room.width) padding-bottom=(room.foot + 24) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
-        PageTitle(text="Last check", room=room, left=(two ? 20 : room.clear.x + 20), id="check-title")
+        // The title stands beside the status icons; what follows starts under their foot.
+        column min-height=(two ? 0 : max(0, room.headBottom - room.below))
+          PageTitle(text="Last check", room=room, left=(two ? 20 : room.clear.x + 20), id="check-title")
         column padding=inner gap=12
           if check.at > 0
             text `${whenOf(check.at, now, offset)}${check.why != "" ? ` · ${check.why}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"

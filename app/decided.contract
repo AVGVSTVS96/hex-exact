@@ -130,7 +130,9 @@ component DecidedStory
               text "Try again" font="-exact-footnote" font-weight=600
       if open and inline
         column gap=14 padding="2px 10px 16px 44px"
-          text ask.question font="-exact-headline" color="-exact-label" user-select="text"
+          // The row's line is the question when hex gave no short answer; it isn't said twice.
+          if took != ""
+            text ask.question font="-exact-headline" color="-exact-label" user-select="text"
           DecidedBody(ask=ask, openTopic=openTopic)
 
 // The whole story of one: what it was about, what hex picked, why, what the others gave up, and
@@ -154,7 +156,7 @@ component DecidedBody
       if ask.why != ""
         column gap=4
           Label(text="Why")
-          text ask.why font="-exact-body" color="-exact-label" user-select="text"
+          Prose(text=ask.why, font="-exact-body", color="-exact-label")
       if others.length > 0
         column gap=6
           Label(text=(took == "" ? "The answers it had" : others.length == 1 ? "What the other answer gave up" : "What the other answers gave up"))

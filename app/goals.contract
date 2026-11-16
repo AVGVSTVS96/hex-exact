@@ -21,7 +21,8 @@ fn plainOf(text: string): string = text.replaceAll("**", "").replaceAll("`", "")
 fn sentenceOf(text: string): string = match plainOf(text).split(". ").at(0) { case some(s) => s.endsWith(".") ? s.slice(0, -1) : s, case none => "" }
 // When it runs next, as Bassim would say it: "today at 9 AM", "tomorrow", "on Monday", "on Dec 6".
 fn nextWords(next: number, now: number, offset: number): string = next == 0 ? "" : dayOf(next, offset) == dayOf(now, offset) ? `today at ${formatTime(next, offset, "short")}` : dayOf(next, offset) == dayOf(now, offset) + 1 ? "tomorrow" : dayOf(next, offset) < dayOf(now, offset) + 7 ? `on ${match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(dayOf(next, offset) % 7) { case some(d) => d, case none => "" }}` : `on ${match formatDate(next, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }}`
-fn watchLine(w: Watch, now: number, offset: number): string = w.stopped ? "Stopped" : `${lastRun(w) != "" ? `${sentenceOf(lastRun(w))}. ` : ""}${w.next == 0 ? "Not set to run again" : `Checks again ${nextWords(w.next, now, offset)}`}`
+// When it checks next comes first, so a long report can't push it out of the row's two lines.
+fn watchLine(w: Watch, now: number, offset: number): string = w.stopped ? "Stopped" : `${w.next == 0 ? "Not set to run again" : `Checks again ${nextWords(w.next, now, offset)}`}${lastRun(w) != "" ? ` · ${sentenceOf(lastRun(w))}` : ""}`
 
 component GoalsList
   inject

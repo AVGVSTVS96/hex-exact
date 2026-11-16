@@ -6,7 +6,7 @@ use Mark, Note, Tap, whenOf, springOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Confirmed from "./ask.contract"
 use GoalAnswer, changeOf, partOf from "./goal.contract"
-use nextWords, plainOf from "./goals.contract"
+use nextWords, plainOf, sentenceOf from "./goals.contract"
 
 fn watchOf(goals: Goals, id: string): Watch = match goals.watching.filter(w => w.id == id).at(0) { case some(w) => w, case none => Watch(id="", stopped=false, title="", topic="", run="", every="", next=0, asked=[], does="", runs=[]) }
 fn foundOf(w: Watch): WatchRun[] = w.runs.filter(r => r.said != "")
@@ -35,7 +35,7 @@ component WatchPage
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="watch"
       Chrome(room=room, on="watch", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        WatchBody(foot=room.foot, id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, change=change, undo=undo, openTask=openTask)
+        WatchBody(foot=room.foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, change=change, undo=undo, openTask=openTask)
 
 component WatchBody
   inject
@@ -43,6 +43,8 @@ component WatchBody
     still: bool
   props
     foot: number
+    // Room kept at the heading's end, clear of the status icons beside the chrome row.
+    end: number
     id: string
     goals: Goals
     now: number
@@ -63,7 +65,7 @@ component WatchBody
         Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading" : "hex isn't watching this any more."), pad="24px 0", id="watch-missing")
       else
         column gap=4 padding="0 0 16px"
-          text w.title font="-exact-title1" font-weight=700 role="heading" aria-level=1 user-select="text"
+          text w.title font="-exact-title1" font-weight=700 padding-right=end role="heading" aria-level=1 user-select="text"
           text `Watching · ${w.topic}${w.every != "" ? ` · ${w.every}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
         if w.asked.length > 0
           column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="watch-asked"
@@ -73,7 +75,7 @@ component WatchBody
         else if w.does != ""
           column gap=6 margin-bottom=22 testId="watch-does"
             text "What hex checks" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-            text plainOf(w.does) font="-exact-body" color="-exact-label" line-clamp=6 user-select="text"
+            text `${sentenceOf(w.does)}.` font="-exact-body" color="-exact-label" line-clamp=3 user-select="text"
         column gap=10 margin-bottom=22 testId="watch-next"
           text "Next" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
           row gap=14 align-items="center"

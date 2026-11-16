@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Runs on the server: a picture of the real Duo's lit screen, taken through the Mac it's paired
-# with (devicectl), whatever app is in front. Prints the picture's path.
-#   scripts/phone            (into ~/hex/scratch/hex-exact/shots/phone/, private: it holds his data)
+# Runs on the server: a picture of hex Exact on the real Duo, taken through the Mac it's paired with
+# (devicectl). It's his phone, in his hand, with his messages on it: the picture is taken only
+# while hex Exact alone fills the lit screen, and kept only if it was still there, without
+# leaving, once the picture was taken. Otherwise it says so and takes nothing; it never opens or
+# moves anything on the phone. The app says where it is in its Library/HexFront (shell/Shell/App.swift).
+#   scripts/phone            (into ~/hex/scratch/hex-exact/shots/phone/; it shows his data, so it stays there)
 set -euo pipefail
 mac=${HEX_EXACT_MAC:-mac}
 env=${HEX_VOICE_ENV:-$HOME/.local/share/hex-voice/release/.env.local}
@@ -9,12 +12,31 @@ duo=$(sed -n 's/^DUO_UDID=//p' "$env")
 dir=${SHOTS:-$HOME/hex/scratch/hex-exact/shots}/phone
 file=$dir/$(date +%m%d-%H%M%S).png
 mkdir -p "$dir"
-# The cover is the Duo's primary display even while it's open and dark, so this shoots the lit one.
-ssh "$mac" "export PATH=/opt/homebrew/bin:\$PATH
-  xcrun devicectl device info displays --device $duo --json-output /tmp/hexexact-displays.json >/dev/null &&
-  xcrun devicectl device capture screenshot --device $duo --destination /tmp/hexexact-phone.png \
-    --display-unique-id \$(jq -r '.result.displays[] | select(.active) | .uniqueId' /tmp/hexexact-displays.json) >/dev/null" </dev/null ||
-  { echo "couldn't take the Duo's picture: is it unlocked and near the Mac?" >&2; exit 1; }
-scp -q "$mac:/tmp/hexexact-phone.png" "$file" && ssh "$mac" rm -f /tmp/hexexact-phone.png /tmp/hexexact-displays.json
-[ "$(magick "$file" -format '%[fx:maxima]' info:)" != 0 ] || { echo "the Duo's screen was black ($file): off or locked" >&2; exit 1; }
+ssh "$mac" bash -s -- "$duo" <<'MAC' || exit 1
+set -uo pipefail
+duo=$1 tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+export PATH=/opt/homebrew/bin:$PATH
+# When hex Exact last came to the front and whether it fills the screen; nothing while it isn't in front.
+front() {
+  rm -f "$tmp/front"
+  xcrun devicectl device copy from --device "$duo" --domain-type appDataContainer \
+    --domain-identifier com.shahidy.hexexact --source Library/HexFront --destination "$tmp/front" >/dev/null 2>&1 &&
+    cat "$tmp/front"
+}
+before=$(front) || true
+case $before in
+  *" full") ;;
+  *" part") echo "hex Exact shares the Duo's screen with another app, so no picture" >&2; exit 1 ;;
+  *) echo "hex Exact isn't in front on the Duo (or it's locked, or runs a build from before Nov 15), so no picture" >&2; exit 1 ;;
+esac
+xcrun devicectl device info displays --device "$duo" --json-output "$tmp/displays.json" >/dev/null &&
+  xcrun devicectl device capture screenshot --device "$duo" --destination "$tmp/phone.png" \
+    --display-unique-id "$(jq -r '.result.displays[] | select(.active) | .uniqueId' "$tmp/displays.json")" >/dev/null ||
+  { echo "couldn't take the Duo's picture: is it near the Mac?" >&2; exit 1; }
+# The same coming-to-front as before the picture, so it never left in between.
+[ "$(front)" = "$before" ] || { echo "hex Exact left the front while the picture was taken, so it's deleted" >&2; exit 1; }
+mkdir -p ~/Developer/hex-exact-build && mv "$tmp/phone.png" ~/Developer/hex-exact-build/phone.png
+MAC
+scp -q "$mac:Developer/hex-exact-build/phone.png" "$file" && ssh "$mac" rm -f Developer/hex-exact-build/phone.png
 echo "$file"

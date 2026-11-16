@@ -1,5 +1,6 @@
 import ExactKit
 import ExactUpdates
+import SafariServices
 import UIKit
 
 /// The shell: a plain UIKit app that holds what Exact defers (the WebRTC call, Siri, the Live
@@ -60,19 +61,55 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
 
   func sceneDidBecomeActive(_ scene: UIScene) {
     session?.becameActive()
+    front = Date().timeIntervalSince1970
+    sayFront(scene)
+  }
+
+  func sceneWillResignActive(_ scene: UIScene) {
+    front = nil
+    sayFront(scene)
+  }
+
+  func windowScene(_ scene: UIWindowScene, didUpdateEffectiveGeometry _: UIWindowScene.Geometry) {
+    sayFront(scene)
+  }
+
+  /// scripts/phone takes a picture of the real Duo only while hex Exact alone fills its screen, so
+  /// no other app's window is ever in it: `Library/HexFront` holds when the app last came to the
+  /// front and whether its window fills the screen, and is gone while it's anywhere else.
+  private var front: TimeInterval?
+  private func sayFront(_ scene: UIScene) {
+    let file = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appending(path: "HexFront")
+    guard let front, let scene = scene as? UIWindowScene else {
+      try? FileManager.default.removeItem(at: file)
+      return
+    }
+    let fills = scene.coordinateSpace.bounds.size == scene.screen.bounds.size
+    try? "\(front) \(fills ? "full" : "part")".write(to: file, atomically: true, encoding: .utf8)
   }
 
   func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
     contexts.first.map { open($0.url) }
   }
 
-  /// An embedded session hands every `openURL` to its host: hex's own scheme stays here, and a link
-  /// out (Telegram, T3 Code, a web page) goes to iOS, its answer back to the screen.
+  /// An embedded session hands every `openURL` to its host: hex's own scheme stays here, a web page
+  /// opens in Safari's sheet over the app (an app that claims its link, like Telegram, takes it
+  /// instead), and any other link (T3 Code) goes to iOS; its answer goes back to the screen.
   func exactSession(_ session: ExactSession, command name: String, args: [Any]) {
     guard name == "openURL", let link = args.first as? String, let url = URL(string: link) else { return }
     MainActor.assumeIsolated {
       guard url.scheme != "hexexact" else { return open(url) }
-      UIApplication.shared.open(url) { opened in session.answerOpenURL(args, opened: opened) }
+      guard url.scheme == "https" || url.scheme == "http" else {
+        return UIApplication.shared.open(url) { opened in session.answerOpenURL(args, opened: opened) }
+      }
+      UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { [weak self] opened in
+        if !opened, let screen = self?.screen {
+          var top: UIViewController = screen
+          while let shown = top.presentedViewController { top = shown }
+          top.present(SFSafariViewController(url: url), animated: true)
+        }
+        session.answerOpenURL(args, opened: true)
+      }
     }
   }
 

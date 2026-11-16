@@ -1,47 +1,142 @@
-// The wrap-up a call leaves (§6): what it was, what came of it, and what now waits on Bassim. Under
-// the orb once a call has ended (tap it for the call), and whole at the top of a past call.
-use CallRow from "./shapes.contract"
-use Tap from "./parts.contract"
+// The wrap-up a call leaves (§6): how it ended and when, its name, who spoke when, what it was, what
+// waits on Bassim and what went out from it. Whole at the top of a past call; on its own, fitted,
+// once a call has ended (`lines` clamps the summary, `rows` caps what went out) and opening the call when tapped.
+use CallRecord, CallRow, CallTask from "./shapes.contract"
+use StageHead, RowLines, Tap, dayOf from "./parts.contract"
+
+// One thing that went out from the call: an answer Bassim gave in it, or work it handed off.
+shape Sent
+  at: number
+  to: string
+  text: string
+  done: bool
+
+// mm:ss (or h:mm:ss) into a call.
+fn clockOf(ms: number): string = ms >= 3600000 ? `${floor(ms / 3600000)}:${floor((ms % 3600000) / 60000) < 10 ? "0" : ""}${floor((ms % 3600000) / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}` : `${floor(ms / 60000)}:${floor((ms % 60000) / 1000) < 10 ? "0" : ""}${floor((ms % 60000) / 1000)}`
+// A day as Mail names it: Today, Yesterday, the weekday this week, then the date.
+fn dayName(at: number, now: number, offset: number): string = dayOf(at, offset) == dayOf(now, offset) ? "Today" : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : formatDay(at, now, offset, "list")
+// A call's name: its title, else the first thing he said, else how it failed.
+fn callName(c: CallRow): string = c.title != "" ? c.title : c.preview != "" ? `“${c.preview}”` : badEnd(c.ending) ? endWord(c.ending) : "A quiet call"
+// How a call ended, in a word; "" when he simply hung up.
+fn endWord(kind: string): string = kind == "dropped" ? "Dropped" : kind == "no-connect" ? "Didn't connect" : kind == "hex" ? "hex hung up" : kind == "expired" ? "Time ran out" : kind == "no-answer" ? "No answer" : kind == "busy" ? "Busy" : ""
+fn badEnd(kind: string): bool = kind == "dropped" or kind == "no-connect"
+// Why, as hex gave it: its words, or a code made into words (connection_lost).
+fn whyOf(reason: string): string = reason.includes(" ") ? reason : reason.replaceAll("_", " ")
+fn secondsOf(r: CallRecord): number = r.call.seconds > 0 ? r.call.seconds : r.call.ended > r.call.started ? (r.call.ended - r.call.started) / 1000 : match sortBy(r.turns, t => t.at, "desc").at(0) { case some(t) => t.at / 1000, case none => 0 }
+
+// What went out, each task at its latest state: what's still running first, then in order.
+fn lastOf(tasks: CallTask[], id: string): CallTask = match tasks.filter(t => t.id == id).at(-1) { case some(t) => t, case none => CallTask(id="", state="", at=0, text="", to="") }
+fn sentOf(r: CallRecord): Sent[] = sortBy(sortBy(r.moments.filter(m => m.kind == "answered").map(m => Sent(at=m.at, to=m.topic, text=m.text, done=true)).concat(r.tasks.filter((t, i) => r.tasks.map(x => x.id).indexOf(t.id) == i).map(t => Sent(at=t.at, to=(lastOf(r.tasks, t.id).to != "" ? lastOf(r.tasks, t.id).to : t.to), text=t.text, done=(lastOf(r.tasks, t.id).state == "done")))), s => s.at), s => (s.done ? 1 : 0))
+
+// hex's lane takes the orb's colours along the call: green, then violet, then magenta.
+fn mixOf(a: number, b: number, t: number): number = round(a + (b - a) * t)
+fn rgbOf(r0: number, g0: number, b0: number, r1: number, g1: number, b1: number, t: number): string = `rgb(${mixOf(r0, r1, t)}, ${mixOf(g0, g1, t)}, ${mixOf(b0, b1, t)})`
+fn darkInk(t: number): string = t < 0.5 ? rgbOf(78, 168, 92, 168, 92, 176, t * 2) : rgbOf(168, 92, 176, 190, 60, 128, t * 2 - 1)
+fn lightInk(t: number): string = t < 0.5 ? rgbOf(232, 140, 92, 176, 132, 224, t * 2) : rgbOf(176, 132, 224, 120, 112, 230, t * 2 - 1)
+fn hexInk(t: number): string = `light-dark(${lightInk(t)}, ${darkInk(t)})`
 
 component WrapUp
   inject
     haptics: bool
   props
-    call: CallRow
-    whole: bool
-    more: number
-    openTasks: action
+    record: CallRecord
+    now: number
+    offset: number
+    // The summary's lines and how many of what went out to show (0: all of each).
+    lines: number
+    rows: number
+    // A past call's own page (its name the heading); else it opens that page when tapped.
+    heading: bool
     open: action
-  derive lead = call.summary != "" ? call.summary : call.why != "" ? `hex called because: ${call.why}` : ""
-  derive shown = whole ? call.waiting : call.waiting.slice(0, 3)
-  derive left = call.waiting.length - shown.length + more
+  // What can be done with the call, at the end of its name.
+  slot
+  derive c = record.call
   view
-    column gap=14 align-items=(whole ? "stretch" : "center") max-width="26.25rem" width="100%" testId="wrap-up"
-      if whole
-        WrapBody(call=call, lead=lead, shown=shown, whole=true)
-      else
-        button press=open(path("pastCall", call.id)) class=Tap display="flex" flex-direction="column" align-items="center" width="100%" aria-label=`${call.title}. ${lead}` aria-description="Opens the call" testId="open-wrap-up"
-          WrapBody(call=call, lead=lead, shown=shown, whole=false)
-      if left > 0
-        button press=openTasks("needs") class=Tap align-self=(whole ? "flex-start" : "center") -exact-press-haptic=(haptics ? "selection" : "none") testId="wrap-up-more"
-          text `${left} more in Tasks` font="-exact-footnote" font-weight=600 color="AccentColor"
+    if heading
+      column testId="wrap-up"
+        WrapBody(record=record, now=now, offset=offset, lines=lines, rows=rows, heading=true)
+          children
+    else
+      button press=open(path("pastCall", c.id)) class=Tap display="flex" flex-direction="column" align-items="stretch" text-align="left" width="100%" aria-description="Opens the call" -exact-press-haptic=(haptics ? "selection" : "none") testId="wrap-up"
+        WrapBody(record=record, now=now, offset=offset, lines=lines, rows=rows, heading=false)
 
 component WrapBody
   props
-    call: CallRow
-    lead: string
-    shown: string[]
-    whole: bool
+    record: CallRecord
+    now: number
+    offset: number
+    lines: number
+    rows: number
+    heading: bool
+  slot
+  derive c = record.call
+  derive ms = secondsOf(record) * 1000
+  derive bad = badEnd(c.ending)
+  derive lead = c.summary != "" ? c.summary : c.why != "" ? `hex called because: ${c.why}` : ""
+  derive sent = sentOf(record)
+  derive shown = rows <= 0 ? sent : sent.slice(0, rows)
   view
-    column gap=12 width="100%" align-items=(whole ? "stretch" : "center")
-      if not whole and call.title != ""
-        text call.title font="-exact-headline" color="-exact-label" text-align="center" testId="wrap-up-title"
-      if lead != ""
-        text lead font=(whole ? "-exact-body" : "-exact-subheadline") color="-exact-secondary-label" text-align=(whole ? "left" : "center") line-clamp=(whole ? 0 : 4) user-select=(whole ? "text" : "none") testId="wrap-up-lead"
-      if shown.length > 0
-        column gap=6 align-items="flex-start" width="100%"
-          text "Waiting on you" font="-exact-footnote" font-weight=600 color="-exact-secondary-label" align-self=(whole ? "flex-start" : "center")
-          for w, i in shown key=`${i}`
-            row gap=10 align-items="flex-start" width="100%"
-              box width=6 height=6 border-radius=3 background-color="AccentColor" flex-shrink=0 margin-top=8
-              text w font="-exact-subheadline" color="-exact-label" flex=1 min-width=0 line-clamp=(whole ? 0 : 2) user-select=(whole ? "text" : "none")
+    row gap=8 align-items="center" padding="0 16px" min-height=24
+      text (c.live ? "Live now" : `${endWord(c.ending) != "" ? endWord(c.ending) : "Ended"}${bad and c.reason != "" ? ` · ${whyOf(c.reason)}` : ""}`) font="-exact-subheadline" font-weight=600 color=(c.live ? "hex.progress" : bad ? "hex.danger" : "-exact-secondary-label") flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis" testId="wrap-up-ending"
+      text `${dayName(c.started, now, offset)} · ${formatTime(c.started, offset, "short")}` font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" flex-shrink=0
+    row gap=8 align-items="flex-start" padding="2px 16px 0"
+      text callName(c) role=(heading ? "heading" : "none") aria-level=1 font="-exact-title1" font-weight=600 color="-exact-label" line-clamp=2 flex=1 min-width=0 user-select=(heading ? "text" : "none") testId="wrap-up-title"
+      children
+    Strip(record=record, ms=ms, bad=bad)
+    if lead != ""
+      text lead font="-exact-callout" color="-exact-label" padding="12px 16px 0" line-clamp=lines user-select=(heading ? "text" : "none") testId="wrap-up-lead"
+    if c.waiting.length > 0
+      box height=10
+      StageHead(state="asks", label="Waiting on you", n=c.waiting.length, known=true, pad="9px 16px", id="wrap-up-waiting")
+      column gap=10 padding="2px 16px 0"
+        for w, i in c.waiting key=`${i}`
+          row gap=12 align-items="flex-start"
+            box width=22 flex-shrink=0 display="flex" justify-content="center" padding-top=1
+              box width=20 height=20 border-radius=6 border="1.75px solid -exact-tertiary-label" box-sizing="border-box"
+            text w font="-exact-callout" color="-exact-label" flex=1 min-width=0 user-select=(heading ? "text" : "none")
+    if sent.length > 0
+      box height=10
+      StageHead(state="decided", label="Sent from the call", n=sent.length, known=true, pad="9px 16px", id="wrap-up-sent")
+      for s, i in shown key=`${i}`
+        row gap=10 align-items="flex-start" padding="9px 16px" testId=`wrap-up-sent-${i}`
+          RowLines(mark=(s.done ? "done" : "working"), title=(s.to != "" ? s.to : "hex"), line=s.text, lines=2, failed=false, stamp=clockOf(s.at), n=0, agents=0)
+      if shown.length < sent.length
+        row gap=10 align-items="center" padding="8px 16px 10px" testId="wrap-up-more"
+          column width=22 gap=3 align-items="center" flex-shrink=0 aria-hidden=true
+            for r in [0, 1] key=r
+              row gap=3
+                for k in [0, 1, 2] key=k
+                  box width=3 height=3 border-radius=1.5 background-color="-exact-tertiary-label"
+          text `${sent.length - shown.length} more` font="-exact-subheadline" color="-exact-tertiary-label"
+
+// Who spoke when: a lane each, a turn as long as its words take to say (about 2.5 a second), the
+// answers he sent from the call as mint ticks, and a red edge where it dropped.
+component Strip
+  props
+    record: CallRecord
+    ms: number
+    bad: bool
+  derive span = max(ms, 1)
+  derive answered = record.moments.filter(m => m.kind == "answered")
+  view
+    column padding="14px 16px 0" gap=4 testId="wrap-up-strip"
+      row gap=0 align-items="stretch"
+        column width=34 flex-shrink=0 height=30 justify-content="space-around" aria-hidden=true
+          text "You" font-size=12 line-height="16px" color="-exact-tertiary-label"
+          text "hex" font-size=12 line-height="16px" color="-exact-tertiary-label"
+        box flex=1 min-width=0 height=30 position="relative" aria-label=`${record.turns.length} turns, ${answered.length} answered` role="img"
+          box position="absolute" left=0 right=0 top=7 height=1 background-color="-exact-separator"
+          box position="absolute" left=0 right=0 top=22 height=1 background-color="-exact-separator"
+          for t, i in record.turns key=`${i}`
+            box position="absolute" top=(t.who == "you" ? 3.5 : 18.5) left=`${min(t.at, span) / span * 100}%` width=`${min(t.text.split(" ").length / 2.5 * 1000, span - min(t.at, span)) / span * 100}%` min-width=2 height=8 border-radius=4 background-color=(t.who == "you" ? "-exact-label" : hexInk(min(t.at, span) / span))
+          for m, i in answered key=`a${i}`
+            box position="absolute" top=0 bottom=0 left=`${min(m.at, span) / span * 100}%` width=2 margin-left=-1 border-radius=1 background-color="hex.accent"
+          if bad
+            box position="absolute" right=-1 top=2 bottom=2 width=3 border-radius=2 background-color="hex.danger"
+      row padding-left=34 justify-content="space-between" aria-hidden=true
+        text "0:00" font-size=12 line-height="16px" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+        if answered.length > 0
+          text font-size=12 line-height="16px" color="-exact-tertiary-label"
+            text `${answered.length}` font-weight=600 color="hex.accent"
+            text " answered"
+        text clockOf(ms) font-size=12 line-height="16px" font-variant-numeric="tabular-nums" color=(bad ? "hex.danger" : "-exact-tertiary-label")

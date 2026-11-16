@@ -267,7 +267,7 @@ component Home
               text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
             if wrapped
               box padding="0 10px" display="flex" justify-content="center" width="100%" box-sizing="border-box"
-                WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
+                WrapUp(record=CallRecord(call=last, turns=[], tasks=[], moments=[]), now=now, offset=offset, lines=4, rows=3, heading=false, open=open)
       if two and homeMode and not wordsShown
         // The page beside heads on the chrome row, left of the capsule, as drawn.
         column position="absolute" top=room.secondTop bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"

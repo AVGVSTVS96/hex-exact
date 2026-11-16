@@ -237,7 +237,7 @@ component TaskBody
           Discuss(title=title, id=(pane ? "pane-talk" : "task-talk"), press=talk(kind == "task" ? id : "asks"))
         if missing.includes(door.app)
           text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding-left=4 width="100%" testId="door-missing"
-      scroll id=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
+      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
         column padding="0 10px" padding-bottom=(docked ? 30 : foot + 24) gap=0
           if kind == "done"
             Happened(mark="done", text=finished.title, stamp="", failed=false)

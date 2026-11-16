@@ -100,9 +100,9 @@ component SettingsScreen
               image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
           Head(label="Calls", n=-1, pad="24px 0 4px", id="settings-calls-head")
           Setting(icon="symbol:speaker", title="Call sounds", line="A tone when a call starts and ends", stack=false, last=false, id="setting-sounds")
-            input type="checkbox" role="switch" checked=sounds change=setSounds aria-label="Call sounds" testId="sounds"
+            input type="checkbox" role="switch" accent-color="ink.switch" checked=sounds change=setSounds aria-label="Call sounds" testId="sounds"
           Setting(icon="symbol:sf/hand.tap", title="Haptics", line="A light tap when you pick something", stack=false, last=true, id="setting-haptics")
-            input type="checkbox" role="switch" checked=haptics change=setHaptics aria-label="Haptics" testId="haptics"
+            input type="checkbox" role="switch" accent-color="ink.switch" checked=haptics change=setHaptics aria-label="Haptics" testId="haptics"
 
 // hex's face as it will look on Home, changing the moment a persona or colour is picked.
 component Face

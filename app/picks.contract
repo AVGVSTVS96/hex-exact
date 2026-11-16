@@ -1,7 +1,7 @@
 // hex's picks (§9.6): the questions where hex already knows what it would choose. Bassim takes its
 // picks, changes one, or leaves one for later, then answers them all at once.
 use Viewport, Asks, Ask from "./shapes.contract"
-use Mark, Note, Row from "./parts.contract"
+use Mark, Note, Row, Primary from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use PageTitle from "./calls.contract"
 use Said from "./said.contract"
@@ -47,5 +47,5 @@ component Picks
       // Answer stands on the page's own colour, faded over the 24 above it, as wide as a line reads.
       if picks.length > 0
         box position="absolute" bottom=0 left=0 right=0 height=(room.foot + 8 + 50 + 24) background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" pointer-events="none" aria-hidden=true
-        button press=takeAll buttonStyle=(taking.length > 0 ? "filled" : "bordered") disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(room.columns == 2 ? room.first.x + 16 : left + 16 + max(room.clear.width - 32 - 480, 0) / 2) width=(room.columns == 2 ? room.first.width - 32 : min(room.clear.width - 32, 480)) min-height=50 testId="picks-answer"
-          text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}`
+        button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(room.columns == 2 ? room.first.x + 16 : left + 16 + max(room.clear.width - 32 - 480, 0) / 2) width=(room.columns == 2 ? room.first.width - 32 : min(room.clear.width - 32, 480)) min-height=50 testId="picks-answer"
+          text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}` color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600

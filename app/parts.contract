@@ -38,6 +38,28 @@ style PillTap
     -exact-press-scale=0.96
 style PillFace
   display="flex" flex-direction="row" align-items="center" justify-content="center" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill"
+// A page's main action (Answer, Answer with 2): ink on the page, black in light and white in dark, as
+// Muse's are, not the platform's filled tint, which keeps its label white and so can't be ink in
+// dark. Switched off, it greys like any field.
+style Primary
+  appearance="none" box-sizing="border-box" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=6 min-height=44 padding="0 20px" border-radius=999 background-color="-exact-label" color="-exact-background" font="-exact-body" font-weight=600
+  :active
+    opacity=0.75
+    -exact-press-scale=0.97
+  :disabled
+    background-color="-exact-tertiary-fill"
+    color="-exact-tertiary-label"
+
+// The send circle at the end of a Composer, the same ink as Primary.
+style Send
+  appearance="none" display="flex" align-items="center" justify-content="center" flex-shrink=0 width=36 height=36 margin="4px 0" border-radius=999 background-color="-exact-label" color="-exact-background"
+  :active
+    opacity=0.75
+    -exact-press-scale=0.92
+  :disabled
+    background-color="-exact-tertiary-fill"
+    color="-exact-tertiary-label"
+
 // A plain tap target with no box of its own (an icon, a line of text): it dims under the finger.
 style Tap
   appearance="none"
@@ -185,9 +207,8 @@ component Row
     press: action
   view
     if href != ""
-      link href=href aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
-        row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
-          RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)
+      link href=href class=RowTap background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
+        RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)
     else
       button press=press class=RowTap background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
         RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)

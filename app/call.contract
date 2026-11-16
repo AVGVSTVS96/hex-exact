@@ -6,7 +6,7 @@
 // It follows the room: with two columns the orb and controls take the first and the words the
 // second; with one, the orb rises to make room for the words.
 use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
-use endingOf, badEnding, lengthOf, Tap, HexTabs, Mark, springOf from "./parts.contract"
+use endingOf, badEnding, lengthOf, Tap, HexTabs, Mark, springOf, Primary from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
@@ -502,8 +502,8 @@ component CallAskCard
               link href=l.url
                 text `${l.label} ↗` font="-exact-subheadline" font-weight=600
         if ask.multiple and chosen.length > 0
-          button press=answerMany(ask.id, chosen) buttonStyle="filled" disabled=sending testId=`call-ask-answer-${ask.id}`
-            text `Answer with ${chosen.length}`
+          button press=answerMany(ask.id, chosen) class=Primary disabled=sending testId=`call-ask-answer-${ask.id}`
+            text `Answer with ${chosen.length}` color=(sending ? "-exact-tertiary-label" : "-exact-background") font-weight=600
         if mine.status == "failed"
           text failedWords(mine) font="-exact-caption1" color="hex.danger" role="alert" testId=`call-ask-failed-${ask.id}`
         else

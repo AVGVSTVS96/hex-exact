@@ -251,6 +251,54 @@ component Note
         image "symbol:icon.offline" width=15 height=15 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
       text text font="-exact-subheadline" color="-exact-secondary-label"
 
+// hex writes Markdown. Prose draws it as reading text: paragraphs, bullets, headings, quotes and code,
+// with a paragraph's lead in bold kept bold and the marks themselves (**, `, a link's address) gone.
+// plainOf is the same words on one line, for a preview.
+shape ProseLine
+  kind: string
+  lead: string
+  text: string
+  space: bool
+
+fn pieceOf(xs: string[], i: number): string = match xs.at(i) { case some(x) => x, case none => "" }
+fn dropLastOpen(s: string): string = s.split("[").length > 1 ? `${s.split("[").slice(0, -1).join("[")}${pieceOf(s.split("["), s.split("[").length - 1)}` : s
+fn afterParen(s: string): string = s.indexOf(")") >= 0 ? s.slice(s.indexOf(")") + 1) : s
+fn unlinkPiece(xs: string[], i: number): string = i < xs.length - 1 ? dropLastOpen(i == 0 ? pieceOf(xs, i) : afterParen(pieceOf(xs, i))) : (i == 0 ? pieceOf(xs, i) : afterParen(pieceOf(xs, i)))
+fn unlinked(s: string): string = s.indexOf("](") < 0 ? s : range(s.split("](").length).map(i => unlinkPiece(s.split("]("), i)).join("")
+fn inlineOf(s: string): string = unlinked(s).replaceAll("**", "").replaceAll("`", "")
+fn isFence(l: string): bool = l.trim().startsWith("```")
+fn inCode(lines: string[], i: number): bool = lines.slice(0, i).filter(l => isFence(l)).length % 2 == 1
+fn bulletOf(t: string): bool = t.startsWith("- ") or t.startsWith("* ") or t.startsWith("+ ") or t.startsWith("• ")
+fn proseKind(lines: string[], i: number): string = isFence(pieceOf(lines, i)) ? "fence" : inCode(lines, i) ? "code" : pieceOf(lines, i).trim() == "" ? "gap" : bulletOf(pieceOf(lines, i).trim()) ? "item" : pieceOf(lines, i).trim().startsWith("#") ? "head" : pieceOf(lines, i).trim().startsWith(">") ? "quote" : "p"
+fn proseBody(t: string, kind: string): string = kind == "item" ? t.slice(2) : kind == "head" ? t.split(" ").slice(1).join(" ") : kind == "quote" ? t.slice(1).trim() : t
+// A line that opens in bold: its bold lead, then the rest.
+fn leadOf(t: string): string = t.startsWith("**") and t.split("**").length >= 3 ? inlineOf(pieceOf(t.split("**"), 1)) : ""
+fn restOf(t: string): string = t.startsWith("**") and t.split("**").length >= 3 ? inlineOf(t.split("**").slice(2).join("**")) : inlineOf(t)
+fn proseLine(lines: string[], i: number): ProseLine = ProseLine(kind=proseKind(lines, i), lead=(proseKind(lines, i) == "code" ? "" : leadOf(proseBody(pieceOf(lines, i).trim(), proseKind(lines, i)))), text=(proseKind(lines, i) == "code" ? pieceOf(lines, i) : restOf(proseBody(pieceOf(lines, i).trim(), proseKind(lines, i)))), space=(i > 0 and (proseKind(lines, i - 1) == "gap" or proseKind(lines, i - 1) == "fence")))
+fn proseOf(text: string): ProseLine[] = range(text.split("\n").length).map(i => proseLine(text.split("\n"), i)).filter(l => l.kind != "gap" and l.kind != "fence")
+fn plainOf(text: string): string = proseOf(text).map(l => l.lead != "" ? `${l.lead}${l.text}` : l.text).join(" ")
+
+component Prose
+  props
+    text: string
+    font: string
+    color: string
+  view
+    column gap=4 min-width=0
+      for l, i in proseOf(text) key=`${i}`
+        if l.kind == "code"
+          text l.text font-family="ui-monospace" font="-exact-footnote" color="-exact-secondary-label" white-space="pre-wrap" padding-left=10 user-select="text"
+        else if l.kind == "item"
+          row gap=8 align-items="flex-start" margin-top=(l.space and i > 0 ? 6 : 0)
+            text "•" font=font color=color
+            text font=font color=color flex=1 min-width=0 user-select="text" overflow-wrap="break-word"
+              text l.lead font-weight=600
+              text l.text
+        else
+          text font=font color=(l.kind == "quote" ? "-exact-secondary-label" : color) font-weight=(l.kind == "head" ? 600 : 400) margin-top=(l.space and i > 0 ? 8 : 0) padding-left=(l.kind == "quote" ? 10 : 0) user-select="text" overflow-wrap="break-word"
+            text l.lead font-weight=600
+            text l.text
+
 // A count in its state's ink on its wash ("–" while loading).
 component Chip
   props

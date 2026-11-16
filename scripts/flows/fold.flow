@@ -1,0 +1,10 @@
+# Tasks stays where it was through a fold, an unfold and a turn.
+launch /tasks
+scroll tasks
+shoot scrolled
+pose open-up
+shoot opened
+pose open-side
+shoot turned
+pose cover-up
+shoot shut

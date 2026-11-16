@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Runs on the server: a picture of the real Duo's lit screen, taken through the Mac it's paired
+# with (devicectl), whatever app is in front. Prints the picture's path.
+#   scripts/phone            (into ~/hex/scratch/hex-exact/shots/phone/, private: it holds his data)
+set -euo pipefail
+mac=${HEX_EXACT_MAC:-mac}
+env=${HEX_VOICE_ENV:-$HOME/.local/share/hex-voice/release/.env.local}
+duo=$(sed -n 's/^DUO_UDID=//p' "$env")
+dir=${SHOTS:-$HOME/hex/scratch/hex-exact/shots}/phone
+file=$dir/$(date +%m%d-%H%M%S).png
+mkdir -p "$dir"
+# The cover is the Duo's primary display even while it's open and dark, so this shoots the lit one.
+ssh "$mac" "export PATH=/opt/homebrew/bin:\$PATH
+  xcrun devicectl device info displays --device $duo --json-output /tmp/hexexact-displays.json >/dev/null &&
+  xcrun devicectl device capture screenshot --device $duo --destination /tmp/hexexact-phone.png \
+    --display-unique-id \$(jq -r '.result.displays[] | select(.active) | .uniqueId' /tmp/hexexact-displays.json) >/dev/null" </dev/null ||
+  { echo "couldn't take the Duo's picture: is it unlocked and near the Mac?" >&2; exit 1; }
+scp -q "$mac:/tmp/hexexact-phone.png" "$file" && ssh "$mac" rm -f /tmp/hexexact-phone.png /tmp/hexexact-displays.json
+[ "$(magick "$file" -format '%[fx:maxima]' info:)" != 0 ] || { echo "the Duo's screen was black ($file): off or locked" >&2; exit 1; }
+echo "$file"

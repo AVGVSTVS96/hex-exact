@@ -1,0 +1,22 @@
+name: Flows
+options:
+  deploymentTarget:
+    iOS: "27.0"
+targets:
+  Flows:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Flows.swift]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shahidy.hexexact.flows
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+schemes:
+  Flows:
+    build:
+      targets:
+        Flows: all
+    test:
+      targets: [Flows]
+      captureScreenshotsAutomatically: false

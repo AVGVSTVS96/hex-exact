@@ -1,0 +1,13 @@
+# The demo call: it connects, talks, opens Tasks with the call docked, and ends.
+launch call:/
+wait 10
+shoot talking
+tap open-tasks
+shoot tasks-in-call
+tap tasks-close
+shoot back-in-call
+tap mute
+shoot muted
+tap call
+shoot ended
+tree end

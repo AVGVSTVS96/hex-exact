@@ -1,0 +1,10 @@
+# Home, the first Needs you row, its question, Not needed, Undo. The stand-in keeps every write
+# from reaching hex.
+launch /
+shoot home
+tap home-row-*
+shoot question
+tap ask-dismiss-*
+shoot put-away
+tap Undo
+shoot undone

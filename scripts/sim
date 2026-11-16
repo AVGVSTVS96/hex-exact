@@ -150,8 +150,14 @@ hub=~/Developer/hex-exact-sim-build/devicehub-sim
   codesign -f -s - "$hub" 2>/dev/null
 }
 hubdo() { xcrun simctl spawn "$id" "$hub" "$@" </dev/null; }
-xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true
-xcrun simctl install "$id" "$app"
+# The app keeps drafts and settings, and a flow's `type` adds to what a field holds, so each pose's
+# screens and each flow start from a fresh install: a picture shows the app, not what an earlier
+# run or flow left in it.
+fresh() {
+  xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true
+  xcrun simctl uninstall "$id" com.shahidy.hexexact 2>/dev/null || true
+  xcrun simctl install "$id" "$app"
+}
 if [ ${#flows[@]} -gt 0 ]; then
   (cd $run/scripts/uitests && xcodegen generate -q)
   xcodebuild build-for-testing -project $run/scripts/uitests/Flows.xcodeproj -scheme Flows \
@@ -227,6 +233,7 @@ for pose in $poses; do
   for appearance in $appearances; do
     place "$pose"
     xcrun simctl ui "$id" appearance "$appearance"
+    [ ${#paths[@]} = 0 ] || fresh
     for path in "${paths[@]}"; do
       # Each screen is a fresh launch handed its link, as `simctl openurl` stops at iOS's
       # "Open in" prompt.
@@ -243,6 +250,7 @@ for pose in $poses; do
       case $path in *report=pose*) xcrun simctl spawn "$id" defaults read com.shahidy.hexexact HexPose >"$out/pose-$pose.json" 2>/dev/null || true ;; esac
     done
     for ((i = 0; i < ${#flows[@]}; i += 2)); do
+      fresh
       play "${flows[i]}" "${flows[i + 1]}" "$pose" "$appearance"
       # A flow that folded the Duo leaves it where the next one expects it.
       place "$pose"

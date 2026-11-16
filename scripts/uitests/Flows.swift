@@ -9,7 +9,8 @@ import XCTest
 //   tap <query>            taps it; with the keyboard up, the middle of what shows of it above it
 //   hold <query>           presses it for a second, as for a context menu
 //   tap-at <x> <y>         taps that point of the window
-//   type <query> <text>    taps the field and types on the software keyboard
+//   type <query> <text>    taps the field and types on the software keyboard, after what it holds
+//                          (each flow starts on a fresh install, so only this flow's drafts)
 //   swipe-left <query>     swipes left across the row or pager holding it; swipe-right the other way
 //   swipe-back <query>     drags from it across the screen, the way an edge swipe goes
 //   swipe-down <query>     drags from it to the screen's foot, as to pull a sheet or keyboard away

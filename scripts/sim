@@ -89,6 +89,10 @@ sim=$(simulator "hexexact Duo $lane")
 # ssh joins its arguments into one command line, so each is quoted for the Mac's shell.
 ssh "$mac" bash -s -- "$(printf "%q " "$run" "$lane" "$sim" "$POSES" "$APPEARANCES" "$HEX_URL" "$HEX_TOKEN" "${#paths[@]}" "${paths[@]}" "${flows[@]}")" <<'MAC'
 set -euo pipefail
+# A run stopped on the server stops here too (its ssh gone, this shell is the launchd's), so it never
+# drives a simulator the next run has taken.
+me=$$
+( while ppid=$(ps -o ppid= -p $me) && [ "${ppid// /}" != 1 ]; do sleep 2; done; kill -0 $me && kill -TERM -- -$me ) </dev/null >/dev/null 2>&1 &
 run=~/$1 lane=$2 id=$3 poses=$4 appearances=$5 hex_url=$6 hex_token=$7 npaths=$8
 shift 8
 paths=("${@:1:npaths}")

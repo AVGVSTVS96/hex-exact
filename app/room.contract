@@ -46,6 +46,13 @@ shape Room
   foot: number
   // Where hex's tabs and Call sit; a list in hex's column ends above `tabs.top`.
   tabs: Foot
+  // Where a row heading hex's column right under the chrome ends, clear of the status icons beside
+  // it, and how far down those icons reach.
+  headEnd: number
+  headBottom: number
+  // Where a control docked at the foot ends, clear of a camera in the window's bottom corner (the
+  // Duo folded on its side has one there).
+  footEnd: number
 
 // A chrome row is 44 tall; the capsule of three is 140 wide.
 fn barHeight(): number = 44
@@ -77,7 +84,15 @@ fn foldOf(v: Viewport, p: Pose): Span = v.horizontalViewportSegments == 2 ? matc
 fn firstOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=clearOf(v).x, width=foldOf(v, p).x - clearOf(v).x) : Span(x=clearOf(v).x, width=clearOf(v).width)
 fn secondOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=foldOf(v, p).x + foldOf(v, p).width, width=clearOf(v).x + clearOf(v).width - foldOf(v, p).x - foldOf(v, p).width) : Span(x=v.width, width=0)
 
-fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()))
+// The status icons beside the band under the chrome row, in hex's column.
+fn headCovers(v: Viewport, p: Pose): Rect[] = topCovers(v, p).filter(o => o.y < belowOf(v) + 80 and o.y + o.height > belowOf(v) and o.x + o.width / 2 > v.width / 2 and o.x < firstOf(v, p).x + firstOf(v, p).width)
+fn headEndOf(v: Viewport, p: Pose): number = match sortBy(headCovers(v, p), o => o.x).at(0) { case some(o) => o.x - 10, case none => firstOf(v, p).x + firstOf(v, p).width }
+fn headBottomOf(v: Viewport, p: Pose): number = match sortBy(headCovers(v, p), o => o.y + o.height, "desc").at(0) { case some(o) => o.y + o.height, case none => 0 }
+// What covers the window's foot on its trailing half: a docked control there ends 10 short of it.
+fn footCovers(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.y + o.height > v.height - max(v.safeAreaBottom, 12) - 8 - callSize() and o.y > v.height / 2 and o.x + o.width / 2 > v.width / 2)
+fn footEndOf(v: Viewport, p: Pose): number = min(clearOf(v).x + clearOf(v).width, match sortBy(footCovers(v, p), o => o.x).at(0) { case some(o) => o.x - 10, case none => v.width })
+
+fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v), secondBelow=belowIn(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p))
 
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()
@@ -110,5 +125,5 @@ component Chrome
         button press=open(path("settings")) class=Tap width=44 height=44 border-radius=22 background-color=(on == "settings" ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" aria-current=(on == "settings") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
           image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
         if needsYou > 0 and on != "tasks"
-          box position="absolute" top=4 left=76 width=10 height=10 border-radius=5 background-color="hex.ask" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
+          box position="absolute" top=8 left=78 width=10 height=10 border-radius=5 background-color="hex.ask" aria-hidden=true testId="needs-dot"
 

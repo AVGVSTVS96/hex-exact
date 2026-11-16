@@ -4,7 +4,7 @@ wait 10
 shoot talking
 tap open-tasks
 shoot tasks-in-call
-tap tasks-close
+tap chrome-back
 shoot back-in-call
 tap mute
 shoot muted

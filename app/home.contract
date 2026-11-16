@@ -3,7 +3,7 @@
 // on and what it decided for him; Feed, Ideas and Goals join it as tabs at the foot of hex's column.
 // Home shows it whenever no call is on; Tasks has the rest.
 use Tasks, Asks, TaskRow, Goals from "./shapes.contract"
-use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap from "./parts.contract"
+use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap, springOf from "./parts.contract"
 use Said from "./said.contract"
 use FeedList, FeedView from "./feed.contract"
 use IdeasList, Ideas, Idea from "./ideas.contract"
@@ -60,6 +60,11 @@ component HexHome
     palette: string
     reaction: string
     still: bool
+    // How far in from the column's trailing edge, and down from its top, the status icons beside
+    // the band under the chrome reach (room.headEnd, room.headBottom); the face's one row keeps
+    // clear of them.
+    headRight: number
+    headDown: number
     // hex's pages that are built, and the one under the face.
     pages: string[]
     page: string
@@ -116,6 +121,16 @@ component HexHome
   derive needs = needsOf(tasks, asks, said, now)
   derive working = sortBy(entriesOf(tasks, asks, now).filter(e => e.stage == "working"), e => e.at, "desc")
   derive fade = max(100 - 26 * 100 / listHeight, 0)
+  derive wholeFade = max(100 - 26 * 100 / max(height, 1), 0)
+  // The face in one row, as it heads Feed, Ideas and Goals scrolled.
+  derive row = Face(compact=true, height=max(76, headDown + 8), x=30, y=38, size=40)
+  // The pages scrolled past hex's face, where its one row shows at the top; written only when a
+  // page crosses that line, so nothing redraws while a list scrolls.
+  state past: string[] = []
+  action moved(p: string, x: number, y: number)
+    let over = y > f.height - 40
+    if over != past.includes(p)
+      past = over ? past.concat([p]) : past.filter(q => q != p)
   action goLive
     if split
       select(homeOf(liveId, tasks.tasks))
@@ -123,34 +138,63 @@ component HexHome
       openTask(homeOf(liveId, tasks.tasks))
   view
     column flex=1 min-height=0 position="relative" testId="home-all"
-      if compact
-        row gap=14 align-items="center" padding="12px 16px" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
-          box width=f.size height=f.size flex-shrink=0
-            if face
-              hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
-          column flex=1 min-width=0 gap=2
-            text "hex" font="-exact-headline" color="-exact-label"
-            LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=false, press=goLive)
-      else
-        column align-items="center" padding="14px 16px 0" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
-          box width=f.size height=f.size flex-shrink=0
-            if face
-              hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
-          text "hex" font="-exact-headline" color="-exact-label" margin-top=8
-          LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=true, press=goLive)
       // hex pages: each tab keeps its own scroll, mounted while another shows, so it keeps its place.
-      box position="relative" flex=1 min-height=0
-        for p in pages key=p
-          scroll position="absolute" inset=0 padding="0 6px 34px" box-sizing="border-box" opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) mask-image=`linear-gradient(to bottom, #000 0, #000 ${fade}%, transparent 100%)` testId=`home-list-${p}`
-            if p == "now"
-              children
-              NowList(height=listHeight, now=now, offset=offset, tasks=tasks, needs=needs, working=working, needing=needing, workingOn=workingOn, decided=asks.decided.length, known=known, failed=failed, liveId=liveId, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
-            else if p == "feed"
+      // On Now hex's face stays over the list, the call's orb resting on it (call.contract); on the
+      // others it heads the list with its own orb and scrolls away with it, and the face in one row
+      // takes its place at the top.
+      if page == "now"
+        box position="absolute" top=0 left=0 right=0 padding="0 6px" testId="hex-face"
+          HexFace(f=f, face=face, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
+      for p in pages key=p
+        scroll position="absolute" top=(p == "now" ? f.height : 0) left=0 right=0 bottom=0 padding="0 6px 34px" box-sizing="border-box" scroll=moved(p) opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) mask-image=`linear-gradient(to bottom, #000 0, #000 ${p == "now" ? fade : wholeFade}%, transparent 100%)` testId=`home-list-${p}`
+          if p == "now"
+            children
+            NowList(height=listHeight, now=now, offset=offset, tasks=tasks, needs=needs, working=working, needing=needing, workingOn=workingOn, decided=asks.decided.length, known=known, failed=failed, liveId=liveId, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
+          else
+            HexFace(f=f, face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
+            if p == "feed"
               FeedList(feed=feed, now=now, offset=offset, width=(width - 12), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
             else if p == "ideas"
               IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
             else if p == "goals"
               GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
+      if page != "now"
+        box position="absolute" top=0 left=0 right=0 background-color="-exact-background" opacity=(past.includes(page) ? 1 : 0) pointer-events=(past.includes(page) ? "auto" : "none") aria-hidden=(not past.includes(page)) transition=springOf(still, "opacity") testId="hex-bar"
+          box padding-right=headRight
+            HexFace(f=row, face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
+
+// hex's face at the head of a page: stacked (orb, name, live line) or one row with the window wider
+// than tall; the orb only where Home draws it itself.
+component HexFace
+  props
+    f: Face
+    face: bool
+    persona: string
+    personaColor: string
+    palette: string
+    reaction: string
+    still: bool
+    known: bool
+    liveId: string
+    liveTopic: string
+    lineText: string
+    goLive: action
+  view
+    if f.compact
+      row gap=14 align-items="center" padding="0 10px" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
+        box width=f.size height=f.size flex-shrink=0
+          if face
+            hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
+        column flex=1 min-width=0 gap=2
+          text "hex" font="-exact-headline" color="-exact-label"
+          LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=false, lines=(f.height < 88 ? 1 : 2), press=goLive)
+    else
+      column align-items="center" padding="14px 10px 0" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
+        box width=f.size height=f.size flex-shrink=0
+          if face
+            hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
+        text "hex" font="-exact-headline" color="-exact-label" margin-top=8
+        LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=true, lines=2, press=goLive)
 
 // hex's live line: what it's doing, two lines at most, ending in an ellipsis; a tap opens that work.
 component LiveLine
@@ -161,14 +205,15 @@ component LiveLine
     line: string
     still: bool
     center: bool
+    lines: number
     press: action
   view
-    button press=press disabled=(id == "") class=Tap display="flex" flex-direction="row" align-items="flex-start" justify-content=(center ? "center" : "flex-start") gap=7 max-width="100%" min-width=44 min-height=44 margin-top=(center ? -2 : -10) padding=(center ? "2px 0 0" : "0") box-sizing="border-box" aria-live="polite" aria-label=(id == "" ? "Nothing running" : `hex is working on ${topic}: ${line}`) testId="live-line"
+    button press=press disabled=(id == "") class=Tap display="flex" flex-direction="row" align-items="flex-start" justify-content=(center ? "center" : "flex-start") gap=7 max-width="100%" min-width=44 min-height=44 margin-top=(center ? -2 : -12) padding=(center ? "2px 0 0" : "12px 0 0") box-sizing="border-box" aria-live="polite" aria-label=(id == "" ? "Nothing running" : `hex is working on ${topic}: ${line}`) testId="live-line"
       if id != ""
         row gap=3 flex-shrink=0 padding-top=8 aria-hidden=true
           for i in [0, 1, 2] key=i
             box width=4 height=4 border-radius=2 background-color="hex.progress" animation=(still ? "none" : `liveDot 1.2s ease-in-out ${i * 0.2}s infinite`)
-      text line font="-exact-subheadline" color=(id == "" ? "-exact-tertiary-label" : "-exact-secondary-label") text-align=(center ? "center" : "left") line-clamp=2 min-width=0 flex-shrink=1
+      text line font="-exact-subheadline" color=(id == "" ? "-exact-tertiary-label" : "-exact-secondary-label") text-align=(center ? "center" : "left") line-clamp=lines min-width=0 flex-shrink=1
 
 // Now: the few things that need Bassim (as many as fit without scrolling, then "Show N more"), what
 // hex is working on, then "hex decided N".

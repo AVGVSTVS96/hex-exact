@@ -187,14 +187,17 @@ component Home
   // The orb: hex's face at rest; in a call at the head of the column (one) or the middle of the
   // first (two), its name, clock and agent line under it.
   derive agentShown = live and agent.id != ""
-  derive bigOrb = round(single ? max(min(min(hexW * 0.42, H * 0.2), 150), 60) : max(min(min(hexW - 96, (controlsTop - below) * 0.5), 260), 80))
+  // Open like a laptop the fold runs across the window: the orb and its lines stay above it.
+  derive foldTop = viewport.verticalViewportSegments == 2 ? match viewport.segments.at(0) { case some(s) => s.y + s.height, case none => H } : H
+  derive stackBottom = min(controlsTop, foldTop - 16)
+  derive bigOrb = round(single ? max(min(min(hexW * 0.42, H * 0.2), 150), 60) : max(min(min(hexW - 96, (stackBottom - below) * 0.5), 260), 80))
   derive under = 8 + 24 + 22 + (agentShown ? 36 : 0) + 8
-  derive callOrbY = single ? below + 14 + bigOrb / 2 : below + (controlsTop - below) / 2 - (bigOrb + under) / 2 + bigOrb / 2
+  derive callOrbY = single ? below + 14 + bigOrb / 2 : below + (stackBottom - below) / 2 - (bigOrb + under) / 2 + bigOrb / 2
   // It stands where the call puts it, and at rest is moved and scaled onto the face: a transform,
   // so it springs between the two without laying anything out.
   derive orbX = left + hexW / 2
   derive restShift = `${left + face.x - orbX}px ${below + face.y - callOrbY}px`
-  derive glide = still ? "none" : "translate -exact-spring(380, 34, 1), scale -exact-spring(380, 34, 1)"
+  derive glide = still ? "none" : "translate -exact-spring(380, 34, 1), scale -exact-spring(380, 34, 1), opacity -exact-spring(380, 34, 1)"
 
   // One column: the words fill the column under the orb's lines down to the controls (`rest`), or,
   // pulled up, the whole column (`full`). The handle drags the panel's height natively; a release
@@ -239,7 +242,7 @@ component Home
       // hex as the home: in hex's column under the chrome, down to the tabs and Call; with two columns
       // the page a row opens beside it.
       column position="absolute" top=below bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
-        HexHome(width=hexW, height=(H - footTop - below), compact=compact, face=false, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
+        HexHome(width=hexW, height=(H - footTop - below), compact=compact, face=false, headRight=max(left + hexW - room.headEnd, 0), headDown=max(room.headBottom - below, 0), persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
           column align-items="center" gap=8 padding="12px 0 0"
             CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
             if wrapped
@@ -249,8 +252,8 @@ component Home
         column position="absolute" top=room.secondBelow bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
           children
 
-      // The orb: hex's face at rest, grown into the call.
-      box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? face.size / bigOrb : 1) transition=glide z-index=2 pointer-events="none" testId="orb-spot"
+      // The orb: hex's face at rest on Now (Feed, Ideas and Goals scroll their own), grown into the call.
+      box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? face.size / bigOrb : 1) opacity=(homeMode and page != "now" ? 0 : 1) transition=glide z-index=2 pointer-events="none" testId="orb-spot"
         hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width="100%" height="100%" role="img" aria-label=label testId="orb"
 
       // Under the orb in a call: hex, the clock or how it's connecting, and what hex is doing for it.
@@ -292,7 +295,7 @@ component Home
       else
         row position="absolute" top=controlsTop left=left width=hexW justify-content="center" align-items="flex-start" gap=30 z-index=4 testId="controls"
           Labeled(text=(micOff ? "Unmute" : "Mute"))
-            MuteButton(size=sideSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
+            MuteButton(size=sideSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(elsewhere or status == "idle" or status == "ending" or not call.shell))
           Labeled(text=(status == "idle" ? "Call" : "End"))
             CallButton(size=endSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
           Labeled(text="Camera")
@@ -308,7 +311,8 @@ component Labeled
   slot
   view
     column align-items="center" gap=6 min-width=58
-      children
+      box height=68 display="flex" align-items="center" justify-content="center"
+        children
       text text font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" aria-hidden=true
 
 // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
@@ -387,7 +391,7 @@ component CallDock
     else
       end()
   view
-    row position="absolute" bottom=room.foot left=(room.clear.x + 12) width=(min(room.clear.width - 24, 440)) height=64 padding="0 8px" box-sizing="border-box" gap=10 align-items="center" border-radius=32 backgroundMaterial="glass" box-shadow="0 6px 24px rgba(0,0,0,0.18)" z-index=20 testId="call-dock"
+    row position="absolute" bottom=room.foot left=(room.first.x + 12) width=(min(min(room.first.width - 24, 440), room.footEnd - room.first.x - 12)) height=64 padding="0 8px" box-sizing="border-box" gap=10 align-items="center" border-radius=32 backgroundMaterial="glass" box-shadow="0 6px 24px rgba(0,0,0,0.18)" z-index=20 testId="call-dock"
       button press=home class=Tap flex=1 min-width=0 height=56 display="flex" flex-direction="row" align-items="center" gap=10 aria-label="Back to the call" -exact-press-haptic=(haptics ? "selection" : "none") testId="dock-orb"
         hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=44 height=44
         column min-width=0 align-items="flex-start"
@@ -395,14 +399,14 @@ component CallDock
           if status == "live"
             row gap=4
               text (micOff ? "Muted ·" : "On a call ·") font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
-              time datetime=started format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
+              time datetime=started format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" text-align="left"
           else
-            text (status == "ending" ? "Ending…" : status == "reconnecting" ? "Reconnecting…" : "Calling…") font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
+            text `${micOff and status != "ending" ? "Muted · " : ""}${status == "ending" ? "Ending…" : status == "reconnecting" ? "Reconnecting…" : "Calling…"}` font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
       if room.columns == 2 and tasksOpen
         button press=toggleBeside class=Tap width=48 height=48 border-radius=24 background-color=(beside ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(beside ? "Show Tasks beside the page" : "Show the transcript beside Tasks") aria-pressed=beside -exact-press-haptic=(haptics ? "selection" : "none") testId="dock-beside"
           image "symbol:sf/text.bubble" width=18 height=18 object-fit="contain" color=(beside ? "AccentColor" : "-exact-label")
       if not elsewhere
-        MuteButton(size=48, mute=mute, micOff=micOff, hushed=false, disabled=(status != "live" or not call.shell))
+        MuteButton(size=48, mute=mute, micOff=micOff, hushed=false, disabled=(status == "ending" or not call.shell))
       CallButton(size=48, status=status, busy=(status != "live"), retry=false, primary=stop)
 
 // Under the orb: the call's clock, its connecting, and how it went.
@@ -419,7 +423,7 @@ component CallLines
       row gap=6 align-items="center" testId="elapsed"
         if call.muted
           image "symbol:sf/mic.slash.fill" width=13 height=13 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-        time datetime=elapsed format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
+        time datetime=elapsed format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" text-align="center"
     if status == "connecting" or status == "reconnecting"
       text (status == "reconnecting" ? "Reconnecting…" : "Calling hex…") font="-exact-subheadline" color="-exact-secondary-label" testId="connecting"
     if footer != ""

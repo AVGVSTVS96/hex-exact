@@ -19,7 +19,7 @@ use YourWords from "./words.contract"
 use UpdateToast from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
-use Room, roomOf from "./room.contract"
+use Room, roomOf, belowIn from "./room.contract"
 use DecidedPage from "./decided.contract"
 use Feed, FeedEntry, FeedView from "./feed.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
@@ -175,7 +175,7 @@ component App
   derive pastId = match stack(nav).filter(e => e.name == "pastCall").at(-1) { case some(e) => e.params.id, case none => callsPane ? paneCall : "" }
   derive pastLive = calls.live != "" and pastId == calls.live
   // Tasks beside a page: the Duo opened like a book, or a window wide enough for both.
-  derive split = viewport.horizontalViewportSegments == 2 or viewport.width >= 900
+  derive split = room.columns == 2
   derive firstPage = match stageTopics(entriesOf(tasks, asks, now), shownTab).at(0) { case some(t) => homeOf(pageOf(t), tasks.tasks), case none => "" }
   // Home beside a page: two columns with no call on, the first thing that needs Bassim until he
   // picks one.
@@ -220,7 +220,7 @@ component App
   // update toast with a made-up build.
   derive linkStage = match stack(nav).filter(e => e.name == "tasks").at(0) { case some(e) => searchParam(e, "stage"), case none => "" }
   derive demoUpdate = match stack(nav).at(0) { case some(e) => searchParam(e, "update") == "demo", case none => false }
-  derive shownTab = tab != "" ? tab : linkStage != "" ? linkStage : (needsYou > 0 ? "needs" : "working")
+  derive shownTab = tab != "" ? tab : linkStage != "" ? linkStage : "all"
   derive now = clock.epochAtZero + tick
   // Nothing attached: what a send carries until the camera and Photos attach media ids from POST /media.
   derive noMedia = [""].slice(0, 0)
@@ -595,7 +595,7 @@ component App
         if e.name == "home"
           Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
             if besideId != ""
-              TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+              TaskBody(id=besideId, pane=true, room=room, clearTop=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"
@@ -605,14 +605,14 @@ component App
         if e.name == "pastCall"
           PastCall(entry=e, room=room, pane=false, id=e.params.id, now=now, offset=clock.utcOffset, record=record, counts=counts, loading=(not current(record)), failed=failed(record), live=pastLive, onCall=(call.status != "idle" and not pastLive), docked=callOn, openTasks=openTasks, open=open, remove=removeCall, home=home, back=back)
         if e.name == "tasks"
-          TasksList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(liveTasks) or not current(liveAsks)), failed=(failed(liveTasks) or failed(liveAsks)), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, split=split, beside=besideId, select=besidePage, back=back)
-            TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+          TasksList(entry=e, room=room, clearTop=belowIn(viewport, pose, room.first), now=now, offset=clock.utcOffset, tab=shownTab, pickTab=pickTab, tasks=tasks, asks=asks, counts=counts, loading=(not current(liveTasks) or not current(liveAsks)), failed=(failed(liveTasks) or failed(liveAsks)), callOn=callOn, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, act=act, markRead=markRead, talk=talk, answering=answering, said=saids, again=again, beside=besideId, select=besidePage, back=back)
+            TaskBody(id=besideId, pane=true, room=room, clearTop=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "task"
-          TaskScreen(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+          TaskScreen(entry=e, room=room, clearTop=belowIn(viewport, pose, room.first), counts=counts, callOn=callOn, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "thread"
-          Thread(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${task.id}` ? addError : ""), stopError=(stopFailed == task.id ? stopWords : ""), missing=missing, openOut=openOut, attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
+          Thread(entry=e, room=room, clearTop=belowIn(viewport, pose, room.first), counts=counts, callOn=callOn, openTasks=openTasks, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, sends=sends.map(l => sendingOf(l)), drafts=drafts, keepDraft=keepDraft, resend=resend, loading=(not current(chat)), failed=failed(chat), sending=(pending(messaged)), message=message, stop=stop, attached=(attachedTo == `thread:${task.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${task.id}` ? addError : ""), stopError=(stopFailed == task.id ? stopWords : ""), missing=missing, openOut=openOut, attach=attach, detach=detach, talk=talk, inCall=(call.status == "live"), open=open, back=back)
         if e.name == "steps"
-          Steps(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), back=back)
+          Steps(entry=e, room=room, clearTop=belowIn(viewport, pose, room.first), counts=counts, callOn=callOn, viewport=viewport, now=now, offset=clock.utcOffset, task=task, loading=(not current(task)), failed=failed(task), open=open, openTasks=openTasks, back=back)
         if e.name == "picks"
           Picks(entry=e, viewport=viewport, asks=asks, said=saids, picked=picked, open=open, answerAll=answerAll, back=back)
         if e.name == "pick"

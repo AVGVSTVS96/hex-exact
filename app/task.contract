@@ -1,8 +1,9 @@
 // A task's page (§9.2, 9.7, 9.8): what it needs from Bassim, what it's doing now, what it did, its
 // pinned post, its messages, every place it lives, its week and its history. The same route opens
 // a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
-use Viewport, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
-use Mark, PlaceTile, whenOf, appName, lengthOf, Tap from "./parts.contract"
+use Viewport, Counts, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
+use Mark, PlaceTile, Row, Head, Note, Discuss, ShowMore, RowTap, PillTap, PillFace, Composer, whenOf, appName, lengthOf, Tap from "./parts.contract"
+use Room, Chrome from "./room.contract"
 use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
 use EntryRow from "./rows.contract"
@@ -30,6 +31,10 @@ fn eventOf(text: string): string = text.startsWith("(") and text.indexOf(") ") >
 component TaskScreen
   props
     entry: Entry
+    room: Room
+    clearTop: number
+    counts: Counts
+    callOn: bool
     viewport: Viewport
     now: number
     offset: number
@@ -45,6 +50,7 @@ component TaskScreen
     failed: bool
     inCall: bool
     open: action
+    openTasks: action
     openTask: action
     answer: action
     answerMany: action
@@ -69,14 +75,75 @@ component TaskScreen
     detach: action
     back: action
   view
-    column navigationKey=`${entry.id}` navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 testId="task"
-      TaskBody(id=entry.params.id, pane=false, entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="task"
+      Chrome(room=room, on="task", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
+      column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
+        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
 
-// The page itself: a route's (TaskScreen), or a pane beside the Tasks list on a wide screen.
+// A page's head: its title (two lines at most) and where it stands, clear of the status icons beside
+// it, then what it offers (its children: a way out to where it lives, a call about it). Whatever
+// follows starts below the icons.
+component PageHead
+  props
+    room: Room
+    // Where the column is clear of the status icons (0: it already is, as beside hex's column).
+    clearTop: number
+    pane: bool
+    title: string
+    line: string
+    id: string
+  slot
+  derive inset = pane or room.columns == 2 ? 20 : max(20, room.clear.x + room.clear.width - room.bar.end)
+  view
+    column flex-shrink=0 gap=4 padding-left=20 padding-right=inset padding-top=(pane ? 6 : 0) padding-bottom=10 min-height=(pane ? 0 : max(0, clearTop - room.below)) box-sizing="border-box" testId=id
+      text title role="heading" aria-level=1 font="-exact-title1" font-weight=700 color="-exact-label" line-clamp=2
+      if line != ""
+        text line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+      row gap=8 flex-wrap="wrap" align-items="center" margin-left=-4
+        children
+
+// A row that goes further in the app: its words and a chevron pointing right.
+component Further
+  inject
+    haptics: bool
+  props
+    label: string
+    line: string
+    id: string
+    press: action
+  view
+    button press=press class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(line != "" ? `${label}, ${line}` : label) testId=id
+      column flex=1 min-width=0 gap=2
+        text label font="-exact-headline" color="-exact-label"
+        if line != ""
+          text line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
+      image "symbol:forward-chevron" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+
+// One line of what happened, with its mark and when.
+component Happened
+  props
+    mark: string
+    text: string
+    stamp: string
+    failed: bool
+  view
+    row gap=12 align-items="flex-start" padding="7px 10px"
+      box padding-top=1 flex-shrink=0
+        Mark(state=mark, size=22)
+      text text font="-exact-body" color=(failed ? "hex.danger" : "-exact-label") line-clamp=3 flex=1 min-width=0
+      text stamp font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" padding-top=3
+
+// The page itself: a route's (TaskScreen), or a page beside a list (Tasks, Home) with two columns.
 component TaskBody
+  inject
+    haptics: bool
   props
     id: string
     pane: bool
+    room: Room
+    clearTop: number
+    // How far the page's foot stands off the window's bottom (the call docked there, the home indicator).
+    foot: number
     // The route this shows on (a pane beside the list shows on the list's).
     entry: Entry
     viewport: Viewport
@@ -134,7 +201,7 @@ component TaskBody
   derive places = [row].concat(siblings)
   derive working = siblings.filter(t => t.state == "working")
   derive busyAgents = task.agents.filter(a => a.state == "working")
-  derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${waiting > 0 ? `${waiting} need you · ` : ""}${row.state == "needs" ? `waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `working for ${lengthOf((now - row.since) / 1000)}` : row.state == "done" ? `done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}`
+  derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${row.state == "needs" ? `Waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `Working · started ${lengthOf((now - row.since) / 1000)} ago` : row.state == "done" ? `Done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}${waiting > 0 ? ` · ${waiting} need you` : ""}`
   derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
   derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
   // The reply box docked at the foot: for the question Bassim picked, else the first still open.
@@ -143,168 +210,88 @@ component TaskBody
   // The door out to where this lives: the thread's own place, the finished item's, or a topic's
   // first question's.
   derive door = kind == "task" ? match places.filter(t => t.place == row.place and t.link != "").at(0) { case some(t) => Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), case none => Place(app="", place="", task="", call="", link="") } : kind == "done" ? Place(app=finished.app, place="", task="", call="", link=finished.link) : match pageAsks.map(a => a.places).flat().filter(p => p.link != "").at(0) { case some(p) => p, case none => Place(app="", place="", task="", call="", link="") }
+  derive width = pane ? room.second.width : room.clear.width
+  // A composer docked at the foot: the page scrolls to its top edge and fades over the 24 above it.
+  derive docked = replyAsk.length == 0 and kind == "task" and chat.sends
   action reply(askId: string)
     replying = askId
   action closeReply
     replying = ""
   action morePlaces
     allPlaces = not allPlaces
+  action toSteps
+    open(path("steps", id))
+  action toMessages
+    open(path("thread", id))
+  action toProject
+    openTask(finished.run)
   view
-    column flex=1 min-height=0
-      if pane
-        row gap=8 align-items="center" padding="14px 16px 6px"
-          column flex=1 min-width=0 gap=1
-            text title font="-exact-title3" font-weight=700 line-clamp=1
-            text subtitle font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
-          if door.link != ""
-            button press=openOut(door.link, door.app) appearance="auto" buttonStyle="glass" aria-label=`Open in ${appName(door.app)}` testId="pane-door"
-              image (door.app == "telegram" ? "symbol:sf/paperplane.fill" : door.app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : door.app == "buzz" ? "symbol:sf/bolt.fill" : door.app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : door.app == "server" ? "symbol:sf/terminal.fill" : door.app == "voice" or door.app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right")
-          if kind != "done"
-            button press=talk(kind == "task" ? id : "asks") appearance="auto" buttonStyle="glass" aria-label="Talk it through" testId="pane-talk"
-              image "symbol:sf/phone.and.waveform"
-      else
-        header display="flex" align-items="center"
-          text title role="heading" aria-level=2
-          text subtitle
-          if door.link != ""
-            button press=openOut(door.link, door.app) aria-label=`Open in ${appName(door.app)}` testId="task-door-bar"
-              image (door.app == "telegram" ? "symbol:sf/paperplane.fill" : door.app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : door.app == "buzz" ? "symbol:sf/bolt.fill" : door.app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : door.app == "server" ? "symbol:sf/terminal.fill" : door.app == "voice" or door.app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right")
-          if kind != "done"
-            button press=talk(kind == "task" ? id : "asks") aria-label="Talk it through" testId="task-talk"
-              image "symbol:sf/phone.and.waveform"
-      list id=(pane ? "task-pane" : "task-page") appearance="auto" listStyle="inset-grouped" flex=1 min-height=0
-        if kind == "done"
-          section
-            row gap=12 align-items="flex-start" padding="4px 0"
-              Mark(state="done", size=26)
-              text finished.title font="-exact-title3" font-weight=600 flex=1
-          if finished.said != ""
-            section
-              header
-                text "Proof"
-              text finished.said font="-exact-body" user-select="text"
+    column flex=1 min-height=0 height="100%"
+      PageHead(room=room, clearTop=clearTop, pane=pane, title=title, line=subtitle, id=(pane ? "pane-head" : "task-head"))
+        if door.link != ""
+          button press=openOut(door.link, door.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(door.app)}` testId=(pane ? "pane-door" : "task-door-bar")
+            box class=PillFace gap=8 padding="5px 12px 5px 6px"
+              PlaceTile(place=door, size=22)
+              text appName(door.app) font="-exact-subheadline" font-weight=600 color="-exact-label"
+        if kind != "done"
+          Discuss(title=title, id=(pane ? "pane-talk" : "task-talk"), press=talk(kind == "task" ? id : "asks"))
+        if missing.includes(door.app)
+          text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding-left=4 width="100%" testId="door-missing"
+      scroll id=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked ? "linear-gradient(to top, transparent 0, #000 24px)" : "none")
+        column padding="0 10px" padding-bottom=(docked ? 30 : foot + 24) gap=0
+          if kind == "done"
+            Happened(mark="done", text=finished.title, stamp="", failed=false)
+            if finished.said != ""
+              Head(label="Proof", n=-1, pad="18px 10px 4px", id="head-proof")
+              text finished.said font="-exact-body" user-select="text" padding="2px 10px"
               for l in finished.links key=l.url
-                link href=l.url testId=`proof-${l.label}`
-                  text l.label flex=1
+                link href=l.url class=RowTap align-items="center" testId=`proof-${l.label}`
+                  text l.label font="-exact-body" color="-exact-label" flex=1
                   image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
-          if finished.run != ""
-            section
-              header
-                text "Project"
-              link href=path("task", finished.run) testId="done-project"
-                PlaceTile(place=Place(app=finished.app, place=finished.topic, task=finished.run, call="", link=finished.link), size=28)
-                text finished.topic flex=1
-        else
-          if kind == "task" and loading and not known and row.id == ""
-            section
-              progress aria-label="Loading"
-          if kind == "task" and failed and not known and row.id == ""
-            section
-              text "hex didn't answer, so this can't open yet." color="-exact-secondary-label"
-          if pageAsks.length > 0
-            section background-color="transparent"
-              for a, i in pageAsks key=a.id
-                // An open question swipes to Not needed, as a row in the list does.
-                if said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0
-                  AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
-                else
-                  scroll swipeContent=`${a.id}-card` swipeTrailing=`${a.id}-card-away` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`ask-swipe-${a.id}`
-                    box id=`${a.id}-card` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box"
-                      AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(viewport.width - 64))
-                    button id=`${a.id}-card-away` press=dismiss(a.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`card-away-${a.id}`
-                      image "symbol:sf/hand.raised.slash"
-                      text "Not needed"
-          if pageDecided.length > 0
-            section background-color="transparent"
-              for a in pageDecided key=a.id
-                DecidedCard(ask=a, now=now, offset=offset, failed=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, undo=undo)
-          if kind == "topic" and topicEntries.length > 0
-            section
+            if finished.run != ""
+              Further(label=finished.topic, line="The project it was for", id="done-project", press=toProject)
+          else
+            if kind == "task" and loading and not known and row.id == ""
+              Note(kind="loading", text="Loading", pad="24px 10px", id="task-loading")
+            if kind == "task" and failed and not known and row.id == ""
+              Note(kind="failed", text="hex didn't answer, so this can't open yet.", pad="24px 10px", id="task-offline")
+            for a, i in pageAsks key=a.id
+              // An open question swipes to Not needed, as a row in the list does.
+              if said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0
+                AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(width - 40))
+              else
+                scroll swipeContent=`${a.id}-card` swipeTrailing=`${a.id}-card-away` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`ask-swipe-${a.id}`
+                  box id=`${a.id}-card` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box"
+                    AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(width - 40))
+                  button id=`${a.id}-card-away` press=dismiss(a.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`card-away-${a.id}`
+                    image "symbol:sf/hand.raised.slash"
+                    text "Not needed"
+            if kind == "topic" and topicEntries.length > 0
               for e in topicEntries key=e.id
                 EntryRow(entry=e, asks=asks.asks, said=said, why="", now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openTask)
-          if kind == "task" and task.needs != "" and pageAsks.length == 0
-            section
-              header
-                text "Needs you"
-              row gap=12 align-items="flex-start"
-                Mark(state="needs", size=22)
-                column flex=1 gap=2
-                  text task.needs font="-exact-body"
-                  text `Waiting on you since ${whenOf(row.since, now, offset)}` font="-exact-footnote" color="-exact-secondary-label"
-          if kind == "task" and (row.state == "working" or working.length > 0 or busyAgents.length > 0)
-            section
-              header
-                text "Working"
+            if kind == "task" and task.needs != "" and pageAsks.length == 0
+              Head(label="Needs you", n=-1, pad="18px 10px 4px", id="head-needs")
+              Happened(mark="needs", text=task.needs, stamp=whenOf(row.since, now, offset), failed=false)
+            if kind == "task" and (row.state == "working" or working.length > 0 or busyAgents.length > 0)
+              Head(label="Now", n=-1, pad="18px 10px 4px", id="head-now")
               if row.state == "working"
-                link href=path("steps", id) testId="task-now"
-                  Mark(state="working", size=22)
-                  column flex=1 min-width=0 gap=2
-                    text `Now: ${row.line != "" ? row.line : "working"}` font="-exact-body" line-clamp=2
-                    text `for ${lengthOf((now - row.since) / 1000)}` font="-exact-footnote" color="-exact-secondary-label" font-variant-numeric="tabular-nums"
-              if working.length + busyAgents.length > 0
-                scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory"
-                  row gap=10 padding="4px 0"
-                    for t in working key=t.id
-                      link href=path("task", t.id) width="13.75rem" flex-shrink=0 scroll-snap-align="start" padding=12 border-radius=14 background-color="-exact-tertiary-fill" display="flex" flex-direction="column" gap=4 testId=`working-${t.id}`
-                        row gap=6 align-items="center"
-                          Mark(state="working", size=16)
-                          text t.place font="-exact-subheadline" font-weight=600 line-clamp=1 flex=1
-                        text t.line font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
-                    for a in busyAgents key=a.id
-                      link href=path("steps", id) width="13.75rem" flex-shrink=0 scroll-snap-align="start" padding=12 border-radius=14 background-color="-exact-tertiary-fill" display="flex" flex-direction="column" gap=4 testId=`agent-${a.id}`
-                        row gap=6 align-items="center"
-                          Mark(state="working", size=16)
-                          text a.label font="-exact-subheadline" font-weight=600 line-clamp=1 flex=1
-                        text (a.line != "" ? a.line : `since ${whenOf(a.since, now, offset)}`) font="-exact-footnote" color="-exact-secondary-label" line-clamp=2
-          if kind == "task" and task.steps.length > 0
-            section
-              header
-                text "Last run"
-              for s in sortBy(task.steps, s => s.at, "desc").slice(0, 3) key=s.id
-                row gap=10 align-items="baseline"
-                  text kindWord(s.kind) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" width="5.5rem" flex-shrink=0
-                  text s.text font="-exact-subheadline" line-clamp=2 flex=1 color=(s.state == "failed" ? "hex.danger" : "-exact-label")
-              link href=path("steps", id) testId="task-steps"
-                text (task.agents.length > 0 ? `All steps · ${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : "All steps") flex=1 line-clamp=1
-          if kind == "task"
-            for p, i in task.pins key=`${p.title}${i}`
-              Pinned(section=p, first=(i == 0))
-          if kind == "task" and chat.turns.length > 0
-            section
-              header
-                text "Messages"
+                Happened(mark="working", text=(row.line != "" ? row.line : "Working"), stamp=lengthOf((now - row.since) / 1000), failed=false)
+              for t in working key=t.id
+                Row(mark="working", title=t.place, line=t.line, lines=2, failed=false, stamp=whenOf(t.at, now, offset), n=0, selected=false, href="", label=`${t.place}, working: ${t.line}`, id=`working-${t.id}`, press=openTask(t.id))
+            if kind == "task" and (task.steps.length > 0 or task.agents.length > 0)
+              Further(label="Steps", line=(task.agents.length > 0 ? `${task.agents.length} ${task.agents.length == 1 ? "agent" : "agents"} · ${task.agents.slice(0, 3).map(a => a.label).join(", ")}` : match sortBy(task.steps, s => s.at, "desc").at(0) { case some(s) => `${kindWord(s.kind)}: ${s.text}`, case none => "" }), id="task-steps", press=toSteps)
+            if kind == "task"
+              for p, i in task.pins key=`${p.title}${i}`
+                Pinned(section=p, first=(i == 0))
+            if kind == "task" and chat.turns.length > 0
+              Head(label="Messages", n=chat.total, pad="18px 10px 4px", id="head-messages")
               for t in chat.turns.slice(-2) key=t.id
-                row justify-content=(t.source == "me" ? "flex-end" : "flex-start")
-                  text (eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-subheadline" line-clamp=3 max-width=(t.source == "me" ? "85%" : "100%") padding=(t.source == "me" ? "6px 12px" : "0") border-radius=16 background-color=(t.source == "me" ? "-exact-tertiary-fill" : "transparent")
-              link href=path("thread", id) testId="task-messages"
-                text `All messages${chat.total > 0 ? ` · ${chat.total}` : ""}` flex=1
-          if kind == "task" and row.id != ""
-            section
-              header
-                text `Places · ${places.length}`
-              for t, i in places.slice(0, allPlaces ? places.length : 5) key=t.id
-                if i == 0
-                  button press=openOut(t.link, t.app) disabled=(t.link == "") display="flex" flex-direction="row" gap=12 align-items="center" text-align="left" testId="task-door"
-                    PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=28)
-                    column flex=1 min-width=0 gap=1
-                      text (t.place != "" ? t.place : t.name) line-clamp=1 color="-exact-label"
-                      text (missing.includes(t.app) ? `${appName(t.app)} isn’t on this iPhone` : `${appName(t.app)} · ${whenOf(t.at, now, offset)}${t.link == "" ? " · no link" : ""}`) font="-exact-footnote" color=(missing.includes(t.app) ? "hex.danger" : "-exact-secondary-label")
-                    if t.link != ""
-                      image "symbol:sf/arrow.up.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label"
-                else
-                  link href=path("task", t.id) testId=`place-${t.id}`
-                    PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=28)
-                    column flex=1 min-width=0 gap=1
-                      text (t.place != "" ? t.place : t.name) line-clamp=1
-                      text `${appName(t.app)} · ${whenOf(t.at, now, offset)} · ${stateWord(t.state)}` font="-exact-footnote" color="-exact-secondary-label"
-              if places.length > 5
-                button press=morePlaces testId="more-places"
-                  text (allPlaces ? "Show fewer" : `Show ${places.length - 5} more threads`)
-          if kind == "task" and weekly.length > 0
-            section
-              header
-                text "This week"
-              column gap=6 padding="4px 0"
+                row justify-content=(t.source == "me" ? "flex-end" : "flex-start") padding="3px 10px"
+                  text (eventOf(t.text) != "" ? t.text.slice(eventOf(t.text).length + 3) : t.text) font="-exact-body" line-clamp=4 max-width=(t.source == "me" ? "85%" : "100%") padding=(t.source == "me" ? "8px 14px" : "0") border-radius=18 background-color=(t.source == "me" ? "-exact-tertiary-fill" : "transparent")
+              Further(label="All messages", line="", id="task-messages", press=toMessages)
+            if kind == "task" and weekly.length > 0
+              Head(label="This week", n=-1, pad="18px 10px 6px", id="head-week")
+              column gap=6 padding="4px 10px"
                 for t in weekly.slice(0, 6) key=t.id
                   row gap=8 align-items="center"
                     text (t.place != "" ? t.place : t.name) font="-exact-caption1" color="-exact-secondary-label" width="5.5rem" flex-shrink=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
@@ -317,21 +304,32 @@ component TaskBody
                 row padding-left="6.0rem"
                   for l, j in ["1w", "3d", "1d", "6h", "1h", "now"] key=l
                     text l font="-exact-caption2" color="-exact-tertiary-label" flex=(j == 5 ? 0 : 1) font-variant-numeric="tabular-nums"
-          if kind == "task" and task.lately.length > 0
-            section
-              header
-                text "Lately"
+            if kind == "task" and task.lately.length > 0
+              Head(label="Lately", n=-1, pad="18px 10px 4px", id="head-lately")
               for l, i in task.lately.slice(0, 8) key=`${l.at}${i}`
-                row gap=12 align-items="flex-start"
-                  Mark(state=l.state, size=20)
-                  text l.text flex=1 font="-exact-subheadline" line-clamp=2
-                  text whenOf(l.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+                Happened(mark=l.state, text=l.text, stamp=whenOf(l.at, now, offset), failed=(l.state == "failed"))
+            if pageDecided.length > 0
+              Head(label="hex decided", n=-1, pad="18px 10px 4px", id="head-decided")
+              for a in pageDecided key=a.id
+                DecidedCard(ask=a, now=now, offset=offset, failed=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, undo=undo)
+            if kind == "task" and siblings.length > 0
+              Head(label="Other threads", n=siblings.length, pad="18px 10px 4px", id="head-threads")
+              for t in siblings.slice(0, allPlaces ? siblings.length : 4) key=t.id
+                button press=openTask(t.id) class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") testId=`place-${t.id}`
+                  PlaceTile(place=Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), size=26)
+                  column flex=1 min-width=0 gap=1
+                    text (t.place != "" ? t.place : t.name) font="-exact-body" color="-exact-label" line-clamp=1
+                    text `${appName(t.app)} · ${whenOf(t.at, now, offset)} · ${stateWord(t.state)}` font="-exact-footnote" color="-exact-secondary-label"
+                  image "symbol:forward-chevron" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+              if siblings.length > 4
+                ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
       if replyAsk.length > 0
         for a in replyAsk key=a.id
           ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach)
-      else if kind == "task" and chat.sends
-        link href=`${path("thread", id)}#compose` margin="6px 12px 10px" padding="11px 16px" border-radius=22 border="1px solid -exact-separator" testId="task-compose"
-          text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1
+      else if docked
+        button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=16 right=16 bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
+          row class=Composer flex=1 align-items="center" padding="0 16px"
+              text (draftOf(drafts, `thread:${id}`) != "" ? draftOf(drafts, `thread:${id}`) : `Message ${title}`) font="-exact-body" color=(draftOf(drafts, `thread:${id}`) != "" ? "-exact-label" : "-exact-tertiary-label") line-clamp=1 flex=1 text-align="left"
 
 // A section of the pinned post: its mark and title, its items with their own marks, links that
 // open, code in a box. Done sections start folded to "Title · N".
@@ -348,26 +346,26 @@ component Pinned
     if haptics
       haptic("selection")
   view
-    section
-      header
-        text (section.title != "" ? section.title : first ? "Pinned" : "")
+    column gap=0
       if section.folded
-        button press=fold class=Tap display="flex" flex-direction="row" gap=10 align-items="center" text-align="left" aria-expanded=(not folded) testId=`pin-fold-${section.title}`
-          Mark(state=section.mark, size=18)
-          text `${section.title} · ${section.lines.length}` flex=1 font="-exact-subheadline" color="-exact-secondary-label"
-          image (folded ? "symbol:sf/chevron.down" : "symbol:sf/chevron.up") width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+        button press=fold class=RowTap align-items="center" aria-expanded=(not folded) testId=`pin-fold-${section.title}`
+          Mark(state=section.mark, size=22)
+          text `${section.title} · ${section.lines.length}` flex=1 font="-exact-headline" color="-exact-secondary-label"
+          image "symbol:icon.open" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" rotate=(folded ? "-90deg" : "0deg")
+      else
+        Head(label=(section.title != "" ? section.title : first ? "Pinned" : ""), n=-1, pad="18px 10px 4px", id=`pin-${section.title}`)
       if not folded
         for l, i in section.lines key=`${i}`
           if l.kind == "code"
-            text l.text font-family="ui-monospace" font="-exact-footnote" padding="8px 10px" border-radius=10 background-color="-exact-tertiary-fill" white-space="pre-wrap" user-select="text"
+            text l.text font-family="ui-monospace" font="-exact-footnote" margin="4px 10px" padding="8px 10px" border-radius=10 background-color="-exact-tertiary-fill" white-space="pre-wrap" user-select="text"
           else if l.url != ""
-            link href=l.url
+            link href=l.url class=RowTap align-items="flex-start" padding="6px 10px"
               if l.kind == "item"
-                Mark(state=l.mark, size=18)
-              text l.text markup="markdown" font="-exact-subheadline" flex=1
-              image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label"
+                Mark(state=l.mark, size=20)
+              text l.text markup="markdown" font="-exact-body" color="-exact-label" flex=1
+              image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" margin-top=5
           else
-            row gap=10 align-items="flex-start"
+            row gap=12 align-items="flex-start" padding="6px 10px"
               if l.kind == "item"
-                Mark(state=l.mark, size=18)
-              text l.text markup="markdown" font="-exact-subheadline" flex=1 user-select="text"
+                Mark(state=l.mark, size=20)
+              text l.text markup="markdown" font="-exact-body" color="-exact-label" flex=1 user-select="text"

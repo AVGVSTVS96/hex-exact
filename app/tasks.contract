@@ -1,11 +1,14 @@
 // Tasks (§9.1): everything hex is doing and everything that waits on Bassim, in tabs: All, Needs
 // you, Working, Done, Quiet. Each topic is one row; search finds any question, thread or result by
-// every word. On a phone it's a sheet over the call, so the call stays in reach.
-use Viewport, Tasks, Asks, Counts from "./shapes.contract"
-use Mark, Chip, StageHead, ShowMore, Note, whenOf, Tap from "./parts.contract"
+// every word. It's a page like any other: over Home in one column, with the chrome beside the status
+// icons and the call docked at its foot; with two columns, the list in the first and the open row's
+// page in the second.
+use Tasks, Asks, Counts from "./shapes.contract"
+use Mark, StageHead, ShowMore, Note, Row, whenOf, Tap, PillTap, PillFace, RowTap from "./parts.contract"
+use Room, Chrome from "./room.contract"
 use Said from "./said.contract"
-use Item, Topic, entriesOf, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
-use ProjectRow, TopicHead, EntryRow, DecidedRow from "./rows.contract"
+use Item, Topic, unique, entriesOf, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
+use ProjectRow, TopicHead, EntryRow from "./rows.contract"
 
 shape TabItem
   id: string
@@ -15,13 +18,21 @@ shape TabItem
 fn headState(stage: string): string = stage == "needs" ? "asks" : stage
 fn stageIndex(stage: string): number = stage == "needs" ? 1 : stage == "working" ? 2 : stage == "done" ? 3 : 4
 fn emptyWords(tab: string): string = tab == "needs" ? "Nothing waits on you" : tab == "working" ? "Nothing is working" : tab == "done" ? "Nothing done in the last day" : tab == "quiet" ? "Nothing is quiet" : "Nothing from hex yet"
+fn stageOf(t: Topic): string = match t.entries.at(0) { case some(e) => e.stage, case none => "" }
+// All is the overview: each stage's first three, then "Show N more"; a stage's own tab shows it whole.
+fn firstFew(): number = 3
+// The page's head: its title row, then the tabs (or the search field).
+fn titleHeight(): number = 52
+fn tabsHeight(): number = 52
 
 component TasksList
   inject
     haptics: bool
   props
     entry: Entry
-    viewport: Viewport
+    room: Room
+    // Where the list's column is clear of the status icons and cameras.
+    clearTop: number
     now: number
     offset: number
     tab: string
@@ -32,8 +43,10 @@ component TasksList
     said: Said[]
     loading: bool
     failed: bool
-    inCall: bool
+    // A call is on: it's docked at the foot, so the list ends above it.
+    callOn: bool
     open: action
+    openTasks: action
     openTask: action
     answer: action
     answerMany: action
@@ -44,16 +57,15 @@ component TasksList
     markRead: action
     talk: action
     answering: string
-    // Wide (the Duo opened like a book, a big window): the list on the left, a page beside it.
-    split: bool
     beside: string
     select: action
     back: action
   slot
   state query = ""
-  // Needs you shows its first few and what hex decided its first two, until Bassim asks for more.
-  state allNeeds = false
-  state allDecided = false
+  state searchOpen = false
+  // The stages of All Bassim opened past their first few.
+  state opened = [""].slice(0, 0)
+  derive two = room.columns == 2
   derive tabs = [TabItem(id="all", label="All"), TabItem(id="needs", label="Needs you"), TabItem(id="working", label="Working"), TabItem(id="done", label="Done"), TabItem(id="quiet", label="Quiet")]
   derive entries = entriesOf(tasks, asks, now)
   // An ask put away here leaves the counts at once, and its row folds where it was.
@@ -63,23 +75,33 @@ component TasksList
   derive words = wordsOf(query)
   derive searching = words.length > 0
   derive topics = searching ? topicsOf(entries.filter(e => matches(e, words))) : stageTopics(entries, tab)
+  derive stages = unique(topics.map(t => stageOf(t)))
   derive picks = picksOf(asks.asks, said)
   derive asking = asks.asks.filter(a => not away.includes(a.id)).length
   derive known = tasks.version > 0 or asks.version > 0
-  derive needsTab = tab == "needs" and not searching
-  derive shownTopics = needsTab and not allNeeds ? topics.slice(0, 3) : topics
-  derive decided = asks.decided
-  derive shownDecided = allDecided ? decided : decided.slice(0, 2)
-  derive book = viewport.horizontalViewportSegments == 2
-  derive listWidth = book ? "env(viewport-segment-width 0 0)" : "25rem"
-  action moreNeeds
-    allNeeds = not allNeeds
-  action moreDecided
-    allDecided = not allDecided
+  derive decided = asks.decided.length
+  // The column the list takes, and where its head and rows start: under the chrome row when it's
+  // above the list (one column), level with it when the chrome sits over the page beside (two).
+  derive col = room.first
+  derive headTop = two ? room.bar.top : room.below
+  derive tabsTop = max(headTop + titleHeight(), clearTop)
+  derive listTop = tabsTop + tabsHeight()
+  // The title row's search button ends where the chrome's capsule does, clear of the status icons.
+  derive headEnd = two ? col.x + col.width - 16 : min(room.bar.end, col.x + col.width - 16)
+  // With a call docked at the foot, the list ends above it and fades over the 26 above it.
+  derive listBottom = callOn ? room.foot + 64 + 6 : 0
+  derive footRoom = callOn ? 30 : room.foot + 16
+  action toggleStage(stage: string)
+    opened = opened.includes(stage) ? opened.filter(s => s != stage) : opened.concat([stage])
   action search(v: string)
     query = v
+  action openSearch
+    searchOpen = true
+  action closeSearch
+    searchOpen = false
+    query = ""
   action openPage(page: string)
-    if split
+    if two
       select(homeOf(page, tasks.tasks))
     else
       open(path("task", homeOf(page, tasks.tasks)))
@@ -88,69 +110,77 @@ component TasksList
       haptic("selection")
     talk("asks")
   view
-    column navigationKey=`${entry.id}` navigationPresentation=(viewport.width < 700 ? "modal" : "push") navigationDetent=(inCall ? "medium large" : "large") navigationInitialDetent="large" navigationScroll="tasks-list" position="absolute" inset=0 testId="tasks"
-      header display="flex" flex-wrap="wrap" align-items="center" gap=8
-        button id="back" press=back aria-label="Close" testId="tasks-close"
-          image "symbol:close"
-        text "Tasks" role="heading" aria-level=1 flex=1
-        input type="search" value=query input=search placeholder="Tasks, topics, questions" aria-label="Search Tasks" testId="tasks-search" width="100%"
-      row flex=1 min-height=0 align-items="stretch"
-        list id="tasks-list" appearance="auto" listStyle="plain" flex=(split ? "none" : 1) width=(split ? listWidth : "auto") min-height=0
-          section
-            if not searching
-              row role="tablist" aria-label="Stages" gap=6 padding="2px 16px 8px" overflow-x="auto" scrollbar-width="none"
-                for t, i in tabs key=t.id
-                  button press=pickTab(t.id) class=Tap padding="6px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" flex-shrink=0 role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic=(haptics ? "selection" : "none") transition="background-color 160ms ease" testId=`tab-${t.id}`
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="tasks-list" position="absolute" inset=0 background-color="-exact-background" testId="tasks"
+      Chrome(room=room, on="tasks", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
+      row position="absolute" top=headTop left=col.x width=(headEnd - col.x) height=titleHeight() padding-left=20 box-sizing="border-box" gap=12 align-items="center" testId="tasks-head"
+        text "Tasks" role="heading" aria-level=1 font="-exact-large-title" font-weight=700 flex=1 min-width=0 white-space="nowrap"
+        if not searchOpen
+          button press=openSearch class=Tap width=44 height=44 border-radius=22 backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-label="Search Tasks" -exact-press-haptic=(haptics ? "selection" : "none") testId="tasks-search-open"
+            image "symbol:search" width=18 height=18 object-fit="contain" color="-exact-label"
+      row position="absolute" top=tabsTop left=col.x width=col.width height=tabsHeight() align-items="center" testId="tasks-tabs-row"
+        if searchOpen
+          row flex=1 gap=4 padding="0 8px 0 16px" align-items="center"
+            row flex=1 min-width=0 height=40 gap=8 padding="0 12px" border-radius=20 background-color="-exact-tertiary-fill" align-items="center"
+              image "symbol:search" width=15 height=15 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+              input type="search" value=query input=search autofocus=true placeholder="Topics, questions, results" aria-label="Search Tasks" border="none" background-color="transparent" flex=1 min-width=0 font="-exact-body" color="-exact-label" testId="tasks-search"
+            button press=closeSearch class=PillTap padding="0 8px" -exact-press-haptic=(haptics ? "selection" : "none") testId="tasks-search-close"
+              text "Cancel" font="-exact-body" color="-exact-label"
+        else
+          scroll flex=1 min-width=0 overflow-x="auto" overflow-y="hidden" scrollbar-width="none"
+            row role="tablist" aria-label="Stages" gap=6 padding="0 16px" align-items="center"
+              for t, i in tabs key=t.id
+                button press=pickTab(t.id) class=PillTap role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`tab-${t.id}`
+                  box class=PillFace gap=6 padding="7px 14px" background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") transition="background-color 160ms ease"
                     text t.label font="-exact-subheadline" font-weight=600 color=(tab == t.id ? "-exact-background" : "-exact-label") white-space="nowrap"
                     if t.id != "all"
-                      text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(t.id == "needs" and tab != t.id ? "hex.ask" : tab == t.id ? "-exact-background" : "-exact-secondary-label") opacity=(tab == t.id ? 0.7 : 1)
-            if failed and known
-              text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 16px" testId="tasks-behind"
-            if needsTab
-              StageHead(state="asks", label="Needs you", n=match countOf.at(1) { case some(n) => n, case none => 0 }, known=known, pad="6px 16px 2px", id="stage-head-asks")
-            for t, i in shownTopics key=(tab == "done" or searching ? `${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : t.name)
-              if not searching and tab == "all" and (i == 0 or match topics.at(i - 1) { case some(p) => match p.entries.at(0) { case some(e) => e.stage, case none => "" } != match t.entries.at(0) { case some(e) => e.stage, case none => "" }, case none => true })
-                StageHead(state=headState(match t.entries.at(0) { case some(e) => e.stage, case none => "" }), label=stageWord(match t.entries.at(0) { case some(e) => e.stage, case none => "" }), n=match countOf.at(stageIndex(match t.entries.at(0) { case some(e) => e.stage, case none => "" })) { case some(n) => n, case none => 0 }, known=known, pad=(i == 0 ? "6px 16px 2px" : "20px 16px 2px"), id=`stage-head-${match t.entries.at(0) { case some(e) => e.stage, case none => "" }}`)
-              if searching
-                TopicHead(topic=t, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=split, select=select(homeOf(pageOf(t), tasks.tasks)))
-                for e in t.entries key=e.id
-                  EntryRow(entry=e, asks=asks.asks, said=said, why=whyOf(e, words), now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openPage)
-              else
-                ProjectRow(topic=t, now=now, offset=offset, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=split, selected=(split and beside == homeOf(pageOf(t), tasks.tasks)), select=select(homeOf(pageOf(t), tasks.tasks)))
-            if needsTab and topics.length > 3
-              ShowMore(n=(topics.length - 3), shown=allNeeds, pad="4px 16px", id="more-needs", press=moreNeeds)
-            if needsTab and picks.length > 1
-              link href=path("picks") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-picks"
-                Mark(state="pick", size=22)
-                text `hex picked for ${picks.length} questions` flex=1 font="-exact-body"
-                text "Take them" font="-exact-subheadline" color="hex.accent"
-            if needsTab and decided.length > 0
-              StageHead(state="decided", label="hex decided", n=decided.length, known=known, pad="20px 16px 2px", id="stage-head-decided")
-              for a in shownDecided key=a.id
-                DecidedRow(ask=a, said=said, href=path("task", homeOf(a.task, tasks.tasks)), split=split, selected=(split and beside == homeOf(a.task, tasks.tasks)), select=select(homeOf(a.task, tasks.tasks)), undo=undo)
-              if decided.length > 2
-                ShowMore(n=(decided.length - 2), shown=allDecided, pad="4px 16px", id="more-decided", press=moreDecided)
-            if needsTab and asks.check.at > 0
-              link href=path("check") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-check"
+                      text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(tab == t.id ? "-exact-background" : t.id == "needs" ? "hex.ask" : "-exact-secondary-label") opacity=(tab == t.id ? 0.7 : 1)
+      scroll id="tasks-list" position="absolute" top=listTop bottom=listBottom left=col.x width=col.width overflow-y="auto" mask-image=(callOn ? "linear-gradient(to top, transparent 0, #000 26px)" : "none") testId="tasks-rows"
+        column padding="0 6px" padding-bottom=footRoom
+          if failed and known
+            text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 10px" testId="tasks-behind"
+          if not searching and decided > 0
+            button press=open(path("decided")) class=RowTap align-items="center" padding="10px 10px 14px" margin-bottom=6 border-bottom="0.5px solid -exact-separator" border-radius=0 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided}` testId="open-decided"
+              Mark(state="decided", size=22)
+              text `hex decided ${decided}` font="-exact-headline" color="-exact-label" flex=1
+              image "symbol:forward-chevron" width=13 height=13 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+          if searching
+            for t in topics key=`${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}`
+              TopicHead(topic=t, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=two, select=openPage(pageOf(t)))
+              for e in t.entries key=e.id
+                EntryRow(entry=e, asks=asks.asks, said=said, why=whyOf(e, words), now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openPage)
+          else
+            for s, si in stages key=s
+              StageHead(state=headState(s), label=stageWord(s), n=match countOf.at(stageIndex(s)) { case some(n) => n, case none => 0 }, known=known, pad=(si == 0 ? "8px 10px 2px" : "22px 10px 2px"), id=`stage-head-${s}`)
+              for t, i in topics.filter(x => stageOf(x) == s) key=(tab == "done" ? `${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : t.name)
+                if tab != "all" or i < firstFew() or opened.includes(s)
+                  ProjectRow(topic=t, now=now, offset=offset, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=two, selected=(two and beside == homeOf(pageOf(t), tasks.tasks)), select=openPage(pageOf(t)))
+              if tab == "all" and topics.filter(x => stageOf(x) == s).length > firstFew()
+                ShowMore(n=(topics.filter(x => stageOf(x) == s).length - firstFew()), shown=opened.includes(s), pad="2px 10px", id=`more-${s}`, press=toggleStage(s))
+              if s == "needs" and picks.length > 1
+                link href=path("picks") class=RowTap align-items="center" padding="10px 10px" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-picks"
+                  Mark(state="pick", size=22)
+                  text `hex picked for ${picks.length} questions` flex=1 font="-exact-body"
+                  text "Take them" font="-exact-subheadline" font-weight=600 color="hex.accent"
+              if s == "needs" and asking > 1
+                button press=goThrough class=RowTap align-items="center" padding="10px 10px" -exact-press-haptic=(haptics ? "selection" : "none") aria-label="Go through them with hex, in a call" testId="go-through"
+                  box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+                    image "symbol:waveform" width=17 height=17 object-fit="contain" color="-exact-label"
+                  text "Go through them with hex" font="-exact-body" color="-exact-label" flex=1
+            if tab == "needs" and asks.check.at > 0
+              link href=path("check") class=RowTap align-items="center" padding="10px 10px" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-check"
                 Mark(state="done", size=22)
                 column flex=1 min-width=0 gap=2
                   text `Checked ${whenOf(asks.check.at, now, offset)}` font="-exact-body"
                   text [asks.check.fixed > 0 ? `fixed ${asks.check.fixed}` : "", asks.check.flagged > 0 ? `flagged ${asks.check.flagged}` : ""].filter(s => s != "").join(" · ") font="-exact-subheadline" color="-exact-secondary-label"
-            if known and topics.length == 0
-              Note(kind="empty", text=(searching ? "Nothing matches" : emptyWords(tab)), pad="48px 16px", id="tasks-empty")
-            if failed and not known
-              Note(kind="failed", text="Can't reach hex. Trying again…", pad="48px 16px", id="tasks-offline")
-            if loading and not known and not failed
-              Note(kind="loading", text="Loading tasks", pad="48px 16px", id="tasks-loading")
-            if needsTab and asking > 0
-              box height=72
-        if split
-          column position="absolute" top=0 bottom=0 right=0 left=(book ? "env(viewport-segment-left 1 0)" : "25rem") border-left=(book ? "none" : "0.5px solid -exact-separator") testId="tasks-beside"
-            if beside == ""
-              text (known ? "Pick a project" : "") color="-exact-secondary-label" margin="auto"
-            else
-              children
-      if needsTab and asking > 0
-        button press=goThrough appearance="auto" buttonStyle="glass" position="absolute" left=16 right=16 bottom=(max(viewport.safeAreaBottom, 12) + 4) max-width="26rem" margin="0 auto" display="flex" flex-direction="row" gap=8 align-items="center" justify-content="center" padding="14px 20px" border-radius=999 testId="go-through"
-          image "symbol:messages"
-          text "Go through them with hex"
+          if known and topics.length == 0
+            Note(kind="empty", text=(searching ? "Nothing matches" : emptyWords(tab)), pad="48px 10px", id="tasks-empty")
+          if failed and not known
+            Note(kind="failed", text="Can't reach hex. Trying again…", pad="48px 10px", id="tasks-offline")
+          if loading and not known and not failed
+            Note(kind="loading", text="Loading tasks", pad="48px 10px", id="tasks-loading")
+      if two
+        column position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width testId="tasks-beside"
+          if beside == ""
+            text (known ? "Pick a project" : "") color="-exact-secondary-label" margin="auto"
+          else
+            children

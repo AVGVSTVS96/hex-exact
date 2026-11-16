@@ -71,12 +71,14 @@ component SettingsScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="settings"
       Chrome(room=room, on="settings", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
       if two
-        column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="settings-persona-pane"
-          PageTitle(text="Voice and appearance", room=room, left=20, id="settings-title")
-          column flex=1 align-items="center" justify-content="center" gap=18 padding-bottom=(room.foot + 24)
-            Face(persona=persona, tint=chosenColor, palette=opalPalette, reaction=reaction, still=still, spoken=spoken, size=200)
-            Pager(options=faces, value=persona, pick=pickPersona, replay=pickPersona, width=pagerWidth, locked=false, note="", label="Persona", testKey="persona")
-            Swatches(persona=persona, colors=colors(), palettes=palettes(), chosen=(persona == "opal" ? opalPalette : chosenColor), pick=pickSwatch)
+        // Its own scroll, so folded on its side (a short window) the colours are never cut off.
+        scroll position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width overflow-y="auto" testId="settings-persona-pane"
+          column min-height="100%"
+            PageTitle(text="Voice and appearance", room=room, left=20, id="settings-title")
+            column flex=1 align-items="center" justify-content="center" gap=18 padding-top=12 padding-bottom=(room.foot + 24)
+              Face(persona=persona, tint=chosenColor, palette=opalPalette, reaction=reaction, still=still, spoken=spoken, size=min(200, max(120, room.height - 380)))
+              Pager(options=faces, value=persona, pick=pickPersona, replay=pickPersona, width=pagerWidth, locked=false, note="", label="Persona", testKey="persona")
+              Swatches(persona=persona, colors=colors(), palettes=palettes(), chosen=(persona == "opal" ? opalPalette : chosenColor), pick=pickSwatch)
       scroll id="settings" position="absolute" top=(two ? room.secondBelow : room.below) bottom=0 left=rowsLeft width=rowsWidth padding-bottom=(room.foot + (docked ? 88 : 24)) box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)" testId="settings-scroll"
         if not two
           PageTitle(text="Voice and appearance", room=room, left=20, id="settings-title")

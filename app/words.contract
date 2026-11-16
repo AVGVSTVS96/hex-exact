@@ -1,10 +1,19 @@
 // Your words (§10): a short note on how hex should talk, for every call. Saved with Done, and when
-// the field lets go (the sheet swiped away).
+// the field lets go. A page like Voice, not a sheet: a sheet grows under the Duo's status icons
+// when the keyboard is up, and its Done went under the battery.
+use Counts from "./shapes.contract"
+use Room, Chrome from "./room.contract"
+use PageTitle from "./calls.contract"
+
 component YourWords
   props
     entry: Entry
+    room: Room
+    counts: Counts
     words: string
     set: action
+    open: action
+    openTasks: action
     back: action
   state draft = ""
   state touched = false
@@ -19,9 +28,10 @@ component YourWords
       save(draft)
     back()
   view
-    column navigationKey=`${entry.id}` navigationPresentation="modal" navigationDetent="260" position="absolute" inset=0 testId="words"
-      header
-        text "Your words" role="heading" aria-level=2
-        button id="back" press=done buttonStyle="bordered" aria-label="Done" testId="words-done"
-          image "symbol:checkmark"
-      textarea value=(touched ? draft : words) input=edit change=save maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="4px 20px 20px" flex=1 font="-exact-body" aria-label="Your words" autofocus=true testId="words-field"
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="words"
+      Chrome(room=room, on="settings", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=done)
+      scroll position="absolute" top=(room.columns == 2 ? room.secondBelow : room.below) bottom=0 left=(room.columns == 2 ? room.second.x : room.clear.x) width=(room.columns == 2 ? room.second.width : room.clear.width) padding-bottom=(room.foot + 24) box-sizing="border-box"
+        column min-height=(room.columns == 2 ? 0 : max(0, room.headBottom - room.below))
+          PageTitle(text="Your words", room=room, left=20, id="words-title")
+        text "How hex talks to you, on every call. Back keeps it." font="-exact-subheadline" color="-exact-secondary-label" padding="2px 20px 0"
+        textarea value=(touched ? draft : words) input=edit change=save maxlength=600 placeholder="Short answers, no recaps. Talk like a friend." border="none" margin="12px 20px 0" min-height=160 padding="12px 14px" border-radius=16 background-color="-exact-tertiary-fill" font="-exact-body" aria-label="Your words" autofocus=true testId="words-field"

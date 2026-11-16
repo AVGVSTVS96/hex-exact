@@ -25,8 +25,8 @@ fn undoOf(verb: string): string = verb == "start" or verb == "drop" ? "keep" : v
 fn weekdayNumber(now: number, offset: number): number = (floor((now + offset * 60000) / 86400000) + 4) % 7
 fn weekdayName(n: number): string = match ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].at(n) { case some(d) => d, case none => "" }
 fn checkName(day: string): string = day == "daily" ? "daily check" : day != "" ? `${day} check` : "checks"
-// The head over a check: "Found today, 1:40 PM" when it was news, else "Checked …".
-fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}, ${formatTime(c.at, offset, "short")}`
+// The head over a check: "Found today, 1:40 PM" when it was news, else "Checked …"; past yesterday the date alone.
+fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}${now - c.at < 172800000 ? `, ${formatTime(c.at, offset, "short")}` : ""}`
 
 // One check: its words, its links (each leaves the app, so its arrow says so).
 component CheckWords

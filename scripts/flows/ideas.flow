@@ -1,13 +1,9 @@
-# Ideas: the tab, scrolled to its end, the rail idea hex found something on, its earlier checks,
-# Start it and Undo, Stop looking, and a word added to it. The stand-in keeps every write from
-# reaching hex.
+# Ideas: the tab, the idea hex found something on, its earlier checks, Start it and Undo, Stop
+# looking, a word added to it, Back, then the list shown in full and scrolled to its end. The
+# stand-in keeps every write from reaching hex.
 launch /
 tap hex-tab-ideas
 shoot ideas
-tap ideas-more
-scroll home-list-ideas
-shoot ideas-end
-scroll-back home-list-ideas
 tap idea-row-t-906
 shoot idea
 tap idea-earlier
@@ -23,3 +19,10 @@ shoot typed
 tap idea-send
 wait 1
 shoot sent
+tap chrome-back
+shoot back
+tap ideas-more
+scroll home-list-ideas
+shoot ideas-end
+scroll-back home-list-ideas
+shoot ideas-top

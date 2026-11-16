@@ -197,6 +197,50 @@ svg{display:block}
 .cdock .c{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--fill);color:var(--text);flex:none}
 .cdock .c svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .cdock .c.end{background:var(--end);color:#fff}.cdock .c.end svg{width:26px;height:26px}
+/* hex's tabs: Now, Feed, Ideas, Goals, at the foot of its column, Call beside them */
+.tabbar{position:absolute;height:54px;border-radius:27px;display:flex;align-items:center;padding:0 4px}
+.tab{position:relative;width:54px;height:46px;border-radius:23px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--sec);font-size:10.5px;line-height:13px;font-weight:500}
+.tab svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{background:var(--fill);color:var(--text);font-weight:600}
+.tab .dot{position:absolute;top:5px;right:12px;width:8px;height:8px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--glass)}
+/* feed, ideas, goals */
+.m.n{background:var(--fill);color:var(--text)}.m.n svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.m.n.new{box-shadow:0 0 0 1.5px var(--bg),0 0 0 3px var(--text)}
+.m.todo{border-radius:6px;width:20px;height:20px;margin:1px;border:1.5px dashed var(--ter)}
+.dayh{font-size:13px;line-height:18px;font-weight:600;color:var(--sec);padding:16px 10px 2px}
+.earlier{display:flex;align-items:center;gap:10px;color:var(--ter);font-size:12px;line-height:16px;padding:10px 10px 0}
+.earlier::before,.earlier::after{content:"";flex:1;height:.5px;background:var(--sep)}
+.fe{display:flex;gap:12px;padding:9px 10px 11px;align-items:flex-start;border-radius:12px}
+.fe.sel{background:var(--sel)}
+.fe .b{flex:1;min-width:0}
+.fe .h{font-weight:600;font-size:17px;line-height:22px;text-wrap:pretty}
+.fe .p{font-size:15px;line-height:21px;color:var(--text);margin-top:3px;text-wrap:pretty}
+.fe .p.g{color:var(--sec)}
+.fe .ft{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;color:var(--sec);font-size:13px;line-height:18px;white-space:nowrap}
+.fe .act{display:inline-flex;gap:5px;align-items:center;color:var(--text);font-weight:600}
+.fe .act svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.fe .pill{padding:4px 11px}
+.pics{display:flex;gap:8px;margin-top:10px}
+.pic{flex:1;height:92px;border-radius:12px;position:relative;overflow:hidden;background:linear-gradient(170deg,#e8e4dc,#cfc8bb 60%,#b9b0a0)}
+.pic svg{position:absolute;inset:0;width:100%;height:100%}
+.pic.b{background:linear-gradient(200deg,#dfe3e7,#c3cad1 55%,#a7b0b9)}
+.pic.doc{background:var(--fill2);height:76px}
+.pic.doc::before{content:"";position:absolute;left:14px;right:38%;top:16px;height:7px;border-radius:4px;background:var(--ter);box-shadow:0 16px 0 var(--fill),0 30px 0 var(--fill)}
+.gp{display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:12px;font-weight:600}
+.gp .cv{width:22px;height:22px;display:grid;place-items:center;flex:none;color:var(--sec)}.gp .cv svg{width:8px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.gp.open .cv svg{transform:rotate(90deg)}
+.gp .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gp .n{color:var(--ter);font-weight:400;font-size:13px;line-height:18px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.segs{display:flex;gap:3px;flex:none}.segs i{width:14px;height:5px;border-radius:3px;background:var(--fill)}
+.segs i.d{background:var(--text)}.segs i.w{background:var(--prog)}.segs i.q{background:var(--ask)}
+.kids{margin-left:34px}
+.row .t.wrap{white-space:normal;text-wrap:pretty}
+.say{margin:10px 0 0;padding:2px 0 2px 12px;border-left:2px solid var(--sep);font-size:15px;line-height:21px;color:var(--text)}
+.say .who2{color:var(--sec);font-weight:600;font-size:13px;line-height:18px;margin-bottom:2px}
+.find{padding:8px 0 10px;border-bottom:.5px solid var(--sep)}
+.find .d{color:var(--sec);font-size:13px;line-height:18px;font-variant-numeric:tabular-nums}
+.find p{margin:2px 0 0;font-size:17px;line-height:23px;text-wrap:pretty}
+.find .src{display:flex;gap:14px;margin-top:6px}
 /* the index */
 main{max-width:1600px;margin:auto;padding:28px 20px 80px}
 main h1{font-size:26px;margin:0 0 6px;font-weight:700}main h2{font-size:19px;margin:44px 0 4px;font-weight:600}
@@ -234,6 +278,13 @@ const I={
  play:'<svg viewBox="0 0 12 12"><path d="M3.5 2.2v7.6L9.8 6z"/></svg>',
  agent:'<svg viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="9" rx="3"/><path d="M8 4V2"/><circle cx="6" cy="8.5" r=".9" style="fill:currentColor;stroke:none"/><circle cx="10" cy="8.5" r=".9" style="fill:currentColor;stroke:none"/></svg>',
  bang:'<svg viewBox="0 0 12 12"><path d="M6 2.8v4"/><circle cx="6" cy="9.2" r=".4"/></svg>',
+ now:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2" style="fill:currentColor;stroke:none"/></svg>',
+ feed:'<svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><path d="M7.5 9h4.5M7.5 12.5h9M7.5 16h9"/></svg>',
+ ideas:'<svg viewBox="0 0 24 24"><path d="M9.5 18h5M10.5 21h3M12 3.5a6 6 0 0 0-3.7 10.7c.7.6 1.1 1.2 1.2 2h5c.1-.8.5-1.4 1.2-2A6 6 0 0 0 12 3.5z"/></svg>',
+ goals:'<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4.5h11.5l-2.5 4 2.5 4H6"/></svg>',
+ lens:'<svg viewBox="0 0 12 12"><circle cx="5.3" cy="5.3" r="3.1"/><path d="M7.7 7.7l2.6 2.6"/></svg>',
+ clock:'<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.3"/><path d="M6 3.6V6l1.6 1.1"/></svg>',
+ bulb:'<svg viewBox="0 0 12 12"><path d="M4.7 9.1h2.6M6 1.7a3 3 0 0 0-1.8 5.4c.3.3.5.6.5 1h2.6c0-.4.2-.7.5-1A3 3 0 0 0 6 1.7z"/></svg>',
  plane:'<svg viewBox="0 0 24 24"><path d="M2.5 11.2l18-7.4c.6-.2 1.1.3.9.9l-5.6 15.6c-.2.6-1 .7-1.4.2l-3.6-4.6-4.6 3 .9-5.3z"/></svg>',
 };
 const spin=(s=20)=>`<svg viewBox="0 0 20 20" width="${s}" height="${s}"><circle cx="10" cy="10" r="8" fill="none" stroke="var(--progW)" stroke-width="2.25"/><circle cx="10" cy="10" r="8" fill="none" stroke="var(--prog)" stroke-width="2.25" stroke-linecap="round" stroke-dasharray="14 40" transform="rotate(-30 10 10)"/></svg>`;
@@ -278,7 +329,7 @@ const homeList=(sel,n=3)=>`<div class="head ask"><span class="d"><i></i></span>N
  <div class="head prog"><span class="d"><i></i></span>Working on</div>${workRows(sel)}
  <div class="decided">${MD}<span>hex decided 12 this week</span><span class="c">${I.chev}</span></div>`;
 // In a column beside a page, hex's head is a row: face, then name and live line.
-const hexRow=(call=false)=>`<div style="display:flex;gap:14px;align-items:center"><div class="orb" style="width:52px;height:52px"></div><div style="flex:1;min-width:0"><div style="font-weight:600">hex</div><div class="live" style="margin-top:1px;text-align:left">${LIVE}</div></div>${call?`<div class="call" style="position:relative;width:52px;height:52px;flex:none">${I.wave}</div>`:''}</div>`;
+const hexRow=(call=false,size=52)=>`<div style="display:flex;gap:${size<52?12:14}px;align-items:center"><div class="orb" style="width:${size}px;height:${size}px"></div><div style="flex:1;min-width:0"><div style="font-weight:600">hex</div><div class="live" style="margin-top:1px;text-align:left">${LIVE}</div></div>${call?`<div class="call" style="position:relative;width:52px;height:52px;flex:none">${I.wave}</div>`:''}</div>`;
 
 // A task's page.
 const taskPage=t=>{const T={
@@ -406,6 +457,96 @@ const settings=`
 const callDock=`<div class="cdock glass"><div class="back2" aria-label="Back to the call"><div class="orb" style="width:36px;height:36px"></div><div><div style="font-weight:600;line-height:20px">hex</div><div class="timer" style="margin:0;font-size:13px;line-height:16px">On a call · 4:12</div></div></div>
  <div class="c" aria-label="Mute">${I.mic}</div><div class="c end" aria-label="End">${I.end}</div></div>`;
 const dev=(p,inner)=>{const P=POSE[p];return `<div class="dev" style="width:${P.w}px;height:${P.h}px">${inner}${furniture(p)}</div>`};
+// hex's tabs and Call, one group centred at the foot of hex's column.
+const TABS=[['now','Now'],['feed','Feed'],['ideas','Ideas'],['goals','Goals']];
+const foot=(cx,on='now',bottom=22)=>`<div class="tabbar glass" style="left:${cx-149}px;bottom:${bottom+5}px">${TABS.map(([k,l])=>`<div class="tab${on==k?' on':''}" aria-label="${l}">${I[k]}${l}${k=='feed'&&on!='feed'?'<span class="dot"></span>':''}</div>`).join('')}</div>
+ <div class="call" style="left:${cx+85}px;bottom:${bottom}px" aria-label="Call hex">${I.wave}</div>`;
+const MF=`<span class="m n">${I.lens}</span>`,MI=`<span class="m n">${I.bulb}</span>`,MC=`<span class="m n">${I.clock}</span>`,MT=`<span class="m todo"></span>`;
+// A stand-in for a photo hex found: a rail with pans on it. Drawn, so nothing real is in the repo.
+const pic=(steel=false)=>{const m=steel?'#4a4b4f':'#b8903a',h=steel?'#6b6d72':'#8f6d24';return `<div class="pic${steel?' b':''}" role="img" aria-label="Photo: a ${steel?'steel':'brass'} rail with pans hanging from it"><svg viewBox="0 0 160 92" preserveAspectRatio="xMidYMid slice"><path d="M34 0v29M126 0v29" stroke="${h}" stroke-width="2"/><rect x="18" y="28" width="124" height="4.5" rx="2.25" fill="${m}"/><path d="M50 32v7M80 32v7M110 32v7" stroke="${h}" stroke-width="1.6" stroke-linecap="round"/><path d="M50 39v14" stroke="#2c2c2e" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="65" r="12" fill="#2c2c2e"/><path d="M80 39v20" stroke="#8d8f94" stroke-width="2" stroke-linecap="round"/><ellipse cx="80" cy="63" rx="5.5" ry="4.5" fill="#8d8f94"/><path d="M110 39v10" stroke="#a65f38" stroke-width="3" stroke-linecap="round"/><circle cx="110" cy="58" r="9" fill="#b9693d"/></svg></div>`};
+const discuss=`<span class="act" aria-label="Talk about it in a call">${I.wave}Discuss</span>`;
+// Feed: what hex did and found, by day. Each entry is the news itself, then where it's from.
+const FE=(mark,h,p,ft,{end=discuss,pics='',sel=false}={})=>`<div class="fe${sel?' sel':''}">${mark}<div class="b"><div class="h">${h}</div><div class="p">${p}</div>${pics}<div class="ft"><span>${ft}</span>${end}</div></div></div>`;
+const feed=({sel='',short=false}={})=>`<div class="dayh" style="padding-top:20px">This afternoon</div>
+ ${FE(MDone,'Booked both flights to Lisbon, aisle seats','Out Friday 9:05, back Sunday 7:05, both direct. €296 for the two of you.','Lisbon trip · 3:10 PM',{sel:sel=='flights'})}
+ ${FE(MF,'Two makers will cut a brass pot rail to length',short?'Nobody stocks 90 cm, but both cut to order.':'Nobody stocks one at 90 cm, but both cut to order. The cheaper is €64 and ships in a week.','Idea · Kitchen remodel · 1:40 PM',{pics:`<div class="pics">${pic()}${pic(true)}</div>`})}
+ <div class="earlier">Earlier</div>
+ <div class="dayh" style="padding-top:8px">This morning</div>
+ ${FE(MD,'Took the Saturday slot at the bike shop','It was Saturday at 10 or a ten-day wait.','Bike repair · 9:12 AM',{end:'<span class="pill">Undo</span>'})}
+ ${FE(MDone,'Issue 13 went out to 412 readers','Opened by 61% in the first hour; two replies are waiting in the thread.','Newsletter · 8:30 AM')}
+ <div class="dayh">Yesterday</div>
+ ${FE(MF,'No rail strike is called for the 22nd','The union vote was put off to December.','Watching · Lisbon trip · 6:00 PM')}`;
+// Ideas: what you floated for later. What hex found since reads at full strength; your own words wait in grey.
+const ideas=({sel=''}={})=>`<div class="head done"><span class="d" style="background:var(--fill)"><i style="background:var(--text)"></i></span>hex found something<span class="n">2</span></div>
+ ${FE(`<span class="m n new">${I.bulb}</span>`,'A pot rail over the island','Two makers cut brass to length. The cheaper is €64 and ships in a week.','Kitchen remodel · checked today',{end:'',sel:sel=='rail'})}
+ ${FE(`<span class="m n new">${I.bulb}</span>`,'The night train home from Lisbon','It runs again from March, so not this trip. Tickets open in January.','Lisbon trip · looks every Friday',{end:''})}
+ <div class="head done"><span class="d"><i></i></span>Other ideas<span class="n">7</span></div>
+ ${FE(MI,'Ask readers what they want more of','<span class="p g" style="margin:0">“maybe a short survey before issue 20, not now”</span>','Newsletter · floated Nov 3',{end:''})}
+ ${FE(MI,'A second bike for guests','<span class="p g" style="margin:0">“if a cheap one turns up, something to lend people”</span>','Bike repair · floated Oct 28',{end:''})}
+ ${more(5)}`;
+const ideaPage=({beside=false}={})=>`${beside?'':'<div class="ptitle">A pot rail over the island</div>'}
+ <div class="meta" style="margin-top:${beside?0:6}px">${beside?'A pot rail over the island · ':''}Idea · Kitchen remodel · floated Nov 9</div>
+ <div class="say"><div class="who2">You said</div>what about a rail over the island for the pans, at some point</div>
+ <div class="sec">What hex found</div>
+ <div class="find"><div class="d">Today 1:40 PM</div><p>Two makers cut a brass rail to length. Forge &amp; Co: €64, a week. Atelier Laiton: €92, three weeks. Nobody stocks 90 cm.</p>
+  <div class="src"><span class="link" style="margin:0">Forge &amp; Co${I.chev}</span><span class="link" style="margin:0">Atelier Laiton${I.chev}</span></div></div>
+ <div class="why" style="margin-top:10px"><b>Earlier checks</b>· 2, since Nov 9${I.chev}</div>
+ <div class="ans">
+  <div class="a"><span class="r"></span><div class="l">Start it<div class="s">Becomes a goal hex works on</div></div></div>
+  <div class="a"><span class="r"></span><div class="l">Stop looking into it<div class="s">hex checks every Friday now</div></div></div>
+  <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">Take it off your ideas</div></div></div>
+ </div>`;
+// Goals: what hex keeps watch on, then what you asked for, by project, each part coloured by where it stands.
+const GP=(t,segs,n,open)=>`<div class="gp${open?' open':''}"><span class="cv">${I.chev}</span><span class="t">${t}</span><span class="segs">${[...segs].map(c=>`<i class="${c}"></i>`).join('')}</span><span class="n">${n}</span></div>`;
+const goals=({sel='',watch=1}={})=>`<div class="head done"><span class="d"><i></i></span>Watching<span class="n">3</span></div>
+ ${R(MC,'Rail strike on the 22nd','No strike called. Checked at 9 AM','Tomorrow')}
+ ${watch>1?R(MC,'Passport renewal','Reminds you when the form opens','Dec 6'):''}
+ ${more(3-watch)}
+ <div class="head plain"><span class="d" style="background:var(--fill)"><i style="background:var(--text)"></i></span>Goals<span class="n">9</span></div>
+ ${GP('Lisbon trip','dwq-','1 of 4',true)}
+ <div class="kids">
+  ${R(MW,'A hotel near Alfama under €180','Checking three that have a lift','3:28 PM',sel=='hotel')}
+  ${R(MQ,'A day in Sintra','9:15 or 11:40 train?','1:12 PM')}
+  ${R(MT,'Dinner on Saturday night','Not started','')}
+  ${R(MDone,'Flights, aisle seats','Reached today','3:10 PM',sel=='flights')}
+ </div>
+ ${GP('Kitchen remodel','dddw-','3 of 5',false)}
+ ${GP('Newsletter','d-','1 of 2',false)}
+ ${R(MT,'Fix the squeaky front brake','Bike repair · the shop has it Saturday','')}`;
+const goalPage=({beside=false,reached=false}={})=>reached?`${beside?'':'<div class="ptitle">Flights, aisle seats</div>'}
+ <div class="meta" style="margin-top:${beside?0:6}px">${beside?'Flights, aisle seats · ':''}Goal · Lisbon trip · asked Nov 12</div>
+ <div class="say"><div class="who2">You asked</div>book us both ways, direct if you can, and i want the aisle</div>
+ <div class="sec">Done when</div><div style="font-size:17px;line-height:23px">Both flights are booked, with an aisle seat each way.</div>
+ <div class="sec">Reached today, 3:10 PM</div>
+ <div class="now">${MDone}<div class="tx">Out Friday 9:05, back Sunday 7:05, both direct. €296 for the two of you.</div></div>
+ <div class="pics" style="margin-left:34px"><div class="pic doc" role="img" aria-label="The booking confirmation"></div></div>
+ <div style="margin:8px 0 0 34px;display:flex;gap:16px"><span class="link" style="margin:0">Confirmation${I.chev}</span><span class="link" style="margin:0">Steps${I.chev}</span></div>
+ <div class="ans">
+  <div class="a"><span class="r"></span><div class="l">Not what I asked<div class="s">hex picks it up again</div></div></div>
+ </div>`:`${beside?'':'<div class="ptitle">A hotel near Alfama under €180</div>'}
+ <div class="meta" style="margin-top:${beside?0:6}px">${beside?'A hotel near Alfama under €180 · ':''}Goal · Lisbon trip · asked Nov 12</div>
+ <div class="say"><div class="who2">You asked</div>find us somewhere in alfama, not over 180 a night, and it needs a lift</div>
+ <div class="sec">Done when</div><div style="font-size:17px;line-height:23px">A room is booked in Alfama, under €180 a night, with a lift.</div>
+ <div class="sec" style="color:var(--prog)">Now</div>
+ <div class="now">${MW}<div><div class="tx">Checking three that have a lift. Two have rooms for both nights.</div><span class="link">Steps${I.chev}</span></div></div>
+ <div class="sec">In</div>
+ <div><span class="place"><span class="tile">${I.plane}</span>Lisbon trip</span></div>
+ <div class="ans">
+  <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">Take it off your goals</div></div></div>
+ </div>`;
+// hex's column, on any of its four tabs: the same face and live line, the tab's list under them.
+const hexCol=(p,tab,list)=>({'cover-up':`
+  <div class="abs" style="left:0;right:0;top:80px">${hexHead(56,300)}</div>
+  <div class="abs" style="left:6px;right:6px;top:196px;bottom:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 calc(100% - 150px),transparent calc(100% - 84px))">${list}</div>
+  ${foot(233,tab)}`,
+ 'open-up':`<div class="pane" style="left:0;width:475px">
+   <div class="abs" style="left:22px;right:22px;top:20px">${hexRow()}</div>
+   <div class="abs" style="left:6px;right:6px;top:86px;bottom:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 calc(100% - 150px),transparent calc(100% - 84px))">${list}</div>
+   ${foot(237.5,tab,18)}</div>`,
+ 'cover-side':`<div class="pane" style="left:0;width:360px">
+   <div class="abs" style="left:80px;right:14px;top:12px">${hexRow(false,40)}</div>
+   <div class="abs" style="left:6px;right:6px;top:78px;bottom:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 calc(100% - 140px),transparent calc(100% - 78px))">${list}</div>
+   ${foot(180,tab,14)}</div>`}[p]);
 const callBtn=(cx,bottom)=>`<div class="call" style="left:${cx-32}px;bottom:${bottom}px" aria-label="Call hex">${I.wave}</div>`;
 
 const D={
@@ -413,26 +554,26 @@ const D={
  'home-cover-up':(update=false)=>dev('cover-up',`
   <div class="abs" style="left:0;right:0;top:80px">${hexHead(56,300)}</div>
   <div class="abs" style="left:6px;right:6px;top:196px">${homeList('',2)}</div>
-  ${callBtn(233,22)}${toolbar('cover-up',{update})}`),
+  ${foot(233)}${toolbar('cover-up',{update})}`),
  'home-cover-side':()=>dev('cover-side',`
   <div class="pane" style="left:0;width:360px">
-   <div class="abs" style="left:80px;right:16px;top:14px"><div style="display:flex;gap:12px;align-items:center"><div class="orb" style="width:44px;height:44px"></div><div style="flex:1;font-weight:600">hex</div><div class="call" style="position:relative;width:56px;height:56px;flex:none" aria-label="Call hex">${I.wave}</div></div></div>
-   <div class="abs" style="left:16px;right:16px;top:84px"><div class="live" style="margin:0;text-align:left">${LIVE}</div></div>
-   <div class="abs" style="left:6px;right:6px;top:118px">${homeList('lisbon',1)}</div></div>
+   <div class="abs" style="left:80px;right:14px;top:12px">${hexRow(false,40)}</div>
+   <div class="abs" style="left:6px;right:6px;top:68px">${homeList('lisbon',1)}</div>
+   ${foot(180,'now',14)}</div>
   <div class="pane" style="left:360px;right:0;border-left:.5px solid var(--sep)"><div class="abs" style="left:20px;right:20px;top:80px">${taskPage('lisbon')}</div><div class="fade" style="height:60px"></div></div>
   ${toolbar('cover-side')}`),
  'home-open-up':()=>dev('open-up',`
   <div class="pane" style="left:0;width:475px">
    <div class="abs" style="left:22px;right:22px;top:20px">${hexRow()}</div>
    <div class="abs" style="left:6px;right:6px;top:92px">${homeList('lisbon')}</div>
-   ${callBtn(237.5,18)}</div>
+   ${foot(237.5,'now',18)}</div>
   <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${taskPage('lisbon')}</div><div class="fade" style="height:70px"></div></div>
   ${toolbar('open-up')}`),
  'home-open-side':()=>dev('open-side',`
   <div class="pane" style="left:0;width:320px;border-right:.5px solid var(--sep)">
    <div class="abs" style="left:0;right:0;top:36px">${hexHead(60,272)}</div>
    <div class="abs" style="left:6px;right:6px;top:192px">${homeList('lisbon',5)}</div>
-   ${callBtn(160,24)}</div>
+   ${foot(160,'now',24)}</div>
   <div class="pane" style="left:320px;right:0"><div class="abs" style="left:22px;right:22px;top:80px">${taskPage('lisbon')}</div></div>
   ${toolbar('open-side')}`),
  // 2. Home with an update waiting
@@ -496,11 +637,35 @@ const D={
   <div class="abs" style="left:22px;right:82px;top:84px"><div class="ptitle">Voice and appearance</div></div>
   <div class="abs" style="left:22px;right:22px;top:128px">${settings}</div>
   ${toolbar('cover-up',{back:true,on:'settings'})}`),
+ // 11. Feed
+ 'feed-cover-up':()=>dev('cover-up',`${hexCol('cover-up','feed',feed())}${toolbar('cover-up')}`),
+ 'feed-cover-side':()=>dev('cover-side',`${hexCol('cover-side','feed',feed({sel:'flights',short:true}))}
+  <div class="pane" style="left:360px;right:0;border-left:.5px solid var(--sep)"><div class="abs" style="left:20px;right:20px;top:80px">${goalPage({reached:true})}</div><div class="fade" style="height:60px"></div></div>
+  ${toolbar('cover-side')}`),
+ 'feed-open-up':()=>dev('open-up',`${hexCol('open-up','feed',feed({sel:'flights'}))}
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:76px">${goalPage({reached:true})}</div></div>
+  ${toolbar('open-up')}`),
+ // 12. Ideas
+ 'ideas-cover-up':()=>dev('cover-up',`${hexCol('cover-up','ideas',ideas())}${toolbar('cover-up')}`),
+ 'idea-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:22px;top:84px">${ideaPage()}</div>
+  <div class="fade" style="height:100px"></div>${dock(16,16,18,{text:'Add to this idea'})}${toolbar('cover-up',{back:true})}`),
+ 'ideas-open-up':()=>dev('open-up',`${hexCol('open-up','ideas',ideas({sel:'rail'}))}
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:76px">${ideaPage()}</div><div class="fade" style="height:100px"></div>${dock(24,24,18,{text:'Add to this idea'})}</div>
+  ${toolbar('open-up')}`),
+ // 13. Goals
+ 'goals-cover-up':()=>dev('cover-up',`${hexCol('cover-up','goals',goals())}${toolbar('cover-up')}`),
+ 'goal-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:22px;top:84px">${goalPage()}</div>
+  <div class="fade" style="height:100px"></div>${dock(16,16,18,{text:'Add to this goal',end:'stop'})}${toolbar('cover-up',{back:true})}`),
+ 'goals-open-up':()=>dev('open-up',`${hexCol('open-up','goals',goals({sel:'hotel',watch:2}))}
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:76px">${goalPage()}</div><div class="fade" style="height:100px"></div>${dock(24,24,18,{text:'Add to this goal',end:'stop'})}</div>
+  ${toolbar('open-up')}`),
 };
 // The frames to draw: [screen, pose, themes, what it shows].
 const F=[
- ['home','cover-up',['dark','light'],'Folded upright. hex, its live line in two lines, the few things that need you, what it’s working on, what it decided. Chrome beside the status icons, nothing under them.'],
- ['home','cover-side',['dark'],'Folded on its side. 678 wide is two columns: Home on the left with Call beside hex, the row you picked beside it.'],
+ ['home','cover-up',['dark','light'],'Folded upright, on Now. hex, its live line in two lines, the few things that need you, what it’s working on, what it decided. Its four tabs and Call at the foot; chrome beside the status icons, nothing under them.'],
+ ['home','cover-side',['dark'],'Folded on its side. 678 wide is two columns: hex on the left, its face, name and live line in one row so the list keeps its room, the row you picked beside it.'],
  ['home','open-up',['dark','light'],'Open like a book. Home on the left page, the task a row opens on the right; the hinge is the seam.'],
  ['home','open-side',['dark'],'Open on its side. Two columns again, so no row stretches 669 wide.'],
  ['update','cover-up',['dark'],'An update waiting, on Home only: Update ready, Install, and × to hide it, in the toolbar row’s free space, clear of hex.'],
@@ -516,6 +681,15 @@ const F=[
  ['decided','cover-up',['dark'],'What hex decided, as its own list, each with Undo. One opened to its whole story: what hex picked, why, and what the other answers gave up.'],
  ['calls','cover-up',['dark'],'Calls by day, each with what it was about and how long it ran.'],
  ['settings','cover-up',['dark'],'Voice and appearance, as the app has it: the face you pick and its colour on hex, then flat groups (Reacts to you, Voice with play, Call sounds, Haptics), each saying what it does.'],
+ ['feed','cover-up',['dark','light'],'Feed: what hex did and found, by day, under the same face. Each entry leads with the news itself. A tick is something finished, a lens something found, mint something hex decided, with Undo. What came since you last looked sits above Earlier.'],
+ ['feed','open-up',['dark'],'Book: Feed on the left, the entry you tapped beside it. A finished entry opens the goal it reached: what you asked, what done meant, the proof.'],
+ ['feed','cover-side',['dark'],'Folded on its side: the same two columns, tabs and Call at the foot of hex’s.'],
+ ['ideas','cover-up',['dark','light'],'Ideas: what you floated for later. The ones hex found something on come first, its finding in full-strength text; the rest wait with your own words in grey.'],
+ ['idea','cover-up',['dark'],'An idea: what you said, what hex found and when, and three rows: start it, stop or start looking into it, or drop it. Your own words dock at the foot.'],
+ ['ideas','open-up',['dark'],'Book: Ideas beside the idea you picked.'],
+ ['goals','cover-up',['dark','light'],'Goals: what hex keeps watch on, then what you asked for, by project. Each bar segment is one goal, coloured by where it stands: reached, working, waiting on you, not started.'],
+ ['goal','cover-up',['dark'],'A goal: what you asked in your words, what done means, where it stands now, and the thread it lives in.'],
+ ['goals','open-up',['dark'],'Book: Goals beside the goal you picked.'],
 ];
 const q=new URLSearchParams(location.search);
 const theme=q.get('theme');if(theme)document.documentElement.style.colorScheme=theme;
@@ -524,7 +698,7 @@ else{
  const fig=(s,p,t,cap)=>{const P=POSE[p],k=`${s}-${p}`,sc=Math.min(1,(P.w>P.h?520:300)/P.w);
   return `<figure><div class="frame" style="width:${P.w*sc}px;height:${P.h*sc}px;color-scheme:${t}"><div style="transform:scale(${sc});transform-origin:0 0">${D[k]()}</div></div><figcaption><b>${k}-${t}</b></figcaption></figure>`};
  let h=`<h1>hex Exact, finished</h1><p class="lede">Drawn from the app’s own colours and type at the Duo’s real sizes. Every name and number is made up. Open one frame alone with <code>?only=home-cover-up&amp;theme=dark</code>.</p>`;
- let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks','call-tasks':'Tasks during a call',thread:'A topic’s thread',steps:'Steps',decided:'What hex decided',calls:'Calls',settings:'Settings'}[s]}</h2>`;last=s}
+ let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks','call-tasks':'Tasks during a call',thread:'A topic’s thread',steps:'Steps',decided:'What hex decided',calls:'Calls',settings:'Settings',feed:'Feed',ideas:'Ideas',idea:'An idea',goals:'Goals',goal:'A goal'}[s]}</h2>`;last=s}
   h+=`<p class="lede">${cap}</p><div class="grid">${ts.map(t=>fig(s,p,t,cap)).join('')}</div>`}
  m.innerHTML=h;
 }

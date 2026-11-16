@@ -3,15 +3,14 @@ import AppIntents
 import Foundation
 
 /// What the call's Live Activity shows. The app starts and updates it (Activity.swift); the
-/// extension draws it (CallActivity.swift). `state`: connecting (reconnecting too), live, muted or
-/// ended; `orb` names Bassim's persona's image; an ended call says how it ended in `outcome`.
+/// extension draws it (CallActivity.swift). `state`: connecting, live, paused (a phone call or Siri
+/// has the audio) or reconnecting; `since` is when it went live; `orb` names Bassim's persona's image.
 struct CallAttributes: ActivityAttributes {
   struct ContentState: Codable, Hashable {
     var state: String
+    var muted: Bool
     var since: Date?
     var orb: String
-    var outcome: String = ""
-    var bad: Bool = false
   }
 }
 

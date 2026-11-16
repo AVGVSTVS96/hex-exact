@@ -12,7 +12,7 @@ struct Activities: WidgetBundle {
 }
 
 /// The call on the Lock Screen and in the Dynamic Island, as the stable app draws it: Bassim's orb,
-/// "hex", how long it's run (or how it ended), and Mute and End in circles.
+/// "hex", how long it has run (or Connecting, Reconnecting, Paused), and Mute and End in circles.
 struct CallActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: CallAttributes.self) { context in
@@ -42,13 +42,15 @@ struct CallActivity: Widget {
       } compactLeading: {
         Orb(name: context.state.orb, size: 24)
       } compactTrailing: {
-        if context.state.state == "muted" {
+        if context.state.muted || context.state.state == "paused" {
           Image(systemName: "mic.slash.fill").font(.system(size: 14))
-        } else if context.state.outcome.isEmpty, let since = context.state.since {
+        } else if context.state.state == "live", let since = context.state.since {
           Text(timerInterval: since...since.addingTimeInterval(86_400), countsDown: false)
             .font(.system(size: 15).monospacedDigit())
             .multilineTextAlignment(.trailing)
             .frame(width: 44)
+        } else {
+          ProgressView().controlSize(.mini)
         }
       } minimal: {
         Orb(name: context.state.orb, size: 24)
@@ -65,55 +67,54 @@ private struct Orb: View {
   }
 }
 
+/// "hex", and under it how long the call has run, or what holds it up.
 private struct Title: View {
   let state: CallAttributes.ContentState
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       Text("hex").font(.system(size: 17, weight: .semibold))
       Group {
-        if !state.outcome.isEmpty {
-          Text(state.outcome).foregroundStyle(state.bad ? AnyShapeStyle(Color("Bad")) : AnyShapeStyle(.secondary))
-        } else if let since = state.since {
-          Text(timerInterval: since...since.addingTimeInterval(86_400), countsDown: false)
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-        } else {
-          Text("Connecting").foregroundStyle(.secondary)
+        switch state.state {
+        case "live":
+          if let since = state.since {
+            Text(timerInterval: since...since.addingTimeInterval(86_400), countsDown: false).monospacedDigit()
+          }
+        case "paused": Text("Paused")
+        case "reconnecting": Text("Reconnecting")
+        default: Text("Connecting")
         }
       }
       .font(.system(size: 15))
+      .foregroundStyle(.secondary)
       .lineLimit(1)
     }
   }
 }
 
+/// Mute and End, each answered by the app at once (EndCall, MuteCall).
 private struct Controls: View {
   let state: CallAttributes.ContentState
   let size: CGFloat
   var body: some View {
     HStack(spacing: 10) {
-      if state.state == "live" || state.state == "muted" {
-        Button(intent: MuteCall()) {
-          Image(systemName: state.state == "muted" ? "mic.slash.fill" : "mic.fill")
-            .font(.system(size: size * 0.38, weight: .medium))
-            .foregroundStyle(.primary)
-            .frame(width: size, height: size)
-            .background(Color(state.state == "muted" ? "MuteOn" : "MuteOff"), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(state.state == "muted" ? "Unmute microphone" : "Mute microphone")
+      Button(intent: MuteCall()) {
+        Image(systemName: state.muted ? "mic.slash.fill" : "mic.fill")
+          .font(.system(size: size * 0.38, weight: .medium))
+          .foregroundStyle(.primary)
+          .frame(width: size, height: size)
+          .background(Color(state.muted ? "MuteOn" : "MuteOff"), in: Circle())
       }
-      if state.state != "ended" {
-        Button(intent: EndCall()) {
-          Image(systemName: "xmark")
-            .font(.system(size: size * 0.38, weight: .semibold))
-            .foregroundStyle(Color("Background"))
-            .frame(width: size, height: size)
-            .background(Color.primary, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("End conversation")
+      .buttonStyle(.plain)
+      .accessibilityLabel(state.muted ? "Unmute microphone" : "Mute microphone")
+      Button(intent: EndCall()) {
+        Image(systemName: "phone.down.fill")
+          .font(.system(size: size * 0.38, weight: .semibold))
+          .foregroundStyle(.white)
+          .frame(width: size, height: size)
+          .background(Color(.systemRed), in: Circle())
       }
+      .buttonStyle(.plain)
+      .accessibilityLabel("End the call")
     }
   }
 }

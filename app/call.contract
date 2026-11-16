@@ -188,9 +188,10 @@ component Home
   derive hexTop = across ? max(viewport.safeAreaTop, 16) + 2 : below - 6
   derive hexX = across ? hexW / 4 : hexW / 2
   // Call floats 12 in from the room's trailing foot corner; open like a laptop at the window's, beside
-  // the system's tabs, so the list above the hinge keeps its whole room.
+  // the system's tabs, centred on their pill (52 above the window's foot), so the list above the hinge
+  // keeps its whole room.
   derive callRight = across ? 14 : hexRight + 12
-  derive callBottom = across ? max(viewport.safeAreaBottom, 12) : bottom
+  derive callBottom = across ? 52 - fabSize / 2 : bottom
   derive listPad = across ? 20 : bottom + 70
   derive callSize = 64
   derive fabSize = 58

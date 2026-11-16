@@ -2,7 +2,7 @@
 // call, Siri and the Live Activity; this root holds everything the screens read and write, as
 // Exact asks: every resource, mutation and the actions that send them live here, and each screen,
 // in its own file, takes what it shows as props. A screen gets data by adding a prop, not a source.
-use CallRow, Viewport, Pose, Delivery, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs from "./shapes.contract"
+use CallRow, Viewport, Pose, Delivery, Time, CallState, Captions, Activity, Counts, Calls, CallRecord, Tasks, Asks, TaskPage, Chat, Check, Words, Settings, Sent, Reply, Build, Page, Media, Attached, PhonePrefs, Goal from "./shapes.contract"
 use Home, CallDock, CallWords, linesOf, isElsewhere from "./call.contract"
 use CallsList from "./calls.contract"
 use PastCall from "./past-call.contract"
@@ -134,6 +134,11 @@ component App
   derive goals = liveGoals.version > 0 ? liveGoals : keptGoals
   resource keepingGoals = keep("/goals", `${liveGoals.version}`) when liveGoals.version > 0 as shape Reply else empty()
   derive goalsWhy = match failure(liveGoals) { case some(f) => f.message, case none => "" }
+  // Goals lists a reached goal for a week; one opened from an older Feed entry is read on its own.
+  derive goalPast = openGoalId.startsWith("t-") and goals.version > 0 and not goals.goals.map(g => g.id).includes(openGoalId)
+  resource pastGoal = goalById(openGoalId) when goalPast as shape Goal else empty()
+  derive goalsShown = pastGoal.id == "" or goals.goals.map(g => g.id).includes(pastGoal.id) ? goals : Goals(version=goals.version, goals=goals.goals.concat([pastGoal]), groups=goals.groups, watching=goals.watching)
+  derive goalsLoading = not current(liveGoals) or (goalPast and not current(pastGoal) and not failed(pastGoal))
 
   // Feed (feed.contract): the last Feed hex gave shows until it answers; older stretches load as
   // the list reaches its end. feedSeen is the newest entry Bassim has had Feed open for; feedMark,
@@ -753,9 +758,9 @@ component App
             if besideId.startsWith("idea:")
               IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, inset=0, end=(room.clear.x + room.clear.width - room.footEnd), draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
             else if besideId.startsWith("goal:")
-              GoalBody(foot=(callOn ? room.foot + 64 + 12 : room.foot), end=0, footRight=max(12, room.clear.x + room.clear.width - room.footEnd), id=besideId.slice(5), goals=goals, now=now, offset=clock.utcOffset, loading=(not current(liveGoals)), changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+              GoalBody(foot=(callOn ? room.foot + 64 + 12 : room.foot), end=0, footRight=max(12, room.clear.x + room.clear.width - room.footEnd), id=besideId.slice(5), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
             else if besideId.startsWith("watch:")
-              WatchBody(foot=(callOn ? room.foot + 64 + 12 : room.foot), end=0, id=besideId.slice(6), goals=goals, now=now, offset=clock.utcOffset, loading=(not current(liveGoals)), changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask)
+              WatchBody(foot=(callOn ? room.foot + 64 + 12 : room.foot), end=0, id=besideId.slice(6), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask)
             else if besideId != ""
               TaskBody(id=besideId, pane=true, room=room, clearTop=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "idea"
@@ -763,9 +768,9 @@ component App
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "goal"
-          GoalPage(entry=e, room=room, id=e.params.id, goals=goals, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=(not current(liveGoals)), changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open, openTasks=openTasks, back=back)
+          GoalPage(entry=e, room=room, id=e.params.id, goals=goalsShown, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "watch"
-          WatchPage(entry=e, room=room, id=e.params.id, goals=goals, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=(not current(liveGoals)), changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask, open=open, openTasks=openTasks, back=back)
+          WatchPage(entry=e, room=room, id=e.params.id, goals=goalsShown, now=now, offset=clock.utcOffset, needsYou=counts.yours, working=counts.working, loading=goalsLoading, changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"
           CallsList(entry=e, room=room, now=now, offset=clock.utcOffset, calls=callsShown, counts=counts, loading=(not current(liveCalls)), failed=failed(liveCalls), docked=callOn, selected=paneCall, select=pickCall, open=open, openTasks=openTasks, remove=removeCall, undoRemove=undoRemove, undoable=undoable, removing=removing, removeError=removeError, back=back)
           if callsPane and paneCall != ""

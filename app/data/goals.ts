@@ -1,5 +1,5 @@
 import type { Result, Sources } from '../app.contract.d.ts';
-import { enc, kept, watch, write } from './hex.ts';
+import { enc, kept, read, watch, write } from './hex.ts';
 import { proofLinks, proofWords } from './proof.ts';
 import { at, bool, list, num, str, strings, type Json } from './parse.ts';
 
@@ -50,6 +50,8 @@ const sent = (id: string, r: { ok: boolean; error: string }) => ({ id, ok: r.ok,
 export const goalSources: Partial<Sources> = {
   watchGoals: () => watch('/goals', goals),
   keptGoals: async (_args, _store, storage) => kept<Result<'keptGoals'>>(storage, '/goals'),
+  // A goal reached before the list's week, as a Feed entry opens it.
+  goalById: async ([id]) => goal((await read(`/goals/${enc(id)}`)) as Json),
   // verb: drop ("Not needed") | reopen ("Not what I asked") | undo.
   changeGoal: async ([id, verb]) => sent(id, await write('POST', `/goals/${enc(id)}/${verb}`)),
   // verb: stop | undo.

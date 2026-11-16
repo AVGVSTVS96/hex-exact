@@ -34,14 +34,28 @@ export const call: Partial<Sources> = {
       turns: list(c.turns, (t) => ({ id: str(t.id), who: str(t.who), text: str(t.text), at: num(t.at), media: list(t.media, media), note: str(t.note) })),
     };
   },
-  // The Duo's side column, fold and camera cutouts, as the shell's Screen sees them.
+  // The Duo's side column, fold and camera cutouts, as the shell's Screen sees them, and the
+  // shell's own bars (shell/Shell/Frame.swift): whether it can draw them, whether it does, and the
+  // last tap on them, counted.
   devicePose: (_args, _store, _storage, native) => {
     const none = { x: 0, y: 0, width: 0, height: 0 };
-    if (!native?.available) return { bar: '', fold: none, occlusions: [] };
+    const flush = { top: 0, left: 0, bottom: 0, right: 0 };
+    if (!native?.available) return { bar: '', fold: none, occlusions: [], frame: false, bars: false, tap: '', taps: 0, inset: flush };
     native.watch('pose');
     const p = native.call({ op: 'pose' });
     const rect = (r: Json) => ({ x: num(r.x), y: num(r.y), width: num(r.width), height: num(r.height) });
-    return { bar: str(p.bar), fold: rect(obj(p.fold)), occlusions: list(p.occlusions, rect) };
+    return {
+      bar: str(p.bar), fold: rect(obj(p.fold)), occlusions: list(p.occlusions, rect),
+      frame: bool(p.frame), bars: bool(p.bars), tap: str(p.tap), taps: num(p.taps),
+      inset: { top: num(obj(p.inset).top), left: num(obj(p.inset).left), bottom: num(obj(p.inset).bottom), right: num(obj(p.inset).right) },
+    };
+  },
+  // The shell's bars: hex's pages as its tabs (none or one: no tabs), the one showing, whether
+  // Back shows, whether anything needs Bassim (a dot on Tasks), and whether the bars show at all.
+  setBars: async ([pages, page, shown, back, needs], _store, _storage, native) => {
+    if (!native?.available) return { ok: false, error: NO_SHELL };
+    const r = obj(await native.later({ op: 'bars', pages, page, shown, back, needs }));
+    return { ok: bool(r.ok), error: str(r.error) };
   },
   // op: start | mute | end. voice and about only start a call; about is a task id or "asks".
   // prefs: the phone's sounds, haptics and persona, which the shell keeps for the call's feedback

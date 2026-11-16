@@ -260,6 +260,7 @@ component App
   mutation removed as shape Reply queue
   mutation previewed as shape Reply
   mutation saved as shape Reply queue refreshes settings
+  mutation barsSet as shape Reply
 
   derive place = top(nav)
   derive needsYou = counts.yours
@@ -396,6 +397,35 @@ component App
     if page == "feed" or hexPage == "feed"
       feedSeen = max(feedSeen, feedLatest)
     hexPage = page
+
+  // The shell's bars (shell/Shell/Frame.swift), where the binary draws them: hex's pages as the
+  // system's tabs and Calls, Tasks, Settings and Back as its bar buttons, which iOS puts in the
+  // Duo's column under the status icons when it's folded, and along the top and foot when open.
+  // No tabs while a call fills Home.
+  derive barPages = callOn and place.name == "home" ? hexPages.slice(0, 0) : hexPages
+  derive barsKey = `${barPages.join(",")}|${hexPage}|${place.name != "home"}|${counts.yours > 0}`
+  task sayBars when pose.frame key=barsKey
+    after(1, tellBars)
+  action tellBars
+    send barsSet = setBars(barPages, hexPage, true, place.name != "home", counts.yours > 0)
+  // A tap on them, heard once: the count at launch is only noted.
+  state tapsSeen = -1
+  task barTapped key=`${pose.taps}`
+    after(1, heardTap)
+  action heardTap
+    if tapsSeen >= 0 and pose.taps != tapsSeen
+      if pose.tap.startsWith("page:")
+        nav = go(nav, "/")
+        pickPage(pose.tap.slice(5))
+      else if pose.tap == "back"
+        nav = back(nav)
+      else if pose.tap == "open:tasks" and place.name != "tasks"
+        openTasks("")
+      else if pose.tap == "open:calls" and place.name != "calls"
+        nav = push(nav, path("calls"))
+      else if pose.tap == "open:settings" and place.name != "settings"
+        nav = push(nav, path("settings"))
+    tapsSeen = pose.taps
 
   // Goals
   derive firstProject = match groupsOf(goals).at(0) { case some(n) => n, case none => "" }

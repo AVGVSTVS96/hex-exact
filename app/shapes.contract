@@ -37,6 +37,20 @@ shape Pose
   bar: string
   fold: Rect
   occlusions: Rect[]
+  // The shell's bars (shell/Shell/Frame.swift): it can draw them, it does, and the last tap on them
+  // (page:<id>, open:calls|tasks|settings, back), counted.
+  frame: bool
+  bars: bool
+  tap: string
+  taps: number
+  // The screen's safe area as UIKit gives it, the bars' column included, which the viewport's isn't.
+  inset: Insets
+
+shape Insets
+  top: number
+  left: number
+  bottom: number
+  right: number
 
 // What the binary knows of its own updates: staged is a checked screen waiting to go in.
 shape Delivery

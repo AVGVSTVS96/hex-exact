@@ -42,6 +42,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
   var window: UIWindow?
   private var session: ExactSession?
   private var screen: Screen?
+  private var frame: Frame?
 
   func scene(_ scene: UIScene, willConnectTo _: UISceneSession, options: UIScene.ConnectionOptions) {
     guard let scene = scene as? UIWindowScene else { return }
@@ -50,7 +51,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     let screen = Screen(session: session)
     self.screen = screen
     let window = ExactWindow(windowScene: scene)
-    window.rootViewController = screen
+    let frame = Frame(screen: screen)
+    self.frame = frame
+    window.rootViewController = frame
     window.makeKeyAndVisible()
     self.window = window
     options.urlContexts.first.map { open($0.url) }
@@ -103,8 +106,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
         return UIApplication.shared.open(url) { opened in session.answerOpenURL(args, opened: opened) }
       }
       UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { [weak self] opened in
-        if !opened, let screen = self?.screen {
-          var top: UIViewController = screen
+        if !opened, let frame = self?.frame {
+          var top: UIViewController = frame
           while let shown = top.presentedViewController { top = shown }
           top.present(SFSafariViewController(url: url), animated: true)
         }

@@ -10,7 +10,7 @@ import Foundation
 ///
 /// Commands: `start` {voice, about}, `mute`, `end`, `share` {source} (a photo or video into
 /// the live call), `attach` {source, most} (for a composer: answers the uploaded media), `retry`
-/// {key} (a share that failed). Each may carry Bassim's phone settings, which are kept (Prefs).
+/// {key} (a share that failed), `bars` {pages, page, shown, back, needs} (Frame.swift). Each may carry Bassim's phone settings, which are kept (Prefs).
 @MainActor
 enum Bridge {
   static let state = Notification.Name("HexCallState")
@@ -54,6 +54,9 @@ enum Bridge {
       reply(["ok": true, "error": ""])
     case "end":
       call.end()
+      reply(["ok": true, "error": ""])
+    case "bars":
+      NotificationCenter.default.post(name: Frame.asked, object: nil, userInfo: request)
       reply(["ok": true, "error": ""])
     case "preview":
       Feedback.preview(request["voice"] as? String ?? "")

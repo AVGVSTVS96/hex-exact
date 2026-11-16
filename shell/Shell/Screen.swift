@@ -10,7 +10,7 @@ import UIKit
 ///
 /// Its pose (which side the system bars sit on, where the fold lies, what the cameras cover) goes to
 /// the screen as `HexPose` each time it changes, as Exact's viewport reports only segments and safe
-/// areas. `hexexact://go/…?split=first|second&share=0.4` draws the app in part of the window, as
+/// areas, with what the frame's bars say (Frame.swift). `hexexact://go/…?split=first|second&share=0.4` draws the app in part of the window, as
 /// Split View would, and `report=pose` keeps each pose in the `HexPose` default for tests.
 final class Screen: UIViewController {
   static let pose = Notification.Name("HexPose")
@@ -22,6 +22,8 @@ final class Screen: UIViewController {
   private var reported: NSDictionary?
   private var barSeen = false
   private var edgeKnown = false
+  /// The frame's bars (Frame.swift): whether it draws them, and the last tap on them.
+  var bars: [String: Any] = [:]
 
   init(session: ExactSession) {
     exact = ExactView(session: session)
@@ -44,7 +46,7 @@ final class Screen: UIViewController {
     if #available(iOS 27.1, *) {
       registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge) { (screen: Self, _) in
         screen.edgeKnown = true
-        screen.setNeedsUpdateOfSupportedInterfaceOrientations()
+        (screen.view.window?.rootViewController ?? screen).setNeedsUpdateOfSupportedInterfaceOrientations()
         screen.view.setNeedsLayout()
       }
     }
@@ -60,6 +62,11 @@ final class Screen: UIViewController {
     }
     if value("report") == "pose" { reporting = true }
     reported = nil
+    view.setNeedsLayout()
+  }
+
+  override func viewSafeAreaInsetsDidChange() {
+    super.viewSafeAreaInsetsDidChange()
     view.setNeedsLayout()
   }
 
@@ -86,6 +93,10 @@ final class Screen: UIViewController {
   /// what the cameras and system bars cover.
   private func current() -> [String: Any] {
     var pose: [String: Any] = ["bar": "", "fold": [String: Any](), "occlusions": [[String: Any]]()]
+    pose.merge(bars) { _, frame in frame }
+    // What the frame's bars take (on the folded Duo, the column), which Exact's viewport leaves out.
+    let inset = view.safeAreaInsets
+    pose["inset"] = ["top": inset.top, "left": inset.left, "bottom": inset.bottom, "right": inset.right]
     guard #available(iOS 27.1, *) else { return pose }
     let rtl = traitCollection.layoutDirection == .rightToLeft
     switch traitCollection.verticalBarEdge {

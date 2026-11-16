@@ -179,7 +179,7 @@ component Home
   derive compact = H < W
   derive face = faceOf(hexW, compact)
   // With more than one of hex's pages, its tabs take the foot at rest and Call stands beside them.
-  derive tabbed = pages.length > 1 and status == "idle" and homeMode
+  derive tabbed = pages.length > 1 and status == "idle" and homeMode and not room.native
   // The foot of hex's column: the tabs and Call at rest (room.tabs), Mute, End and Camera with their
   // names in a call. A list in the column ends above them.
   derive callSize = 64

@@ -185,7 +185,7 @@ component Home
   derive callSize = 64
   derive endSize = 68
   derive sideSize = 58
-  derive controlsTop = H - bottom - 4 - endSize - 22
+  derive controlsTop = H - bottom - 12 - endSize - 22
   derive footTop = homeMode ? H - room.tabs.top : H - controlsTop
 
   // The orb: hex's face at rest; in a call at the head of the column (one) or the middle of the

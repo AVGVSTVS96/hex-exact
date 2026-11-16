@@ -92,7 +92,10 @@ fn weekdayOf(at: number, offset: number): string = match ["Thu", "Fri", "Sat", "
 fn whenOf(at: number, now: number, offset: number): string = at == 0 ? "" : dayOf(at, offset) == dayOf(now, offset) ? formatTime(at, offset, "short") : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : dayOf(at, offset) > dayOf(now, offset) - 7 and dayOf(at, offset) < dayOf(now, offset) ? weekdayOf(at, offset) : formatDate(at, offset, "iso").slice(0, 4) == formatDate(now, offset, "iso").slice(0, 4) ? match formatDate(at, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" } : formatDate(at, offset, "medium")
 
 // A call's length: "45 s", "3 min", "1 h 12 min".
-fn lengthOf(seconds: number): string = seconds < 60 ? `${round(seconds)} s` : seconds < 3600 ? `${round(seconds / 60)} min` : `${floor(seconds / 3600)} h ${round((seconds % 3600) / 60)} min`
+// When a run started, said plainly. The clock here moves a minute at a time, so a run newer than
+// its last tick would read as started in the future.
+fn runStarted(since: number, now: number): string = now - since < 60000 ? "just started" : `started ${lengthOf((now - since) / 1000)} ago`
+fn lengthOf(seconds: number): string = seconds < 60 ? `${round(max(0, seconds))} s` : seconds < 3600 ? `${round(seconds / 60)} min` : `${floor(seconds / 3600)} h ${round((seconds % 3600) / 60)} min`
 
 // How a call ended, in Bassim's words; a bad ending is drawn red (badEnding).
 fn endingOf(kind: string): string = kind == "you" ? "You hung up" : kind == "hex" ? "hex hung up" : kind == "dropped" ? "The call dropped" : kind == "expired" ? "The call ran out of time" : kind == "no-connect" ? "Couldn't connect" : kind == "no-answer" ? "No answer" : kind == "busy" ? "Busy" : ""

@@ -2,7 +2,7 @@
 // pinned post, its messages, every place it lives, its week and its history. The same route opens
 // a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
 use Viewport, Counts, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
-use Mark, PlaceTile, Row, Head, Note, Discuss, ShowMore, RowTap, PillTap, PillFace, Composer, whenOf, appName, lengthOf, Tap, inlineOf, plainOf from "./parts.contract"
+use Mark, PlaceTile, Row, Head, Note, Discuss, ShowMore, RowTap, PillTap, PillFace, Composer, whenOf, appName, lengthOf, Tap, inlineOf, plainOf, runStarted from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
@@ -201,7 +201,7 @@ component TaskBody
   derive places = [row].concat(siblings)
   derive working = siblings.filter(t => t.state == "working")
   derive busyAgents = task.agents.filter(a => a.state == "working")
-  derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${row.state == "needs" ? `Waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `Working · started ${lengthOf((now - row.since) / 1000)} ago` : row.state == "done" ? `Done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}${waiting > 0 ? ` · ${waiting} need you` : ""}`
+  derive subtitle = kind == "topic" ? (waiting > 0 ? `${waiting} need you` : `${topicEntries.length} here`) : kind == "done" ? `Done · ${whenOf(finished.at, now, offset)}` : `${parent != "" ? `${parent} · ` : ""}${row.state == "needs" ? `Waiting on you since ${whenOf(row.since, now, offset)}` : row.state == "working" ? `Working · ${runStarted(row.since, now)}` : row.state == "done" ? `Done ${whenOf(row.at, now, offset)}` : stateWord(row.state)}${waiting > 0 ? ` · ${waiting} need you` : ""}`
   derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
   derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
   // The reply box docked at the foot: for the question Bassim picked, else the first still open, else
@@ -244,9 +244,11 @@ component TaskBody
         column padding="0 10px" padding-bottom=(docked or replyAsk.length > 0 ? 30 : foot + 24) gap=0
           if kind == "done"
             Happened(mark="done", text=finished.title, stamp="", failed=false)
-            if finished.said != ""
+            if finished.said != "" or finished.links.length > 0
               Head(label="Proof", n=-1, pad="18px 10px 4px", id="head-proof")
-              text finished.said font="-exact-body" user-select="text" padding="2px 10px"
+              // Proof that is only its link says it once, as the link.
+              if finished.said.trim() != "" and finished.links.filter(l => l.label.trim() == finished.said.trim() or l.url == finished.said.trim()).length == 0
+                text finished.said font="-exact-body" user-select="text" padding="2px 10px"
               for l in finished.links key=l.url
                 link href=l.url class=RowTap align-items="center" testId=`proof-${l.label}`
                   text l.label font="-exact-body" color="-exact-label" flex=1

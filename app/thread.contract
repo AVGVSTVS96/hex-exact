@@ -2,7 +2,7 @@
 // composer that becomes Stop while hex is working and nothing is typed. What Bassim sends shows at
 // once, dimmed until hex has it; one that didn't go says why, and a tap tries again.
 use Viewport, Counts, TaskPage, Chat, Media, Place from "./shapes.contract"
-use Mark, PlaceTile, Discuss, Note, appName, whenOf, lengthOf, Tap, PillTap, PillFace, Composer, ComposerField, Send, Prose from "./parts.contract"
+use Mark, PlaceTile, Discuss, Note, appName, whenOf, lengthOf, Tap, PillTap, PillFace, Composer, ComposerField, Send, Prose, runStarted from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use PageHead from "./task.contract"
 use Sending from "./said.contract"
@@ -78,7 +78,7 @@ component Thread
   derive stopping = empty and task.running
   // Sent from here and not yet in the thread: hex echoes a send's key at the end of a waiting key.
   derive mine = sends.filter(s => s.task == task.id and chat.waiting.map(w => w.key).filter(k => k.endsWith(`:${s.key}`) or k == s.key).length == 0 and not (s.status == "sent" and chat.turns.slice(-6).filter(t => t.source == "me" and t.text == s.text and t.media.length == s.media.length).length > 0))
-  derive subtitle = task.running ? `Working · started ${lengthOf((now - task.since) / 1000)} ago` : `${appName(task.app)}${task.at > 0 ? ` · ${whenOf(task.at, now, offset)}` : ""}`
+  derive subtitle = task.running ? `Working · ${runStarted(task.since, now)}` : `${appName(task.app)}${task.at > 0 ? ` · ${whenOf(task.at, now, offset)}` : ""}`
   // The composer's foot: over the home indicator, or the call docked there, or just above the keyboard.
   derive two = room.columns == 2
   derive foot = viewport.keyboardHeight > 0 ? 8 : callOn ? room.foot + 64 + 12 : room.foot + 4

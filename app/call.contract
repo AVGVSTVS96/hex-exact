@@ -53,6 +53,8 @@ component Home
     calls: Calls
     // The live call's record (here or elsewhere): hex muting itself, a call elsewhere's words.
     liveRecord: CallRecord
+    // The record of the call that just ended here, once hex has written its wrap-up.
+    lastRecord: CallRecord
     persona: string
     personaColor: string
     palette: string
@@ -146,6 +148,7 @@ component Home
   // The wrap-up of the call that just ended here (the call its words are from), once hex has
   // written one.
   derive last = match calls.calls.filter(c => c.id == captions.call).at(0) { case some(c) => c, case none => CallRow(id="", started=0, ended=0, ending="", reason="", source="", voice="", title="", why="", summary="", waiting=[], seconds=0, tasks=0, preview="", live=false) }
+  derive wrap = lastRecord.call.id == last.id ? lastRecord : CallRecord(call=last, turns=[], tasks=[], moments=[])
   derive wrapped = status == "idle" and call.ending != "" and last.id != "" and not last.live and (last.title != "" or last.summary != "" or last.waiting.length > 0)
 
   // What hex is doing for the call: the first running task, or for a moment the one that just
@@ -221,7 +224,7 @@ component Home
   derive ctlRight = across ? callRight : hexRight + 10
   derive ctlBottom = across ? callBottom : max(bottom - 3, 9)
   derive footShown = footer != ""
-  derive wordsTop = aside ? below : panelH + 22 + (footShown ? 24 : 0)
+  derive wordsTop = aside ? below : panelH + 28 + (footShown ? 24 : 0)
   derive wordsBottom = across ? H - room.across + 10 : ctlBottom + ctlSize + 18
   derive wordsLeft = aside ? panelW + 14 - 16 : left
   derive wordsRight = aside ? right : hexRight
@@ -235,7 +238,7 @@ component Home
   // With two columns at rest, the last call's words stay beside the home until Bassim opens a page
   // or puts them away: `away` is the call whose words he put away.
   state away = ""
-  derive wordsShown = talking and away != captions.call
+  derive wordsShown = (talking or wrapped) and away != captions.call
   action choose(page: string)
     away = captions.call
     select(page)
@@ -262,12 +265,13 @@ component Home
       // foot; with two columns the page a row opens beside it (below it open like a laptop).
       column position="absolute" top=0 bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
         HexHome(width=hexW, height=(H - footTop), top=hexTop, x=hexX, dark=(viewport.prefersColorScheme == "dark"), pad=(tabbed ? 26 : listPad), still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
-          column align-items="center" gap=8 padding="12px 0 0"
-            if footShown
-              text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="0 32px" testId="footer"
-            if wrapped
-              box padding="0 10px" display="flex" justify-content="center" width="100%" box-sizing="border-box"
-                WrapUp(record=CallRecord(call=last, turns=[], tasks=[], moments=[]), now=now, offset=offset, lines=4, rows=3, heading=false, open=open)
+          // What the call just left: how it ended until hex has written its wrap-up, then the wrap-up
+          // (beside Now with two columns).
+          if wrapped and single
+            column margin="4px -6px 10px"
+              WrapUp(record=wrap, now=now, offset=offset, lines=4, rows=3, heading=false, open=open)
+          else if footShown and not wrapped
+            text footer font="-exact-subheadline" color=(footerBad ? "-exact-system-red" : "-exact-secondary-label") text-align="center" padding="12px 32px 0" testId="footer"
       if two and homeMode and not wordsShown
         // The page beside heads on the chrome row, left of the capsule, as drawn.
         column position="absolute" top=room.secondTop bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
@@ -306,8 +310,12 @@ component Home
         column position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=0 left=(across ? left : secondLeft) right=right opacity=(callShown ? 1 : 0) pointer-events=(callShown ? "auto" : "none") transition=fade z-index=1 testId="call-work"
           CallWork(record=liveRecord, needs=needsOf(tasks, asks, said, now), tasks=tasks, now=now, offset=offset, known=(tasks.version > 0 or asks.version > 0), sideBySide=across, pad=(across ? H - room.tabs.top + 12 : bottom + 12), goThrough=(here and live), talk=talk, openTask=openTask, openTasks=openTasks)
 
-      // With two columns at rest, the last call's words beside the home until a page is opened.
-      if two and homeMode
+      // With two columns at rest, the last call beside the home until a page is opened: its wrap-up
+      // once hex has written one, its words until then.
+      if two and homeMode and wrapped
+        scroll position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=0 left=(across ? left : secondLeft) right=right padding-bottom=(bottom + 12) box-sizing="border-box" opacity=(wordsShown ? 1 : 0) pointer-events=(wordsShown ? "auto" : "none") transition=fade z-index=1 testId="wrap-beside"
+          WrapUp(record=wrap, now=now, offset=offset, lines=0, rows=0, heading=false, open=open)
+      else if two and homeMode
         column position="absolute" top=(across ? room.across + 12 : room.secondBelow) bottom=bottom left=(across ? left : secondLeft) right=right opacity=(wordsShown ? 1 : 0) pointer-events=(wordsShown ? "auto" : "none") transition=fade z-index=1 testId="words-beside"
           CallWords(lines=lines, asks=activity.asks, said=said, width=room.second.width, live=false, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
 
@@ -320,7 +328,7 @@ component Home
             CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
       else if homeMode
         row position="absolute" right=callRight bottom=callBottom height=fabSize gap=12 align-items="center" z-index=4 testId="controls"
-          if two and talking
+          if two and (talking or wrapped)
             WordsButton(size=52, shown=wordsShown, single=false, show=toggleWords)
           CallButton(size=fabSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
       else
@@ -434,7 +442,7 @@ component CallWords
     openTask: action
     reshare: action
   view
-    list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 16px" mask-image="linear-gradient(to bottom, transparent 0, #000 40px)"
+    list id="transcript" appearance="none" virtualized=true scroll-start="end" scrollFollowEnd=true flex=1 min-height=0 padding="0 16px" mask-image="linear-gradient(to bottom, transparent 0, #000 20px)"
       for l in lines key=l.id
         column padding="6px 0"
           if l.ask >= 0
@@ -571,11 +579,11 @@ component CallButton
     retry: bool
     primary: action
   view
-    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "hex.danger") box-shadow=(status == "idle" ? "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" : "none") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
+    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") box-shadow=(status == "idle" ? "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" : "none") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
       if busy
-        progress width=(size / 3) height=(size / 3) color="-exact-background" aria-label="Connecting"
+        progress width=(size / 3) height=(size / 3) color="#FFFFFF" aria-label="Connecting"
       else
-        image (status == "idle" ? "symbol:waveform" : "symbol:sf/phone.down.fill") width=(size * (status == "idle" ? 0.45 : 0.36)) height=(size * (status == "idle" ? 0.45 : 0.36)) object-fit="contain" color="-exact-background"
+        image (status == "idle" ? "symbol:waveform" : "symbol:sf/phone.down.fill") width=(size * (status == "idle" ? 0.45 : 0.36)) height=(size * (status == "idle" ? 0.45 : 0.36)) object-fit="contain" color=(status == "idle" ? "-exact-background" : "#FFFFFF")
 
 // A question hex put on screen during the call (§7): tap an answer, or say it. hex's pick wears
 // the mint wash with ✦, as everywhere; what Bassim chose fills with the accent.

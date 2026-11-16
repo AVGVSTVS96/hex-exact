@@ -6,7 +6,7 @@ use Ask, Asks, Tasks, TaskRow, Place, Link from "./shapes.contract"
 use Said from "./said.contract"
 
 // An entry. kind: ask | task | stuck | fresh | finished. page: the thread a tap opens ("" for none). mark:
-// the state its mark draws. title: its headline; line: the words under it. tiles: where it lives.
+// the state its mark draws (a question is amber whether or not hex has a pick; its pick shows inside). title: its headline; line: the words under it. tiles: where it lives.
 shape Item
   kind: string
   id: string
@@ -49,7 +49,7 @@ fn appTile(app: string, link: string): Place = Place(app=(app == "telegram" or a
 // An ask's tiles: where it lives, the ones that open first, and its first link (three at most).
 fn askTiles(a: Ask): Place[] = a.places.filter(p => p.link != "" or p.call != "").concat(a.places.filter(p => p.link == "" and p.call == "")).slice(0, a.links.length > 0 ? 2 : 3).concat(a.links.slice(0, 1).map(l => Place(app="link", place=l.label, task="", call="", link=l.url)))
 
-fn askEntry(a: Ask, tasks: TaskRow[]): Item = Item(kind="ask", id=a.id, topic=match tasks.filter(t => t.id == a.task).at(0) { case some(t) => t.name, case none => a.topic }, app=a.app, stage="needs", rank=0, at=a.at, page=a.task, mark=(a.options.filter(o => o.pick).length > 0 ? "pick" : "asks"), title=a.question, line=a.context, meta="", action="", sent=false, words=`${a.question} ${a.context}`, tiles=askTiles(a))
+fn askEntry(a: Ask, tasks: TaskRow[]): Item = Item(kind="ask", id=a.id, topic=match tasks.filter(t => t.id == a.task).at(0) { case some(t) => t.name, case none => a.topic }, app=a.app, stage="needs", rank=0, at=a.at, page=a.task, mark="asks", title=a.question, line=a.context, meta="", action="", sent=false, words=`${a.question} ${a.context}`, tiles=askTiles(a))
 
 fn taskEntry(t: TaskRow): Item = Item(kind="task", id=t.id, topic=t.name, app=t.app, stage=(t.state == "needs" or t.state == "working" ? t.state : "quiet"), rank=rankOf(t.state == "needs" or t.state == "working" ? t.state : "quiet"), at=(t.state == "needs" ? t.since : t.at), page=t.id, mark=(problemOf(t.line) != "" ? "failed" : t.state == "done" ? "read" : t.state), title=(isPart(t) ? `${t.place} · ${t.line != "" ? t.line : stateWord(t.state)}` : t.line != "" ? t.line : stateWord(t.state)), line="", meta=agentsWord(t), action="", sent=false, words=`${t.name} ${t.place} ${t.line}`, tiles=[appTile(t.app, t.link)])
 

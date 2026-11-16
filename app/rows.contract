@@ -2,7 +2,7 @@
 // topic's page. Every row swipes as the stable app's do: from the left to do the obvious thing (take
 // hex's pick, act, mark read), from the right to say "Not needed" or open where it lives.
 use Ask, Place from "./shapes.contract"
-use Mark, Chip, PlaceTile, whenOf, appName, appTint, appSymbol from "./parts.contract"
+use Mark, Chip, PlaceTile, Row, PillTap, RowTap, whenOf, appName, appTint, appSymbol, PillFace from "./parts.contract"
 use Item, Topic, problemOf, pageOf from "./inbox.contract"
 use Said, unreached, failedWords from "./said.contract"
 
@@ -31,32 +31,7 @@ component ProjectRow
   derive headline = problem != "" ? problem : newest.title
   derive mark = newest.stage == "needs" ? (newest.kind == "task" or newest.kind == "fresh" ? "needs" : newest.mark) : problem != "" ? "failed" : newest.stage == "working" ? "working" : newest.stage == "done" ? "done" : "idle"
   view
-    if split
-      button press=select appearance="none" display="flex" text-align="left" padding="10px 12px" margin="0 -12px" border-radius=12 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
-        row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
-          Mark(state=mark, size=22)
-          column flex=1 min-width=0 gap=2
-            row gap=8 align-items="baseline"
-              text topic.name font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
-              if topic.entries.length > 1
-                Chip(n=topic.entries.length, state=mark, loading=false)
-              box flex=1
-              text whenOf(newest.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
-            if headline != topic.name
-              text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
-    else
-      link href=href -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}` testId=`topic-${topic.name}`
-        row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
-          Mark(state=mark, size=22)
-          column flex=1 min-width=0 gap=2
-            row gap=8 align-items="baseline"
-              text topic.name font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
-              if topic.entries.length > 1
-                Chip(n=topic.entries.length, state=mark, loading=false)
-              box flex=1
-              text whenOf(newest.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
-            if headline != topic.name
-              text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") line-clamp=2
+    Row(mark=mark, title=topic.name, line=headline, lines=2, failed=(problem != ""), stamp=whenOf(newest.at, now, offset), n=topic.entries.length, selected=selected, href=(split ? "" : href), label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}`, id=`topic-${topic.name}`, press=select)
 
 // A topic's head over its rows in search: tap to open the topic.
 component TopicHead
@@ -130,13 +105,15 @@ component EntryRow
                 if inline(a)
                   row gap=8 flex-wrap="wrap" padding-top=4
                     for o in a.options key=o.label
-                      button press=answer(a.id, o.label) appearance="none" padding="6px 12px" border-radius=999 background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill") -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`inline-${a.id}-${o.label}`
-                        text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
+                      button press=answer(a.id, o.label) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`inline-${a.id}-${o.label}`
+                        box class=PillFace background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill")
+                          text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
               case none
                 if entry.action != ""
                   row padding-top=4
-                    button press=leading disabled=entry.sent appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId=`act-${entry.id}`
-                      text (entry.kind == "stuck" and entry.sent ? "Sent to hex" : entry.action) font="-exact-subheadline" font-weight=600
+                    button press=leading disabled=entry.sent class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") testId=`act-${entry.id}`
+                      box class=PillFace
+                        text (entry.kind == "stuck" and entry.sent ? "Sent to hex" : entry.action) font="-exact-subheadline" font-weight=600
                 else if entry.kind == "stuck" and entry.sent
                   text "Sent to hex" font="-exact-footnote" color="-exact-secondary-label"
             if word.status == "failed"
@@ -169,10 +146,12 @@ component Folded
         if said.missed > 0
           row gap=8 align-items="center" flex-wrap="wrap"
             text unreached(said.missed) font="-exact-footnote" color="hex.ask"
-            button press=again(said.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`again-${said.id}`
-              text "Send again" font="-exact-footnote" font-weight=600
-      button press=undo(said.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
-        text "Undo" font="-exact-subheadline" font-weight=600
+            button press=again(said.id) class=PillTap testId=`again-${said.id}`
+              box class=PillFace padding="4px 10px"
+                text "Send again" font="-exact-footnote" font-weight=600
+      button press=undo(said.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`undo-${said.id}`
+        box class=PillFace
+          text "Undo" font="-exact-subheadline" font-weight=600
 
 // What hex took off Bassim's list to decide itself: its topic, the question, and Undo, which puts it
 // back on his list. A tap opens the thread hex decides it in.
@@ -191,13 +170,14 @@ component DecidedRow
   view
     row gap=10 align-items="center" testId=`decided-${ask.id}`
       if split
-        button press=select appearance="none" display="flex" flex-direction="row" gap=12 align-items="flex-start" flex=1 min-width=0 text-align="left" padding="8px 10px" margin="0 0 0 -10px" border-radius=12 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided, ${ask.topic}: ${ask.question}` testId=`decided-open-${ask.id}`
+        button press=select class=RowTap flex=1 min-width=0 width="auto" padding="8px 10px" margin="0 0 0 -10px" background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided, ${ask.topic}: ${ask.question}` testId=`decided-open-${ask.id}`
           DecidedLines(ask=ask, word=word)
       else
         link href=href display="flex" flex-direction="row" gap=12 align-items="flex-start" flex=1 min-width=0 padding="8px 0" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided, ${ask.topic}: ${ask.question}` testId=`decided-open-${ask.id}`
           DecidedLines(ask=ask, word=word)
-      button press=undo(ask.id) appearance="none" padding="5px 12px" border-radius=999 background-color="-exact-tertiary-fill" flex-shrink=0 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-undo-${ask.id}`
-        text "Undo" font="-exact-subheadline" font-weight=600
+      button press=undo(ask.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-undo-${ask.id}`
+        box class=PillFace padding="5px 12px"
+          text "Undo" font="-exact-subheadline" font-weight=600
 
 component DecidedLines
   props

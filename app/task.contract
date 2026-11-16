@@ -2,7 +2,7 @@
 // pinned post, its messages, every place it lives, its week and its history. The same route opens
 // a topic with only questions (`topic:<name>`) and a finished thing (`done:<id>`).
 use Viewport, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, Track, Agent, Finished, PinSection, Media from "./shapes.contract"
-use Mark, PlaceTile, whenOf, appName, lengthOf from "./parts.contract"
+use Mark, PlaceTile, whenOf, appName, lengthOf, Tap from "./parts.contract"
 use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
 use EntryRow from "./rows.contract"
@@ -351,7 +351,7 @@ component Pinned
       header
         text (section.title != "" ? section.title : first ? "Pinned" : "")
       if section.folded
-        button press=fold appearance="none" display="flex" flex-direction="row" gap=10 align-items="center" text-align="left" aria-expanded=(not folded) testId=`pin-fold-${section.title}`
+        button press=fold class=Tap display="flex" flex-direction="row" gap=10 align-items="center" text-align="left" aria-expanded=(not folded) testId=`pin-fold-${section.title}`
           Mark(state=section.mark, size=18)
           text `${section.title} · ${section.lines.length}` flex=1 font="-exact-subheadline" color="-exact-secondary-label"
           image (folded ? "symbol:sf/chevron.down" : "symbol:sf/chevron.up") width=11 height=11 object-fit="contain" color="-exact-tertiary-label"

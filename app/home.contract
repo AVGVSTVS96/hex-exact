@@ -3,7 +3,7 @@
 // Home shows it whenever no call is on; Tasks has the rest. Laptop-folded, its top half is hex and
 // Needs you and its bottom half the rest.
 use Tasks, Asks, TaskRow from "./shapes.contract"
-use Mark, StageHead, ShowMore, whenOf from "./parts.contract"
+use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap from "./parts.contract"
 use Said from "./said.contract"
 use Item, entriesOf, homeOf, problemOf from "./inbox.contract"
 
@@ -88,7 +88,7 @@ component HexHome
           else
             box width=60 height=60
           text "hex" font="-exact-headline" margin-top=8
-          button press=goLive disabled=(liveId == "") appearance="none" display="flex" flex-direction="row" align-items="center" justify-content="center" gap=7 max-width="100%" min-width=44 min-height=22 margin-top=2 aria-live="polite" aria-label=(liveId == "" ? "Nothing running" : `hex is working on ${liveTopic}: ${liveLine}`) testId="live-line"
+          button press=goLive disabled=(liveId == "") class=Tap display="flex" flex-direction="row" align-items="center" justify-content="center" gap=7 max-width="100%" min-width=44 min-height=22 margin-top=2 aria-live="polite" aria-label=(liveId == "" ? "Nothing running" : `hex is working on ${liveTopic}: ${liveLine}`) testId="live-line"
             if liveId != ""
               row gap=3 flex-shrink=0 aria-hidden=true
                 for i in [0, 1, 2] key=i
@@ -98,45 +98,25 @@ component HexHome
         if top
           children
           if failed and not known
-            text "Can't reach hex. Trying again…" font="-exact-subheadline" color="-exact-secondary-label" text-align="center" padding="24px 10px" testId="home-offline"
+            Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
           StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="20px 10px 4px", id="home-head-asks")
           for e in shownNeeds key=e.id
-            HomeRow(entry=e, mark=markOf(e), now=now, offset=offset, selected=(split and beside != "" and beside == pageFor(e, tasks)), go=go(e))
+            Row(mark=markOf(e), title=e.topic, line=(problemOf(e.title) != "" ? problemOf(e.title) : e.title), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${problemOf(e.title) != "" ? problemOf(e.title) : e.title}`, id=`home-row-${e.id}`, press=go(e))
           if known and needs.length == 0
-            text "Nothing waits on you" font="-exact-subheadline" color="-exact-secondary-label" padding="6px 10px 6px 44px"
+            Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 44px", id="home-empty-needs")
           if needs.length > shownNeeds.length
             ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="6px 10px", id="home-more-needs", press=openTasks("needs"))
         if bottom
           StageHead(state="working", label="Working on", n=working.length, known=known, pad="20px 10px 4px", id="home-head-working")
           for e in shownWork key=e.id
-            HomeRow(entry=e, mark=markOf(e), now=now, offset=offset, selected=(split and beside != "" and beside == pageFor(e, tasks)), go=go(e))
+            Row(mark=markOf(e), title=e.topic, line=(problemOf(e.title) != "" ? problemOf(e.title) : e.title), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${problemOf(e.title) != "" ? problemOf(e.title) : e.title}`, id=`home-row-${e.id}`, press=go(e))
           if known and working.length == 0
-            text "Nothing is working" font="-exact-subheadline" color="-exact-secondary-label" padding="6px 10px 6px 44px"
+            Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 44px", id="home-empty-working")
           if listed.length > shownWork.length
             ShowMore(n=listed.length - shownWork.length, shown=false, pad="6px 10px", id="home-more-working", press=openTasks("working"))
           if decided > 0
-            button press=openTasks("needs") appearance="none" display="flex" flex-direction="row" align-items="center" gap=12 width="100%" box-sizing="border-box" padding="12px 10px 6px" margin-top=14 border-top="0.5px solid -exact-separator" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided}` testId="home-decided"
+            box height=0 margin="14px 10px 4px" border-top="0.5px solid -exact-separator"
+            button press=openTasks("needs") class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided}` testId="home-decided"
               Mark(state="decided", size=22)
               text `hex decided ${decided}` font="-exact-headline" flex=1 text-align="left"
               image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
-
-// One thing: its mark, its topic, its line, when.
-component HomeRow
-  inject
-    haptics: bool
-  props
-    entry: Item
-    mark: string
-    now: number
-    offset: number
-    selected: bool
-    go: action
-  derive problem = problemOf(entry.title)
-  view
-    button press=go appearance="none" display="flex" flex-direction="row" align-items="flex-start" gap=12 width="100%" box-sizing="border-box" padding="9px 10px" border-radius=12 text-align="left" background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${entry.topic}: ${problem != "" ? problem : entry.title}` testId=`home-row-${entry.id}`
-      box padding-top=1
-        Mark(state=mark, size=22)
-      column flex=1 min-width=0 gap=2
-        text entry.topic font="-exact-headline" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-        text (problem != "" ? problem : entry.title) font="-exact-subheadline" color=(problem != "" ? "hex.danger" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-      text whenOf(entry.at, now, offset) font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" padding-top=3

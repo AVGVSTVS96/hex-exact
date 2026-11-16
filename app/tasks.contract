@@ -2,7 +2,7 @@
 // you, Working, Done, Quiet. Each topic is one row; search finds any question, thread or result by
 // every word. On a phone it's a sheet over the call, so the call stays in reach.
 use Viewport, Tasks, Asks, Counts from "./shapes.contract"
-use Mark, Chip, StageHead, ShowMore, whenOf from "./parts.contract"
+use Mark, Chip, StageHead, ShowMore, Note, whenOf, Tap from "./parts.contract"
 use Said from "./said.contract"
 use Item, Topic, entriesOf, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
 use ProjectRow, TopicHead, EntryRow, DecidedRow from "./rows.contract"
@@ -11,6 +11,9 @@ shape TabItem
   id: string
   label: string
 
+// A stage's head, in the colour of what's in it.
+fn headState(stage: string): string = stage == "needs" ? "asks" : stage
+fn stageIndex(stage: string): number = stage == "needs" ? 1 : stage == "working" ? 2 : stage == "done" ? 3 : 4
 fn emptyWords(tab: string): string = tab == "needs" ? "Nothing waits on you" : tab == "working" ? "Nothing is working" : tab == "done" ? "Nothing done in the last day" : tab == "quiet" ? "Nothing is quiet" : "Nothing from hex yet"
 
 component TasksList
@@ -97,17 +100,17 @@ component TasksList
             if not searching
               row role="tablist" aria-label="Stages" gap=6 padding="2px 16px 8px" overflow-x="auto" scrollbar-width="none"
                 for t, i in tabs key=t.id
-                  button press=pickTab(t.id) appearance="none" padding="6px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" flex-shrink=0 role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic=(haptics ? "selection" : "none") transition="background-color 160ms ease" testId=`tab-${t.id}`
+                  button press=pickTab(t.id) class=Tap padding="6px 12px" border-radius=999 background-color=(tab == t.id ? "-exact-label" : "-exact-tertiary-fill") display="flex" flex-direction="row" gap=6 align-items="center" flex-shrink=0 role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic=(haptics ? "selection" : "none") transition="background-color 160ms ease" testId=`tab-${t.id}`
                     text t.label font="-exact-subheadline" font-weight=600 color=(tab == t.id ? "-exact-background" : "-exact-label") white-space="nowrap"
                     if t.id != "all"
-                      text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(t.id == "needs" ? "hex.accent" : tab == t.id ? "-exact-background" : "-exact-secondary-label") opacity=(tab == t.id and t.id != "needs" ? 0.7 : 1)
+                      text (not known ? "–" : `${match countOf.at(i) { case some(n) => n, case none => 0 }}`) font="-exact-subheadline" font-weight=600 font-variant-numeric="tabular-nums" color=(t.id == "needs" and tab != t.id ? "hex.ask" : tab == t.id ? "-exact-background" : "-exact-secondary-label") opacity=(tab == t.id ? 0.7 : 1)
             if failed and known
               text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 16px" testId="tasks-behind"
             if needsTab
               StageHead(state="asks", label="Needs you", n=match countOf.at(1) { case some(n) => n, case none => 0 }, known=known, pad="6px 16px 2px", id="stage-head-asks")
             for t, i in shownTopics key=(tab == "done" or searching ? `${t.name}·${match t.entries.at(0) { case some(e) => e.id, case none => "" }}` : t.name)
               if not searching and tab == "all" and (i == 0 or match topics.at(i - 1) { case some(p) => match p.entries.at(0) { case some(e) => e.stage, case none => "" } != match t.entries.at(0) { case some(e) => e.stage, case none => "" }, case none => true })
-                text stageWord(match t.entries.at(0) { case some(e) => e.stage, case none => "" }) font="-exact-footnote" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.4 padding=(i == 0 ? "4px 16px 2px" : "18px 16px 2px")
+                StageHead(state=headState(match t.entries.at(0) { case some(e) => e.stage, case none => "" }), label=stageWord(match t.entries.at(0) { case some(e) => e.stage, case none => "" }), n=match countOf.at(stageIndex(match t.entries.at(0) { case some(e) => e.stage, case none => "" })) { case some(n) => n, case none => 0 }, known=known, pad=(i == 0 ? "6px 16px 2px" : "20px 16px 2px"), id=`stage-head-${match t.entries.at(0) { case some(e) => e.stage, case none => "" }}`)
               if searching
                 TopicHead(topic=t, href=path("task", homeOf(pageOf(t), tasks.tasks)), split=split, select=select(homeOf(pageOf(t), tasks.tasks)))
                 for e in t.entries key=e.id
@@ -134,11 +137,11 @@ component TasksList
                   text `Checked ${whenOf(asks.check.at, now, offset)}` font="-exact-body"
                   text [asks.check.fixed > 0 ? `fixed ${asks.check.fixed}` : "", asks.check.flagged > 0 ? `flagged ${asks.check.flagged}` : ""].filter(s => s != "").join(" · ") font="-exact-subheadline" color="-exact-secondary-label"
             if known and topics.length == 0
-              text (searching ? "Nothing matches" : emptyWords(tab)) color="-exact-secondary-label" text-align="center" padding="48px 16px" testId="tasks-empty"
+              Note(kind="empty", text=(searching ? "Nothing matches" : emptyWords(tab)), pad="48px 16px", id="tasks-empty")
             if failed and not known
-              text "Can't reach hex. Trying again…" color="-exact-secondary-label" text-align="center" padding="48px 16px" testId="tasks-offline"
+              Note(kind="failed", text="Can't reach hex. Trying again…", pad="48px 16px", id="tasks-offline")
             if loading and not known and not failed
-              progress aria-label="Loading tasks" margin="48px auto"
+              Note(kind="loading", text="Loading tasks", pad="48px 16px", id="tasks-loading")
             if needsTab and asking > 0
               box height=72
         if split

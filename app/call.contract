@@ -7,7 +7,7 @@
 // the words the right; like a laptop, the orb sits above the fold and the words below; folded shut,
 // or on a phone, one column, the orb rising to make room for the words.
 use Viewport, Pose, Rect, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
-use Glass, endingOf, badEnding, lengthOf from "./parts.contract"
+use Glass, endingOf, badEnding, lengthOf, Tap from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
@@ -294,7 +294,7 @@ component Home
 
       // The agent line: what hex is doing for this call; tap for the Working tab.
       if agentShown
-        button press=openTasks("working") appearance="none" position="absolute" bottom=agentBottom left=(book ? "env(viewport-segment-left 1 0)" : `${left}px`) right=right height=36 margin="0 20px" padding="0 14px" border-radius=18 background-color="-exact-tertiary-fill" display="flex" flex-direction="row" align-items="center" gap=8 aria-live="polite" aria-label=`hex is ${agent.state == "running" ? "working" : agent.state}: ${agentText}${agentWhere != "" ? `, ${agentWhere}` : ""}` testId="agent-line"
+        button press=openTasks("working") class=Tap position="absolute" bottom=agentBottom left=(book ? "env(viewport-segment-left 1 0)" : `${left}px`) right=right height=36 margin="0 20px" padding="0 14px" border-radius=18 background-color="-exact-tertiary-fill" display="flex" flex-direction="row" align-items="center" gap=8 aria-live="polite" aria-label=`hex is ${agent.state == "running" ? "working" : agent.state}: ${agentText}${agentWhere != "" ? `, ${agentWhere}` : ""}` testId="agent-line"
           if agent.state == "running"
             progress width=14 height=14 aria-hidden=true
           else
@@ -364,7 +364,7 @@ component CallWords
               if l.note == "sending"
                 text "Sending" font="-exact-caption1" color="-exact-secondary-label"
               else if l.note != ""
-                button press=reshare(l.id.slice(1)) disabled=(not live) appearance="none" testId=`reshare-${l.id}`
+                button press=reshare(l.id.slice(1)) disabled=(not live) class=Tap testId=`reshare-${l.id}`
                   text `Not sent · ${l.note}${live ? " · Tap to try again" : ""}` font="-exact-caption1" color="-exact-system-red" text-align="end"
           else
             row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
@@ -412,7 +412,7 @@ component CallDock
     if columned
       column position="absolute" top=columnTopOf(viewport, pose) bottom=columnFootOf(viewport, pose) left=(mid - 28) width=56 align-items="center" justify-content="space-between" z-index=20 testId="call-dock"
         column align-items="center" gap=8
-          button press=home appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
+          button press=home class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
             hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=34 height=34
           if status == "live"
             time datetime=started format="timer" font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
@@ -425,7 +425,7 @@ component CallDock
           CallButton(size=(tight ? 48 : 56), status=status, busy=(status != "live"), retry=false, primary=stop)
     else
       row position="absolute" top=max(viewport.safeAreaTop / 2 + 7 - 22, 4) right=(viewport.width - band.x - band.width) gap=10 align-items="center" z-index=20 testId="call-dock"
-        button press=home appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
+        button press=home class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
           hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=34 height=34
         if status == "live"
           time datetime=started format="timer" font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-secondary-label" min-width=44
@@ -465,9 +465,9 @@ component Tools
     button press=open(path("calls")) class=Glass aria-label="Calls" testId="open-calls"
       image "symbol:sf/clock.arrow.circlepath"
     box flex-direction=axis display="flex" backgroundMaterial="glass" border-radius=22 width=(axis == "row" ? "auto" : "44px") height=(axis == "row" ? "44px" : "auto") align-items="center" padding=(axis == "row" ? "0 4px" : "4px 0") gap=2 position="relative"
-      button press=openTasks("") appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${counts.yours} need you, ${counts.working} working` -exact-press-haptic=(haptics ? "selection" : "none") testId="open-tasks"
+      button press=openTasks("") class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${counts.yours} need you, ${counts.working} working` -exact-press-haptic=(haptics ? "selection" : "none") testId="open-tasks"
         image "symbol:list" width=20 height=20 object-fit="contain" color="-exact-label"
-      button press=open(path("settings")) appearance="none" width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
+      button press=open(path("settings")) class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
         image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
       if counts.yours > 0
         box position="absolute" top=(axis == "row" ? -2 : 2) left=(axis == "row" ? 34 : 32) width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
@@ -528,7 +528,7 @@ component CallButton
     retry: bool
     primary: action
   view
-    button press=primary disabled=(status == "ending") appearance="none" width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
+    button press=primary disabled=(status == "ending") class=Tap width=size height=size border-radius=(size / 2) background-color=(status == "idle" ? "-exact-label" : "-exact-system-red") display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "impact-light" : "none") aria-label=(status == "idle" ? (retry ? "Retry conversation" : "Start conversation") : status == "connecting" or status == "reconnecting" ? "Cancel connection" : status == "ending" ? "Ending conversation" : "End conversation") testId="call"
       if busy
         progress width=(size / 3) height=(size / 3) color="#FFFFFF" aria-label="Connecting"
       else
@@ -564,7 +564,7 @@ component CallAskCard
       else
         row gap=8 align-items="center"
           box width=8 height=8 border-radius=4 background-color="hex.ask" flex-shrink=0 aria-hidden=true
-          button press=openTask(ask.task) appearance="none" testId=`call-ask-topic-${ask.id}`
+          button press=openTask(ask.task) class=Tap testId=`call-ask-topic-${ask.id}`
             text `${ask.topic} ›` font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
           if ask.tag != ""
             text `· ${ask.tag}` font="-exact-footnote" font-weight=600 color="hex.ask" white-space="nowrap"

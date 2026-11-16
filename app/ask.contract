@@ -4,7 +4,7 @@
 // as the last row. Once answered it folds to what he said, with Undo.
 use Ask, Words, Media from "./shapes.contract"
 use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
-use Mark, whenOf from "./parts.contract"
+use Mark, whenOf, PillTap, Tap, PillFace from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
 
 fn questionWord(n: number, of: number): string = of > 1 ? `Question ${n} of ${of}` : "Question"
@@ -25,7 +25,7 @@ component AnswerRow
     id: string
     press: action
   view
-    button press=press disabled=disabled appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") role=(role == "check" ? "checkbox" : role == "radio" ? "radio" : "button") aria-checked=chosen aria-label=(pick ? `${label}, hex’s pick` : label) testId=id
+    button press=press disabled=disabled class=Tap display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") role=(role == "check" ? "checkbox" : role == "radio" ? "radio" : "button") aria-checked=chosen aria-label=(pick ? `${label}, hex’s pick` : label) testId=id
       box width=22 height=22 border-radius=11 flex-shrink=0 box-sizing="border-box" border=(chosen ? "none" : pick ? "1.5px solid hex.accent" : "1.5px solid -exact-tertiary-label") background-color=(chosen ? "AccentColor" : "transparent") display="flex" align-items="center" justify-content="center" aria-hidden=true
         if chosen
           image "symbol:checkmark" width=11 height=11 object-fit="contain" color="ink.on-accent"
@@ -85,10 +85,12 @@ component AskCard
             if said.missed > 0
               row gap=8 align-items="center" flex-wrap="wrap" padding-top=2
                 text unreached(said.missed) font="-exact-footnote" color="hex.ask"
-                button press=again(ask.id) appearance="none" padding="4px 10px" border-radius=999 background-color="-exact-tertiary-fill" testId=`card-again-${ask.id}`
-                  text "Send again" font="-exact-footnote" font-weight=600
-          button press=undo(ask.id) appearance="none" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`card-undo-${ask.id}`
-            text "Undo" font="-exact-subheadline" font-weight=600
+                button press=again(ask.id) class=PillTap testId=`card-again-${ask.id}`
+                  box class=PillFace padding="4px 10px"
+                    text "Send again" font="-exact-footnote" font-weight=600
+          button press=undo(ask.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${said.label}` testId=`card-undo-${ask.id}`
+            box class=PillFace padding="6px 12px"
+              text "Undo" font="-exact-subheadline" font-weight=600
       else
         row gap=8 align-items="center"
           box width=8 height=8 border-radius=4 background-color="hex.ask" flex-shrink=0 aria-hidden=true
@@ -96,14 +98,15 @@ component AskCard
           if ask.tag != ""
             text `· ${ask.tag}` font="-exact-footnote" font-weight=600 color="hex.ask" white-space="nowrap"
           box flex=1
-          button press=dismiss(ask.id) appearance="none" padding="4px 11px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-dismiss-${ask.id}`
-            text "Not needed" font="-exact-footnote" font-weight=600
-        button press=fold appearance="none" text-align="left" aria-expanded=(not folded) testId=`ask-fold-${ask.id}`
+          button press=dismiss(ask.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-dismiss-${ask.id}`
+            box class=PillFace padding="4px 11px"
+              text "Not needed" font="-exact-footnote" font-weight=600
+        button press=fold class=Tap text-align="left" aria-expanded=(not folded) testId=`ask-fold-${ask.id}`
           text ask.question font="-exact-title3" font-weight=600 line-clamp=(folded ? 2 : 0)
         if not folded
           if ask.context != ""
             text ask.context font="-exact-body" color="-exact-label" user-select="text"
-          button press=showWords(ask.id) appearance="none" display="flex" flex-direction="row" gap=6 align-items="center" padding="2px 0" aria-expanded=wordsOpen aria-label=`Why: the message from ${from}` testId=`ask-from-${ask.id}`
+          button press=showWords(ask.id) class=Tap display="flex" flex-direction="row" gap=6 align-items="center" padding="2px 0" aria-expanded=wordsOpen aria-label=`Why: the message from ${from}` testId=`ask-from-${ask.id}`
             text "Why" font="-exact-subheadline" font-weight=600 color="-exact-label"
             text `· from ${from}${ask.at > 0 ? `, ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1 flex-shrink=1
             image "symbol:forward-chevron" width=10 height=10 object-fit="contain" color="-exact-tertiary-label" rotate=(wordsOpen ? "90deg" : "0deg") transition="rotate 200ms ease"
@@ -130,7 +133,7 @@ component AskCard
         column border-top="0.5px solid -exact-separator" margin-top=4
           for o in ask.options key=o.label
             AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=chosen.includes(o.label), role=(ask.multiple ? "check" : "radio"), disabled=false, id=`ask-option-${ask.id}-${o.label}`, press=choose(o.label))
-          button press=reply(ask.id) appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-own-${ask.id}`
+          button press=reply(ask.id) class=Tap display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") testId=`ask-own-${ask.id}`
             box width=22 height=22 flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-hidden=true
               image "symbol:pencil" width=17 height=17 object-fit="contain" color="-exact-secondary-label"
             text (draft != "" ? draft : "In your own words") font="-exact-body" color=(draft != "" ? "-exact-label" : "-exact-secondary-label") line-clamp=1 flex=1
@@ -158,8 +161,9 @@ component DecidedCard
       row gap=8 align-items="center"
         box width=8 height=8 border-radius=4 background-color="hex.accent" flex-shrink=0 aria-hidden=true
         text `hex decided${ask.decided > 0 ? ` · ${whenOf(ask.decided, now, offset)}` : ""}` font="-exact-footnote" color="hex.accent" font-variant-numeric="tabular-nums" flex=1 line-clamp=1
-        button press=undo(ask.id) appearance="none" padding="4px 11px" border-radius=999 background-color="-exact-tertiary-fill" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-card-undo-${ask.id}`
-          text "Undo" font="-exact-footnote" font-weight=600
+        button press=undo(ask.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back on your list` testId=`decided-card-undo-${ask.id}`
+          box class=PillFace padding="4px 11px"
+            text "Undo" font="-exact-footnote" font-weight=600
       text ask.question font="-exact-title3" font-weight=600
       if ask.took != ""
         text `✦ ${ask.took}` font="-exact-headline" color="hex.accent"

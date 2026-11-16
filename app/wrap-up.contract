@@ -1,6 +1,7 @@
 // The wrap-up a call leaves (§6): what it was, what came of it, and what now waits on Bassim. Under
 // the orb once a call has ended (tap it for the call), and whole at the top of a past call.
 use CallRow from "./shapes.contract"
+use Tap from "./parts.contract"
 
 component WrapUp
   inject
@@ -19,10 +20,10 @@ component WrapUp
       if whole
         WrapBody(call=call, lead=lead, shown=shown, whole=true)
       else
-        button press=open(path("pastCall", call.id)) appearance="none" display="flex" flex-direction="column" align-items="center" width="100%" aria-label=`${call.title}. ${lead}` aria-description="Opens the call" testId="open-wrap-up"
+        button press=open(path("pastCall", call.id)) class=Tap display="flex" flex-direction="column" align-items="center" width="100%" aria-label=`${call.title}. ${lead}` aria-description="Opens the call" testId="open-wrap-up"
           WrapBody(call=call, lead=lead, shown=shown, whole=false)
       if left > 0
-        button press=openTasks("needs") appearance="none" align-self=(whole ? "flex-start" : "center") -exact-press-haptic=(haptics ? "selection" : "none") testId="wrap-up-more"
+        button press=openTasks("needs") class=Tap align-self=(whole ? "flex-start" : "center") -exact-press-haptic=(haptics ? "selection" : "none") testId="wrap-up-more"
           text `${left} more in Tasks` font="-exact-footnote" font-weight=600 color="AccentColor"
 
 component WrapBody

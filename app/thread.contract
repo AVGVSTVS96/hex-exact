@@ -2,7 +2,7 @@
 // composer that becomes Stop while hex is working and nothing is typed. What Bassim sends shows at
 // once, dimmed until hex has it; one that didn't go says why, and a tap tries again.
 use Viewport, TaskPage, Chat, Media from "./shapes.contract"
-use Mark, appName, whenOf, lengthOf from "./parts.contract"
+use Mark, appName, whenOf, lengthOf, Tap from "./parts.contract"
 use Sending from "./said.contract"
 use Album, AddMedia, Waiting from "./media.contract"
 
@@ -119,11 +119,11 @@ component Thread
               if l.media.length > 0
                 Album(media=l.media, width=min(viewport.width * 0.6, 260))
               if l.text != "" and l.source == "me"
-                text eventWords(l.text) max-width="82%" padding="8px 14px" border-radius=18 background-color="AccentColor" color="ink.on-tile" opacity=(l.kind == "turn" ? 1 : l.kind == "waiting" ? 0.6 : 0.45) user-select="text" white-space="pre-wrap" overflow-wrap="break-word"
+                text eventWords(l.text) max-width="82%" padding="8px 14px" border-radius=18 background-color="-exact-tertiary-fill" color="-exact-label" opacity=(l.kind == "turn" ? 1 : l.kind == "waiting" ? 0.6 : 0.45) user-select="text" white-space="pre-wrap" overflow-wrap="break-word"
               else if l.text != ""
                 text l.text markup="markdown" font="-exact-body" user-select="text" overflow-wrap="break-word"
               if l.kind == "sending" and l.status == "failed" and retries(l.error)
-                button press=resend(l.key) appearance="none" testId=`resend-${l.key}`
+                button press=resend(l.key) class=Tap testId=`resend-${l.key}`
                   text "Not sent · Tap to try again" font="-exact-caption1" color="hex.danger"
               else if l.kind == "sending" and l.status == "failed"
                 text l.error font="-exact-caption1" color="hex.danger" max-width="82%" text-align="right"

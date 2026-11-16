@@ -2,7 +2,7 @@
 // call's sounds and haptics. A sheet on the phone; on the open Duo it takes the screen, the orb on
 // the left half and the settings on the right.
 use Viewport, Settings from "./shapes.contract"
-use Option, personas, paletteColor from "./parts.contract"
+use Option, personas, paletteColor, Tap from "./parts.contract"
 
 shape Swatch
   id: string
@@ -111,7 +111,7 @@ component Swatches
     column gap=8 align-items="center" testId="swatches"
       row role="radiogroup" appearance="none" aria-label=(persona == "opal" ? "Opal colors" : persona == "mana" ? "Mana keeps its own color" : "Persona color") gap=6 justify-content="center" flex-wrap="wrap" opacity=(persona == "mana" ? 0.35 : 1)
         for s in set key=s.id
-          button role="radio" aria-checked=(chosen == s.id) press=pick(s.id) disabled=(persona == "mana") appearance="none" width=36 height=36 border-radius=18 border=(chosen == s.id and persona != "mana" ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" aria-label=s.label testId=`swatch-${s.label}`
+          button role="radio" aria-checked=(chosen == s.id) press=pick(s.id) disabled=(persona == "mana") class=Tap width=36 height=36 border-radius=18 border=(chosen == s.id and persona != "mana" ? "2px solid -exact-label" : "2px solid transparent") display="flex" align-items="center" justify-content="center" aria-label=s.label testId=`swatch-${s.label}`
             box width=26 height=26 border-radius=13 background-color=(persona == "mana" ? "-exact-tertiary-fill" : s.color == "" ? "transparent" : s.color) background-image=(persona != "mana" and s.color == "" ? "linear-gradient(135deg, #2FB5AD, #9B4DD6 50%, #F07B3F)" : "none") border="0.5px solid -exact-separator"
         // The persona's own colour, past the presets (not Opal's palettes; Mana keeps its own).
         if persona != "opal" and persona != "mana"
@@ -153,7 +153,7 @@ component Pager
       else
         scroll display="flex" flex-direction="row" width=width overflow-x="scroll" overflow-y="hidden" scroll-snap-type="x mandatory" scrollbar-width="none" scrollLeft=(index * width) scroll=moved scrollend=settled testId=`pager-${testKey}-scroll`
           for o in options key=o.id
-            button press=replay(o.id) appearance="none" width=width flex-shrink=0 scroll-snap-align="center" display="flex" flex-direction="column" align-items="center" gap=2 padding="6px 0" aria-label=`${o.label}, ${o.detail}` aria-current=(o.id == value) testId=`${testKey}-${o.id}`
+            button press=replay(o.id) class=Tap width=width flex-shrink=0 scroll-snap-align="center" display="flex" flex-direction="column" align-items="center" gap=2 padding="6px 0" aria-label=`${o.label}, ${o.detail}` aria-current=(o.id == value) testId=`${testKey}-${o.id}`
               text o.label font="-exact-title2" font-weight=600 color="-exact-label"
               text o.detail font="-exact-subheadline" color="-exact-secondary-label" text-align="center" white-space="nowrap"
         row gap=6 justify-content="center" aria-hidden=true

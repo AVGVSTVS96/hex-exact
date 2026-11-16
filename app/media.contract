@@ -2,6 +2,7 @@
 // opens the Camera or Photos, and the strip of what waits in a composer. Each picture is the shell's
 // `hex-media` view: it reads hex's copy with its token and opens full screen on a tap.
 use Media from "./shapes.contract"
+use Tap from "./parts.contract"
 
 // A picture's shape (width over height): its own, no taller than 1:2; square until it's known.
 fn shapeOf(aspect: number): number = aspect <= 0 ? 1 : max(1 / 2, aspect)
@@ -79,5 +80,5 @@ component Waiting
         for m in media key=m.id
           box position="relative"
             Thumb(media=m, width=56, square=true)
-            button press=remove(m.id) appearance="none" position="absolute" top=-6 right=-6 width=22 height=22 border-radius=11 background-color="-exact-label" display="flex" align-items="center" justify-content="center" aria-label="Remove" testId=`waiting-remove-${m.id}`
+            button press=remove(m.id) class=Tap position="absolute" top=-6 right=-6 width=22 height=22 border-radius=11 background-color="-exact-label" display="flex" align-items="center" justify-content="center" aria-label="Remove" testId=`waiting-remove-${m.id}`
               image "symbol:sf/xmark" width=9 height=9 object-fit="contain" color="-exact-background"

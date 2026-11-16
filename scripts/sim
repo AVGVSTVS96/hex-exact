@@ -117,29 +117,32 @@ place() {
 # Plays one flow: each line XCUITest prints as it goes is acted on here, a shot or a pose, then
 # answered through a file the test waits for.
 play() {
-  local name=$1 script=$2 pose=$3 appearance=$4 dir=$out/$1 step=0 answered=0 line shot
+  local name=$1 script=$2 pose=$3 appearance=$4 dir=$out/$1 step=0 answered=0 line shot at=$3 where
   mkdir -p "$dir"
   rm -rf "$tests/sync" "$tests/result.xcresult" "$tests/attachments" && mkdir -p "$tests/sync"
   : >"$out/writes.txt"
-  TEST_RUNNER_FLOW=$script TEST_RUNNER_FLOW_SYNC=$tests/sync xcodebuild test-without-building \
+  # The loop reads from a process substitution, not a pipe, so the poses it moves to stay known here.
+  while IFS= read -r line; do
+    case $line in
+      *"flow-shoot "* | *"flow-snap "*)
+        step=$((step + 1)) shot=${line##*flow-s?o?? }
+        # Each pose plays the flow, so a step it folded to names the pose it started from too.
+        where=$at && [ "$at" = "$pose" ] || where=$at-from-$pose
+        xcrun simctl io "$id" screenshot --display=$display "$dir/$(printf %02d $step)-$shot-$where-$appearance.png" >/dev/null 2>&1
+        case $line in *flow-shoot*) touch "$tests/sync/$((answered += 1))" ;; esac
+        ;;
+      *"flow-pose "*)
+        at=${line##*flow-pose }
+        place "$at"
+        touch "$tests/sync/$((answered += 1))"
+        ;;
+      *"flow-note "*) echo "$pose $appearance: ${line##*flow-note }" >>"$dir/notes.txt" ;;
+      *error:* | *XCTAssert* | *" failed "*) echo "$pose $appearance: $line" >>"$dir/notes.txt" ;;
+    esac
+  done < <(TEST_RUNNER_FLOW=$script TEST_RUNNER_FLOW_SYNC=$tests/sync xcodebuild test-without-building \
     -project ~/$folder/scripts/uitests/Flows.xcodeproj -scheme Flows -destination "id=$id" \
     -derivedDataPath "$tests" -resultBundlePath "$tests/result.xcresult" -collect-test-diagnostics never 2>&1 |
-    tee "$tests-$name-$pose-$appearance.log" | while IFS= read -r line; do
-      case $line in
-        *"flow-shoot "* | *"flow-snap "*)
-          step=$((step + 1)) shot=${line##*flow-s?o?? }
-          xcrun simctl io "$id" screenshot --display=$display "$dir/$(printf %02d $step)-$shot-$pose-$appearance.png" >/dev/null 2>&1
-          case $line in *flow-shoot*) touch "$tests/sync/$((answered += 1))" ;; esac
-          ;;
-        *"flow-pose "*)
-          place "${line##*flow-pose }"
-          pose=${line##*flow-pose }
-          touch "$tests/sync/$((answered += 1))"
-          ;;
-        *"flow-note "*) echo "$pose $appearance: ${line##*flow-note }" >>"$dir/notes.txt" ;;
-        *error:* | *XCTAssert* | *" failed "*) echo "$pose $appearance: $line" >>"$dir/notes.txt" ;;
-      esac
-    done || true
+    tee "$tests-$name-$pose-$appearance.log")
   cp "$out/writes.txt" "$dir/writes-$pose-$appearance.txt"
   [ -d "$tests/result.xcresult" ] || return 0
   xcrun xcresulttool export attachments --path "$tests/result.xcresult" --output-path "$tests/attachments" >/dev/null 2>&1 || return 0
@@ -171,6 +174,8 @@ for pose in $poses; do
     done
     for ((i = 0; i < ${#flows[@]}; i += 2)); do
       play "${flows[i]}" "${flows[i + 1]}" "$pose" "$appearance"
+      # A flow that folded the Duo leaves it where the next one expects it.
+      place "$pose"
     done
   done
 done

@@ -10,8 +10,9 @@ theme
   AccentColor = light-dark(#111113, #F2F2F4)
   hex.accent = light-dark(#1F8A6D, #C4F3E5)
   hex.accent.wash = light-dark(#D7F2EA, #1B3534)
-  // hex's pick among a question's answers: a quieter wash than a mark's, under a whole row.
+  // hex's pick among a question's answers: a quieter wash than a mark's under the whole block, and its edge.
   hex.accent.soft = light-dark(#E2EEEB, #1D2422)
+  hex.accent.edge = light-dark(#1F8A6D73, #C4F3E573)
   hex.accent.solid = #1F8A6D  scheme=fixed
   hex.ask = light-dark(#A35F00, #F2C58A)
   hex.ask.wash = light-dark(#F7E6CF, #3A2E1E)

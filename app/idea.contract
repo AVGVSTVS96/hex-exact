@@ -186,7 +186,7 @@ component AddToIdea
         button press=submit disabled=empty class=Send retainFocus=true aria-label="Send" testId="idea-send"
           image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")
       if sent != ""
-        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="0 14px 4px" position="absolute" bottom="100%" left=0 aria-live="polite" testId="idea-sent"
+        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="2px 14px 4px" position="absolute" bottom="100%" left=0 right=0 background-color="-exact-background" aria-live="polite" testId="idea-sent"
 
 // The page itself: the idea scrolling, the composer at its foot with what scrolls fading out
 // behind it. `bottom` is how far the foot stands off the window's edge (the keyboard when it's up).

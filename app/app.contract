@@ -120,7 +120,7 @@ component App
   // Where everything sits: the window's size and what covers it, worked out once (room.contract).
   derive room = roomOf(viewport, pose)
   // hex's own pages that are built, in order now, feed, ideas, goals. With one, no tabs show.
-  derive hexPages = ["now", "goals"]
+  derive hexPages = ["now", "ideas", "goals"]
 
   // Goals (goals.contract): what Bassim asked for and what hex watches, kept current and kept on
   // the phone. goalsOpen holds the projects he left open, once he's opened or shut one

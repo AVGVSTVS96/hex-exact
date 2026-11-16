@@ -22,7 +22,7 @@ tap idea-send
 wait 1
 still idea-field
 shoot sent
-swipe-down idea-field
+swipe-down idea-scroll
 no-keyboard
 tap chrome-back
 shoot back

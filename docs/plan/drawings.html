@@ -534,6 +534,18 @@ const goalPage=({beside=false,reached=false}={})=>reached?`${beside?'':'<div cla
  <div class="ans">
   <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">Take it off your goals</div></div></div>
  </div>`;
+const watchPage=()=>`<div class="ptitle">Rail strike on the 22nd</div>
+ <div class="meta" style="margin-top:6px">Watching · Lisbon trip · every day at 9 AM</div>
+ <div class="say"><div class="who2">You asked</div>keep an eye on whether the trains strike that weekend</div>
+ <div class="sec">Next</div>
+ <div class="now">${MC}<div class="tx">Tomorrow, 9 AM. It stops by itself after the 22nd.</div></div>
+ <div class="sec">What it found</div>
+ <div class="find"><div class="d">Today 9:00 AM</div><p>No strike called. The union vote was put off to December.</p><div class="src"><span class="link" style="margin:0">Rail notice${I.chev}</span></div></div>
+ <div class="find" style="border:0"><div class="d">Yesterday 9:00 AM</div><p style="color:var(--sec)">Nothing new.</p></div>
+ <div class="why" style="margin-top:2px"><b>Earlier checks</b>· 4, since Nov 12${I.chev}</div>
+ <div class="ans">
+  <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Stop watching<div class="s">hex won’t check this again</div></div></div>
+ </div>`;
 // hex's column, on any of its four tabs: the same face and live line, the tab's list under them.
 const hexCol=(p,tab,list)=>({'cover-up':`
   <div class="abs" style="left:0;right:0;top:80px">${hexHead(56,300)}</div>
@@ -658,6 +670,9 @@ const D={
  'goal-cover-up':()=>dev('cover-up',`
   <div class="abs" style="left:22px;right:22px;top:84px">${goalPage()}</div>
   <div class="fade" style="height:100px"></div>${dock(16,16,18,{text:'Add to this goal',end:'stop'})}${toolbar('cover-up',{back:true})}`),
+ 'watch-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:22px;top:84px">${watchPage()}</div>
+  <div class="fade" style="height:60px"></div>${toolbar('cover-up',{back:true})}`),
  'goals-open-up':()=>dev('open-up',`${hexCol('open-up','goals',goals({sel:'hotel',watch:2}))}
   <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:76px">${goalPage()}</div><div class="fade" style="height:100px"></div>${dock(24,24,18,{text:'Add to this goal',end:'stop'})}</div>
   ${toolbar('open-up')}`),
@@ -689,6 +704,7 @@ const F=[
  ['ideas','open-up',['dark'],'Book: Ideas beside the idea you picked.'],
  ['goals','cover-up',['dark','light'],'Goals: what hex keeps watch on, then what you asked for, by project. Each bar segment is one goal, coloured by where it stands: reached, working, waiting on you, not started.'],
  ['goal','cover-up',['dark'],'A goal: what you asked in your words, what done means, where it stands now, and the thread it lives in.'],
+ ['watch','cover-up',['dark'],'Something hex watches: what you asked, when it runs next, what each run found, and one row to stop it.'],
  ['goals','open-up',['dark'],'Book: Goals beside the goal you picked.'],
 ];
 const q=new URLSearchParams(location.search);
@@ -698,7 +714,7 @@ else{
  const fig=(s,p,t,cap)=>{const P=POSE[p],k=`${s}-${p}`,sc=Math.min(1,(P.w>P.h?520:300)/P.w);
   return `<figure><div class="frame" style="width:${P.w*sc}px;height:${P.h*sc}px;color-scheme:${t}"><div style="transform:scale(${sc});transform-origin:0 0">${D[k]()}</div></div><figcaption><b>${k}-${t}</b></figcaption></figure>`};
  let h=`<h1>hex Exact, finished</h1><p class="lede">Drawn from the app’s own colours and type at the Duo’s real sizes. Every name and number is made up. Open one frame alone with <code>?only=home-cover-up&amp;theme=dark</code>.</p>`;
- let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks','call-tasks':'Tasks during a call',thread:'A topic’s thread',steps:'Steps',decided:'What hex decided',calls:'Calls',settings:'Settings',feed:'Feed',ideas:'Ideas',idea:'An idea',goals:'Goals',goal:'A goal'}[s]}</h2>`;last=s}
+ let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks','call-tasks':'Tasks during a call',thread:'A topic’s thread',steps:'Steps',decided:'What hex decided',calls:'Calls',settings:'Settings',feed:'Feed',ideas:'Ideas',idea:'An idea',goals:'Goals',goal:'A goal',watch:'A watch'}[s]}</h2>`;last=s}
   h+=`<p class="lede">${cap}</p><div class="grid">${ts.map(t=>fig(s,p,t,cap)).join('')}</div>`}
  m.innerHTML=h;
 }

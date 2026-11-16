@@ -98,6 +98,33 @@ A row on any of the four opens over Home when folded and beside it when there's 
 columns, as a row on Now does. Back returns to the tab you left. Calls, Tasks and Settings
 stay where they are.
 
+| | Folded | Open like a book |
+|---|---|---|
+| Feed | ![](plan/feed-cover-up-dark.png) | ![](plan/feed-open-up-dark.png) |
+| Ideas | ![](plan/ideas-cover-up-dark.png) | ![](plan/ideas-open-up-dark.png) |
+| Goals | ![](plan/goals-cover-up-dark.png) | ![](plan/goals-open-up-dark.png) |
+
+| An idea | A goal | Something hex watches |
+|---|---|---|
+| ![](plan/idea-cover-up-dark.png) | ![](plan/goal-cover-up-dark.png) | ![](plan/watch-cover-up-dark.png) |
+
+| Feed, folded on its side |
+|---|
+| ![](plan/feed-cover-side-dark.png) |
+
+Feed, Ideas and Goals in light are in `docs/plan/`.
+
+Nothing on these pages is made up by the app. Each reads what hex already keeps:
+
+```
+Feed    a task hex closed, with its proof        an idea's or a watch's check that
+        something hex decided for you            found something new
+Ideas   what you floated for later, in your      what hex's checks on it found, and
+        own words, and the topic it came from    when it looks next
+Goals   what you asked for, its "done when",     what hex runs on a timer for you:
+        where it stands, its proof when reached  reminders and checks
+```
+
 ## The pieces
 
 ```
@@ -105,25 +132,34 @@ start together                         start when Room and System
                                        have their first commit
 ┌───────────────────────────────┐      ┌────────────────────────────────────┐
 │ 1 Hands        scripts/       │      │ 5 Home and the call                │
-│ 2 Room         one layout     │ ───▶ │ 6 Questions                        │ ───▶ 9 Last look
-│ 3 System       one design     │      │ 7 Tasks and threads                │      on the Duo
-│ 4 Call engine  shell/         │      │ 8 Calls, Settings and the update   │
-└───────────────────────────────┘      └────────────────────────────────────┘
+│ 2 Room         one layout     │      │ 6 Questions                        │
+│ 3 System       one design     │ ───▶ │ 7 Tasks and threads                │ ───▶ 12 Last look
+│ 4 Call engine  shell/         │      │ 8 Calls, Settings and the update   │      on the Duo
+└───────────────────────────────┘      │ 9 Feed                             │
+                                       │ 10 Ideas                           │
+                                       │ 11 Goals                           │
+                                       └────────────────────────────────────┘
 ```
 
-Each piece has one builder and owns its files; pieces 2, 3 and 5 to 8 each get a separate
+Each piece has one builder and owns its files; pieces 2, 3 and 5 to 11 each get a separate
 reviewer.
 
 | Piece | Owns |
 |---|---|
 | 1 Hands | `scripts/`, how `shell/Shell/App.swift` opens a link, `app/app.test.contract` |
-| 2 Room | new `app/room.contract`, the layout lines of `app/app.contract`, `shell/Shell/Screen.swift`, where the toolbar, Back, the docked call and the update notice sit |
+| 2 Room | new `app/room.contract`, the layout lines of `app/app.contract`, `shell/Shell/Screen.swift`, where the toolbar, Back, hex's tabs, Call, the docked call and the update notice sit, and which tab is on |
 | 3 System | `app/parts.contract`, `app/shapes.contract`, `app/app.tamber` |
 | 4 Call engine | `shell/**` (but `Screen.swift` and link opening), `app/modules/apple/Hex.swift`, `app/data/call.ts` |
 | 5 Home and the call | `app/home.contract`, `app/call.contract` |
 | 6 Questions | `app/ask.contract`, `pick.contract`, `picks.contract`, `last-check.contract`, `said.contract`, `media.contract`, `app/data/asks.ts` |
 | 7 Tasks and threads | `app/tasks.contract`, `task.contract`, `thread.contract`, `steps.contract`, `inbox.contract`, `rows.contract`, `app/data/tasks.ts`, `kept.ts`, `pinned.ts`, `proof.ts`, `parse.ts` |
 | 8 Calls, Settings, update | `app/calls.contract`, `past-call.contract`, `wrap-up.contract`, `settings.contract`, `voice.contract`, `words.contract`, what `toast.contract` says and does, `app/data/calls.ts`, `settings.ts` |
+| 9 Feed | new `app/feed.contract`, `app/data/feed.ts`, the `/feed` route in hex's voice server |
+| 10 Ideas | new `app/ideas.contract`, `idea.contract`, `app/data/ideas.ts`, the `/ideas` routes in hex's voice server |
+| 11 Goals | new `app/goals.contract`, `goal.contract`, `watch.contract`, `app/data/goals.ts`, the `/goals` routes in hex's voice server |
+
+Pieces 9 to 11 each reach into hex: the route goes in by pull request to hex's own repo, and
+the same answers, made up, go into `scripts/standin.mjs` so the flows run without hex.
 
 ### 1 Hands
 
@@ -172,9 +208,8 @@ On the Duo, in all four poses:
 - Now, Feed, Ideas and Goals are tabs at the foot of hex's column, each an icon with its name,
   with Call beside them. A tap changes the list under hex's face at once; its face and live
   line don't move. The tab you're on is marked, and Feed shows a dot when something is new.
-- The tabs and Call keep a clear spot at the foot of hex's column. When the column is short,
-  Call moves beside hex's face and the tabs keep the foot. A list fades out above them; no row
-  sits under them.
+- The tabs and Call keep a clear spot at the foot of hex's column, together, in every pose. A
+  list scrolls to its last row above them and fades out behind them; no row rests under them.
 - The tabs belong to hex's column. A page over Home has none; Back returns to the tab you left.
   During a call Mute, End and Camera take their place, and the tabs come back when it ends.
 - The same window size gives the same layout, folded or not. Two columns appear only when both
@@ -200,6 +235,8 @@ On the Duo:
 - Every control shows a press at once. Things that move share one spring, and stay still with
   Reduce Motion on.
 - Larger text sizes fit without clipping.
+- hex's tabs, a Feed entry, the mark for something found, the mark for a watch and a project's
+  bar of goals are parts like the rest: one of each, used by every page that shows one.
 
 ### 4 Call engine
 
@@ -220,11 +257,12 @@ On the Duo:
 
 On the Duo:
 - Open the app: hex's face, its name, and its live line, two lines at most. A longer line
-  ends in an ellipsis. A tap on the line opens that work.
-- Needs you shows the few that fit without scrolling, then "Show N more". A tap opens that
-  question: over Home when folded, beside it when there's room for two columns.
+  ends in an ellipsis. A tap on the line opens that work. They hold still on all four tabs.
+- You land on Now. Needs you shows the few that fit without scrolling, then "Show N more". A
+  tap opens that question: over Home when folded, beside it when there's room for two columns.
+- Needs you holds only what waits for your answer. A result you haven't seen is new in Feed.
 - Working on, then "hex decided N", which opens what hex decided.
-- The last row never hides under the Call button.
+- The last row never hides under the tabs or Call.
 - Call: one tap. The orb grows out of hex's face in one motion. Words are bright enough to
   read. Pulling the words up follows the finger.
 - A question hex asks in the call shows at its moment and takes one tap to answer.
@@ -277,7 +315,78 @@ On the Duo:
 - A screens-only update arrives by itself while the app is in the background, never during a
   call or while you type.
 
-### 9 Last look
+### 9 Feed
+
+What hex did and found, newest first. Muse's Feed, with hex's own news in it.
+
+On the Duo:
+- Tap Feed: the list under hex's face changes at once, to the last Feed it knew, then updates
+  in place.
+- Entries sit under the day they happened: This afternoon, This morning, Yesterday, then dates.
+- An entry leads with the news itself in bold, two lines at most, then says it in full-strength
+  reading text. Under that, its pictures where it has any, then the topic and time in grey.
+- Its mark says what kind it is, with the marks the rest of the app uses: a tick is something
+  finished, a lens something found, mint something hex decided for you.
+- What came since you last looked sits above a thin "Earlier" line, and the Feed tab carries a
+  dot until you've seen it. Opening Feed clears the dot; the line stays until you leave.
+- A tap on an entry opens what it's about: a finished one its goal, with the proof; a found one
+  its idea or its watch; a decided one its full story. Over Home when folded, beside Feed with
+  two columns.
+- "Discuss" on an entry starts a call that opens on it. A decided entry has Undo in its place.
+- Only what's worth your eye is here. A check that found nothing new makes no entry, and
+  neither does hex's own housekeeping.
+- Scrolling reaches the last entry above the tabs, and older days load as you get to them.
+- Nothing yet today says so in one line. A failure says why, with Try again.
+
+### 10 Ideas
+
+What you floated for later, and what hex has found on each since. Muse's Ideas are its own
+suggestions; these are yours, kept alive.
+
+On the Duo:
+- Tap Ideas: the ones hex found something on since you last looked come first, under "hex found
+  something", each with its finding in full-strength text and a ring on its mark.
+- The rest follow under "Other ideas": the title in bold, hex's last finding or, with none
+  yet, your own words in grey quotes, then the topic and when you floated it or when hex looks
+  next. A few show, then "Show N more".
+- A tap opens the idea: what you said, in your words; what hex found, newest first, each with
+  its date and its links; older checks behind one row with a chevron that says how many.
+- Three answer rows, the same part questions use, each saying what it does: "Start it" makes it
+  a goal hex works on, and it leaves Ideas for Goals. "Stop looking into it", or "Look into it
+  every week" when hex isn't, turns its checks off or on. "Not needed" takes it off the list.
+  Each confirms in place with Undo.
+- "Add to this idea" is docked at the foot: your words go to the idea's topic, the keyboard
+  stays up, the draft is kept if you leave.
+- An idea you say in a call or a topic shows here by itself, with no reload.
+- No ideas yet says how to float one. A failure says why, with Try again.
+
+### 11 Goals
+
+What you asked for and how far each is, and what hex keeps watch on for you. Muse's Goals,
+with its Tracking on top.
+
+On the Duo:
+- Tap Goals: "Watching" first, then "Goals", each with its count.
+- Watching lists what hex runs on a timer for you, reminders and checks: its name, what the
+  last run found or what it will do, and when it runs next. hex's own housekeeping isn't
+  listed. A tap opens it: what you asked, when it runs next, what each run found, and "Stop
+  watching", with Undo.
+- Goals lists what you asked for under its project, or its topic when it has no project. A
+  project's row shows a bar with one segment per goal, coloured by where each stands, and "3 of
+  5" reached. Its chevron opens it in place, and says so.
+- A goal's row carries the same marks as Now: blue while hex works on it, amber when it waits
+  on you, a dashed box when it hasn't started, a tick when it's reached. Under its name, where
+  it stands in one line.
+- Projects with work going on or a question waiting come first and open; the rest stay shut. A
+  few show, then "Show N more".
+- A tap on a goal opens it: what you asked, in your words; "Done when"; where it stands now,
+  with Steps one tap away; the question, when one waits; the topic it lives in.
+- A reached goal shows its proof: what was done, the picture or link that shows it, and when.
+  "Not what I asked" sends it back to hex with Undo.
+- "Add to this goal" is docked at the foot and goes to its topic. "Not needed" is the last row.
+- A goal moves by itself as hex works: the mark, the line and the bar change in place.
+
+### 12 Last look
 
 Every flow, start to finish, on the real Duo in each pose, light and dark, against this page
 and the drawings. What it finds goes back to the piece that owns it. hex Exact is called
@@ -304,4 +413,6 @@ finished after this, not before.
 ## Not in this plan
 
 - Muse's Spaces.
+- Muse's Feed instructions and its heart on an entry, and ideas hex suggests by itself.
+- A control that types a new idea or goal. You say them to hex, in a call or a topic.
 - Matching the stable app for its own sake.

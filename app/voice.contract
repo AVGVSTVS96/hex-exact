@@ -35,7 +35,9 @@ component VoicePage
   derive rowsWidth = two ? room.second.width : room.clear.width
   derive pagerWidth = min((two ? room.first.width : room.clear.width) - 40, 420)
   derive chosen = voice
-  derive locked = inCall or (loading and settings.voice == "")
+  derive locked = inCall or (loading and not failed and settings.voice == "")
+  // hex keeps personality and pace; until it answers they have nothing to show.
+  derive known = settings.paces.length > 0
   derive note = inCall ? "End the call to change voices." : "Loading your voice…"
   // What Bassim just picked shows at once; hex's answer follows.
   state pickedPace = ""
@@ -78,16 +80,18 @@ component VoicePage
             image "symbol:waveform" width=34 height=34 object-fit="contain" color="-exact-label" aria-hidden=true
             Pager(options=voices(), value=chosen, pick=choose, replay=hear, width=pagerWidth, locked=locked, note=note, label="Voice", testKey="voice")
         column padding="8px 20px 0"
-          Setting(icon="symbol:sf/person.wave.2", title="Personality", line="How hex comes across", stack=false, last=false, id="setting-personality")
-            select value=personality change=pickPersonality disabled=(settings.personalities.length == 0) aria-label="How hex comes across on calls" testId="personality"
-              for p in settings.personalities key=p.id
-                option value=p.id
-                  text p.label
-          Setting(icon="symbol:sf/speedometer", title="Pace", line="How fast hex talks", stack=(rowsWidth < 460), last=false, id="setting-pace")
-            row role="radiogroup" aria-label="How fast hex talks on calls" width=224 flex-shrink=0 testId="pace"
-              for p in settings.paces key=p.id
-                button role="radio" aria-checked=(pace == p.id) press=pickPace(p.id) flex=1 min-height=36 testId=`pace-${p.id}`
-                  text p.label
+          Setting(icon="symbol:sf/person.wave.2", title="Personality", line=(known ? "How hex comes across" : failed ? "Can't reach hex to read it" : "Asking hex…"), stack=false, last=false, id="setting-personality")
+            if known
+              select value=personality change=pickPersonality disabled=(settings.personalities.length == 0) aria-label="How hex comes across on calls" testId="personality"
+                for p in settings.personalities key=p.id
+                  option value=p.id
+                    text p.label
+          Setting(icon="symbol:sf/speedometer", title="Pace", line=(known ? "How fast hex talks" : failed ? "Can't reach hex to read it" : "Asking hex…"), stack=(rowsWidth < 460), last=false, id="setting-pace")
+            if known
+              row role="radiogroup" aria-label="How fast hex talks on calls" width=224 flex-shrink=0 testId="pace"
+                for p in settings.paces key=p.id
+                  button role="radio" aria-checked=(pace == p.id) press=pickPace(p.id) flex=1 min-height=36 testId=`pace-${p.id}`
+                    text p.label
           link href=path("words") class=Tap display="flex" flex-direction="row" gap=14 align-items="center" min-height=64 padding="10px 0" aria-label=(settings.words == "" ? "Your words: tell hex how to talk" : `Your words: ${settings.words}`) testId="open-words"
             image "symbol:sf/text.quote" width=22 height=22 object-fit="contain" color="-exact-secondary-label" flex-shrink=0 aria-hidden=true
             column flex=1 min-width=0 gap=2

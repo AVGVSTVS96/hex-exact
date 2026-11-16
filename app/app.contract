@@ -428,10 +428,8 @@ component App
   action openFeed(e: FeedEntry)
     if haptics
       haptic("selection")
-    if room.columns == 2 and e.kind == "done"
-      besidePage(`done:${e.opens}`)
-    else if e.kind == "done"
-      openTask(`done:${e.opens}`)
+    if e.kind == "done"
+      openGoal(e.opens)
     else if e.kind == "found"
       openIdea(e.opens)
     else if e.kind == "decided"

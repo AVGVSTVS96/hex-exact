@@ -40,7 +40,7 @@ shape FeedView
 
 fn markOf(e: FeedEntry): string = e.kind == "decided" ? "decided" : e.kind == "found" ? "found" : "done"
 // The page an entry opens beside Feed with two columns: its goal, its idea, or what hex decided.
-fn besideOf(e: FeedEntry): string = e.kind == "done" ? `done:${e.opens}` : e.kind == "found" ? `idea:${e.opens}` : `decided:${e.opens}`
+fn besideOf(e: FeedEntry): string = e.kind == "done" ? `goal:${e.opens}` : e.kind == "found" ? `idea:${e.opens}` : `decided:${e.opens}`
 fn dayAt(es: FeedEntry[], i: number, now: number, offset: number): string = match es.at(i) { case some(e) => dayWordOf(e.at, now, offset), case none => "" }
 // The days a run of entries falls on, newest first, each once (the entries come newest first).
 fn daysOf(es: FeedEntry[], now: number, offset: number): string[] = range(es.length).filter(i => i == 0 or dayAt(es, i, now, offset) != dayAt(es, i - 1, now, offset)).map(i => dayAt(es, i, now, offset))

@@ -1,0 +1,150 @@
+// hex decided: what hex took off Bassim's list in the last week to decide itself. Each row is the
+// topic and the question; a tap opens its whole story in place: what hex picked, why, and what
+// the other answers gave up. Undo puts it back in Needs you. A page over Home, or with two columns
+// the page beside it; `/decided?open=<id>` opens with that one open and in view.
+use Ask, AskOption, Asks, Tasks from "./shapes.contract"
+use Mark, Note, RowTap, PillTap, PillFace, Tap, whenOf, springOf from "./parts.contract"
+use Room, Chrome from "./room.contract"
+use Said, failedWords from "./said.contract"
+use homeOf from "./inbox.contract"
+
+// The answer hex took, as the question words it: hex names it short ("Send it") where the answer
+// runs on ("Send it: asks for your free months back"), so the one it starts is the answer.
+fn tookOf(a: Ask): string = a.took != "" ? match a.options.filter(o => o.label == a.took or o.label.startsWith(a.took)).at(0) { case some(o) => o.label, case none => a.took } : match a.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
+fn tookDetail(a: Ask): string = match a.options.filter(o => o.label == tookOf(a)).at(0) { case some(o) => o.detail, case none => "" }
+fn othersOf(a: Ask): AskOption[] = a.options.filter(o => o.label != tookOf(a))
+fn decidedPath(id: string): string = id == "" ? path("decided") : `${path("decided")}?open=${encodeURIComponent(id)}`
+
+component DecidedPage
+  props
+    entry: Entry
+    room: Room
+    now: number
+    offset: number
+    asks: Asks
+    tasks: Tasks
+    said: Said[]
+    needsYou: number
+    working: number
+    loading: bool
+    failed: bool
+    undo: action
+    openTask: action
+    open: action
+    openTasks: action
+    back: action
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="decided"
+      Chrome(room=room, on="decided", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
+      column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
+        DecidedList(opened=searchParam(entry, "open"), foot=room.foot, now=now, offset=offset, asks=asks, tasks=tasks, said=said, loading=loading, failed=failed, undo=undo, openTask=openTask)
+
+component DecidedList
+  inject
+    haptics: bool
+  props
+    // The one to open first and bring into view ("" for none).
+    opened: string
+    foot: number
+    now: number
+    offset: number
+    asks: Asks
+    tasks: Tasks
+    said: Said[]
+    loading: bool
+    failed: bool
+    undo: action
+    openTask: action
+  // The one open in place; "-" once Bassim has shut the one he came to.
+  state toggled = ""
+  derive shown = toggled == "" ? opened : toggled
+  derive decided = asks.decided
+  derive known = asks.version > 0
+  action toggle(id: string)
+    toggled = shown == id ? "-" : id
+  view
+    scroll flex=1 min-height=0 padding=`0 6px ${foot + 16}px` testId="decided-list"
+      column gap=2 padding="0 10px 14px" id="decided-top"
+        text "hex decided" font="-exact-large-title" font-weight=700 role="heading" aria-level=1
+        text (known ? `${decided.length} this week · Undo puts it back to you` : " ") font="-exact-subheadline" color="-exact-secondary-label"
+      if known and decided.length == 0
+        Note(kind="empty", text="Nothing this week. What hex decides for you shows here.", pad="24px 10px", id="decided-empty")
+      if failed and not known
+        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="decided-offline")
+      if loading and not known and not failed
+        Note(kind="loading", text="Loading what hex decided", pad="24px 10px", id="decided-loading")
+      for a in decided key=a.id
+        DecidedStory(ask=a, open=(shown == a.id), now=now, offset=offset, failure=match said.filter(s => s.id == a.id and s.status == "failed").at(-1) { case some(s) => failedWords(s), case none => "" }, toggle=toggle(a.id), undo=undo(a.id), openTopic=openTask(homeOf(a.task, tasks.tasks)))
+
+// One thing hex decided: its topic and question, Undo, and a chevron that says it opens in place;
+// open, the whole story under it.
+component DecidedStory
+  inject
+    haptics: bool
+    still: bool
+  props
+    ask: Ask
+    open: bool
+    now: number
+    offset: number
+    failure: string
+    toggle: action
+    undo: action
+    openTopic: action
+  derive took = tookOf(ask)
+  derive others = othersOf(ask)
+  view
+    column id=`decided-${ask.id}` border-bottom="0.5px solid -exact-separator" testId=`decided-story-${ask.id}`
+      row align-items="center" gap=0
+        button press=toggle class=RowTap flex=1 min-width=0 width="auto" aria-expanded=open aria-label=`hex decided, ${ask.topic}: ${ask.question}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`decided-open-${ask.id}`
+          box padding-top=1 flex-shrink=0
+            Mark(state="decided", size=22)
+          column flex=1 min-width=0 gap=2
+            row gap=8 align-items="baseline"
+              text ask.topic font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+              box flex=1
+              text whenOf(ask.decided, now, offset) font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+            text ask.question font="-exact-subheadline" color=(open ? "-exact-label" : "-exact-secondary-label") line-clamp=(open ? 0 : 2)
+        button press=undo class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${ask.question}” back in Needs you` testId=`decided-undo-${ask.id}`
+          box class=PillFace
+            text "Undo" font="-exact-subheadline" font-weight=600
+        button press=toggle class=Tap width=36 min-height=44 display="flex" align-items="center" justify-content="center" aria-hidden=true testId=`decided-chevron-${ask.id}`
+          image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" rotate=(open ? "90deg" : "0deg") transition=springOf(still, "rotate")
+      if failure != ""
+        row gap=8 align-items="center" padding="0 10px 8px 44px" flex-wrap="wrap"
+          text failure font="-exact-footnote" color="hex.danger" flex=1 testId=`decided-failed-${ask.id}`
+          button press=undo class=PillTap testId=`decided-retry-${ask.id}`
+            box class=PillFace padding="4px 10px"
+              text "Try again" font="-exact-footnote" font-weight=600
+      if open
+        column gap=14 padding="2px 10px 16px 44px" testId=`decided-body-${ask.id}`
+          if ask.context != ""
+            text ask.context markup="markdown" font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+          if took != ""
+            column gap=4
+              Label(text="hex picked")
+              text took font="-exact-headline" color="hex.accent" user-select="text"
+              if tookDetail(ask) != ""
+                text tookDetail(ask) font="-exact-subheadline" color="-exact-secondary-label"
+          if ask.why != ""
+            column gap=4
+              Label(text="Why")
+              text ask.why font="-exact-body" color="-exact-label" user-select="text"
+          if others.length > 0
+            column gap=6
+              Label(text=(took == "" ? "The answers it had" : others.length == 1 ? "What the other answer gave up" : "What the other answers gave up"))
+              for o in others key=o.label
+                column gap=1
+                  text o.label font="-exact-body" color="-exact-label"
+                  if o.detail != ""
+                    text o.detail font="-exact-subheadline" color="-exact-secondary-label"
+          button press=openTopic class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-label=`Open ${ask.topic}` testId=`decided-topic-${ask.id}`
+            text `Open ${ask.topic}` font="-exact-subheadline" font-weight=600 color="-exact-label"
+            image "symbol:sf/chevron.right" width=10 height=10 object-fit="contain" color="-exact-tertiary-label"
+
+// A small head inside a story.
+component Label
+  props
+    text: string
+  view
+    text text font="-exact-caption1" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.6

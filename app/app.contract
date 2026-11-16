@@ -20,12 +20,14 @@ use UpdateToast from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
 use Room, roomOf from "./room.contract"
+use DecidedPage from "./decided.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
 // Every screen and sheet. Home is hex, and the call; the rest open over it. hexexact://go/<path> opens any
 // of them from outside (Siri, scripts/sim).
 routes nav
   home "/"
+    decided "/decided"
     calls "/calls"
       pastCall "/calls/:id"
     tasks "/tasks"
@@ -258,6 +260,12 @@ component App
     reading = on
     if haptics
       haptic("selection")
+
+  // hex decided, opened at one of its rows: that row comes into view.
+  task decidedOpens when top(nav).name == "decided" and searchParam(top(nav), "open") != "" key=top(nav).id
+    after(1, showDecided)
+  action showDecided
+    scrollIntoView(`decided-${searchParam(top(nav), "open")}`, block="start")
 
   // Places
   action follow(url: string)
@@ -525,6 +533,8 @@ component App
           Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
             if besideId != ""
               TaskBody(id=besideId, pane=true, entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+        if e.name == "decided"
+          DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"
           CallsList(entry=e, viewport=viewport, now=now, offset=clock.utcOffset, calls=callsShown, loading=(not current(liveCalls)), failed=failed(liveCalls), open=open, remove=removeCall, removing=removing, removeError=removeError, back=back)
         if e.name == "pastCall"

@@ -381,15 +381,26 @@ component Discuss
 // project's bar is the same width, split evenly among its goals, so bars line up down the list.
 fn segmentInk(state: string): string = state == "done" ? "-exact-label" : state == "working" or state == "running" ? "hex.progress" : state == "needs" or state == "asks" ? "hex.ask" : state == "failed" ? "hex.danger" : "-exact-tertiary-fill"
 
+// Past eight goals a segment each turns to mush, so the bar shows shares without gaps: one run per
+// state, as wide as its share. Goals passes the states sorted, so each run is one kind.
+fn shareKinds(): string[] = ["done", "working", "running", "needs", "asks", "failed", "unstarted"]
+fn shareOf(states: string[], kind: string): number = kind == "unstarted" ? states.filter(s => not ["done", "working", "running", "needs", "asks", "failed"].includes(s)).length : states.filter(s => s == kind).length
+
 component GoalsBar
   props
     states: string[]
   derive reached = states.filter(s => s == "done").length
   view
     row gap=8 align-items="center" flex-shrink=0 aria-label=`${reached} of ${states.length} reached`
-      row gap=3 width="4.25rem" aria-hidden=true
-        for s, i in states key=i
-          box flex=1 min-width=2 height=5 border-radius=3 background-color=segmentInk(s)
+      if states.length > 8
+        row width="4.25rem" height=5 border-radius=3 overflow="hidden" aria-hidden=true
+          for k in shareKinds() key=k
+            if shareOf(states, k) > 0
+              box flex=shareOf(states, k) height=5 background-color=segmentInk(k)
+      else
+        row gap=3 width="4.25rem" aria-hidden=true
+          for s, i in states key=i
+            box flex=1 min-width=2 height=5 border-radius=3 background-color=segmentInk(s)
       text `${reached} of ${states.length}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap"
 
 // A project over its goals: a chevron that turns as it opens in place, its name, and its bar.

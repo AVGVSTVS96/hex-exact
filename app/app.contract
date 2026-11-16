@@ -452,6 +452,9 @@ component App
       else if pose.tap == "open:settings" and place.name != "settings"
         nav = push(nav, path("settings"))
     tapsSeen = pose.taps
+    // The bars mark what shows: a tab the screen didn't take goes back to the one it shows.
+    let shown = tapsSeen >= 0 and pose.taps != tapsSeen and pose.tap.startsWith("page:") ? pose.tap.slice(5) : hexPage
+    send barsSet = setBars(barPages, shown, true, place.name != "home", counts.yours > 0)
 
   // Goals
   derive openGoalId = top(nav).name == "goal" or top(nav).name == "watch" ? top(nav).params.id : besideId.startsWith("goal:") ? besideId.slice(5) : besideId.startsWith("watch:") ? besideId.slice(6) : ""

@@ -144,7 +144,7 @@ component HexHome
       // others it heads the list with its own orb and scrolls away with it, and the face in one row
       // takes its place at the top.
       if page == "now"
-        box position="absolute" top=0 left=0 right=0 padding="0 6px" testId="hex-face"
+        box position="absolute" top=0 left=0 right=0 padding=`0 ${f.compact ? 6 + headRight : 6}px 0 6px` testId="hex-face"
           HexFace(f=f, face=face, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
       for p in pages key=p
         scroll position="absolute" top=(p == "now" ? f.height : 0) left=0 right=0 bottom=0 padding="0 6px 34px" box-sizing="border-box" scroll=moved(p) opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) mask-image=`linear-gradient(to bottom, ${p == "now" ? "transparent 0, #000 12px" : "#000 0"}, #000 ${p == "now" ? fade : wholeFade}%, transparent 100%)` testId=`home-list-${p}`

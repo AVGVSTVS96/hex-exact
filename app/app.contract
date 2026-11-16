@@ -803,6 +803,10 @@ component App
         if e.name == "words"
           YourWords(entry=e, room=room, counts=counts, words=settings.words, set=setSetting, open=open, openTasks=openTasks, back=back)
       input id="opened" display="none" change=heardOpen
+      // A page scrolled under the clock, battery or cameras goes under the page's background there,
+      // fading out at its foot, as iOS does under its status bar.
+      for o in room.covers key=`${o.x},${o.y}`
+        box position="absolute" left=(o.x - 8) top=0 width=(o.width + 16) height=(o.y + o.height + 14) background-color="-exact-background" mask-image="linear-gradient(to top, transparent 0, #000 14px)" pointer-events="none" aria-hidden=true z-index=18 testId="status-scrim"
       // Over every page during a call: the call, docked at the foot; with two columns, its words
       // beside Tasks' page.
       if callOn and place.name != "home"

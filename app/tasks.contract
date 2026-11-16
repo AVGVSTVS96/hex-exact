@@ -129,7 +129,7 @@ component TasksList
             button press=closeSearch class=PillTap padding="0 8px" -exact-press-haptic=(haptics ? "selection" : "none") testId="tasks-search-close"
               text "Cancel" font="-exact-body" color="-exact-label"
         else
-          scroll flex=1 min-width=0 overflow-x="auto" overflow-y="hidden" scrollbar-width="none"
+          scroll flex=1 min-width=0 overflow-x="auto" overflow-y="hidden" scrollbar-width="none" mask-image="linear-gradient(to left, transparent 0, #000 24px)"
             row role="tablist" aria-label="Stages" gap=6 padding="0 16px" align-items="center"
               for t, i in tabs key=t.id
                 button press=pickTab(t.id) class=PillTap role="tab" aria-selected=(tab == t.id) aria-label=`${t.label}, ${match countOf.at(i) { case some(n) => n, case none => 0 }}` -exact-press-haptic=(haptics ? "selection" : "none") testId=`tab-${t.id}`

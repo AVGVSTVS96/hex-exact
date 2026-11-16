@@ -117,7 +117,7 @@ component AskCard
           if ask.why != "" and pickLabel != ""
             column gap=2
               text `✦ Why hex picks ${pickLabel}` font="-exact-subheadline" font-weight=600 color="hex.accent"
-              text ask.why font="-exact-subheadline" color="-exact-secondary-label" user-select="text"
+              Prose(text=ask.why, font="-exact-subheadline", color="-exact-secondary-label")
       if ask.links.length > 0
         row gap=16 flex-wrap="wrap"
           for l in ask.links key=l.url
@@ -139,13 +139,14 @@ component AskCard
             AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=chosen.includes(o.label), role=(ask.multiple ? "check" : "radio"), disabled=settled, id=`ask-option-${ask.id}-${o.label}`, press=choose(o.label))
         if ownWords
           Confirmed(label=said.label, detail="", status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-own-${ask.id}`, undo=takeBack, again=again(ask.id))
+        // Ticking several, Answer comes right under the answers, Not needed last.
+        if ask.multiple and not settled
+          button press=answerMany(ask.id, chosen) class=Primary margin="10px 0" disabled=(chosen.length == 0) testId=`ask-answer-${ask.id}`
+            text (chosen.length == 0 ? "Check one or more" : `Answer with ${chosen.length}`) color=(chosen.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600
         if mine and said.verb == "dismiss"
           Confirmed(label="Not needed", detail="Take it off your list", status=(said.status == "sending" ? "Sending…" : "Off your list"), failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-dismiss-${ask.id}`, undo=takeBack, again=again(ask.id))
         else
           NotNeeded(disabled=settled, id=`ask-dismiss-${ask.id}`, press=dismiss(ask.id))
-      if ask.multiple and not settled
-        button press=answerMany(ask.id, chosen) class=Primary disabled=(chosen.length == 0) testId=`ask-answer-${ask.id}`
-          text (chosen.length == 0 ? "Check one or more" : `Answer with ${chosen.length}`) color=(chosen.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600
       if noted
         text `Sent to ${said.detail != "" ? said.detail : ask.topic} as a note. The question is still open.` font="-exact-footnote" color="-exact-secondary-label"
       if said.id == ask.id and said.status == "failed" and (said.verb == "note" or said.verb == "undo")
@@ -181,8 +182,9 @@ component Confirmed
             text label font="-exact-body" font-weight=600 color="-exact-label" flex=1 min-width=0
             if failed == ""
               text status font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" max-width="40%" aria-live="polite"
-              button press=undo class=Tap padding="12px 0 12px 8px" margin="-12px 0" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${label}` testId=`${id}-undo`
-                text "Undo" font="-exact-subheadline" font-weight=600 color="-exact-label" text-decoration="underline"
+              button press=undo class=PillTap margin="-12px 0" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${label}` testId=`${id}-undo`
+                box class=PillFace
+                  text "Undo" font="-exact-subheadline" font-weight=600 color="-exact-label"
           if detail != ""
             text detail font="-exact-subheadline" color="-exact-secondary-label"
       if failed != ""
@@ -236,7 +238,7 @@ component DecidedCard
       if ask.took != ""
         text `✦ ${ask.took}` font="-exact-headline" color="hex.accent"
       if ask.why != ""
-        text ask.why font="-exact-body" color="-exact-label" user-select="text"
+        Prose(text=ask.why, font="-exact-body", color="-exact-label")
       if failed != ""
         text failed font="-exact-footnote" color="hex.danger"
 

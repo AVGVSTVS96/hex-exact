@@ -27,8 +27,8 @@ on_link=$(jq -r .number "$link/latest.json" 2>/dev/null || echo 0)
 [ "$number" -gt "$on_link" ] || { echo "build $on_link is on the install link already, as new as this one"; exit 0; }
 
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer, so it's asleep" >&2; exit 1; }
-# The folder starts as a clone of the simulator's, so its first build isn't cold.
-ssh "$mac" "[ -d $folder ] || cp -cR Developer/hex-exact $folder" </dev/null
+# The folder starts as a clone of the first one (Rust's target, which names its own path, left out).
+ssh "$mac" "[ -d $folder ] || { cp -cR Developer/hex-exact $folder && rm -rf $folder/app/target; }" </dev/null
 # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
 rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:$folder/"
 if [ -n "${BUILT:-}" ]; then

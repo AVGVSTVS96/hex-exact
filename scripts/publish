@@ -13,8 +13,8 @@ mac=${HEX_EXACT_MAC:-mac}
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
 url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
 "$here/scripts/hex-env" >/dev/null
-# The folder starts as a clone of the simulator's, so its first build isn't cold.
-ssh "$mac" "[ -d Developer/hex-exact-ship ] || cp -cR Developer/hex-exact Developer/hex-exact-ship" </dev/null
+# The folder starts as a clone of the first one (Rust's target, which names its own path, left out).
+ssh "$mac" "[ -d Developer/hex-exact-ship ] || { cp -cR Developer/hex-exact Developer/hex-exact-ship && rm -rf Developer/hex-exact-ship/app/target; }" </dev/null
 # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
 rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:Developer/hex-exact-ship/"
 rsync -a "$link/updates/" "$mac:Developer/hex-exact-origin/"

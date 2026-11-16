@@ -59,8 +59,8 @@ MAC
 tree=$(cd "$here" && { git ls-files -co --exclude-standard app shell; echo app/hex.ts; } | sort -u | xargs sha1sum | sha1sum | cut -c1-40)
 built=$(ssh "$mac" cat $folder-build/sim/tree 2>/dev/null </dev/null || true)
 if [ -z "${BUILT:-}" ] && [ "$tree" != "$built" ]; then
-  # The folder starts as a clone of the first one, so its first build isn't cold.
-  ssh "$mac" "[ -d $folder ] || cp -cR Developer/hex-exact $folder" </dev/null
+  # The folder starts as a clone of the first one (Rust's target, which names its own path, left out).
+  ssh "$mac" "[ -d $folder ] || { cp -cR Developer/hex-exact $folder && rm -rf $folder/app/target; }" </dev/null
   # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
   rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj --exclude /scripts/uitests/Flows.xcodeproj "$here/" "$mac:$folder/"
   echo "building for the simulator on the Mac"

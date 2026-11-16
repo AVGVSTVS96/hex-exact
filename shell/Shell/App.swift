@@ -82,11 +82,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, ExactSessionDeleg
     switch url.host() {
     case "demo":
       Call.shared.startDemo()
-      if !url.path().isEmpty, url.path() != "/" { session?.navigate(url.path()) }
+      if !url.path().isEmpty, url.path() != "/" { go(url.path()) }
     case "go":
       screen?.follow(url)
-      session?.navigate(url.path().isEmpty ? "/" : url.path() + (url.query().map { "?" + $0 } ?? ""))
+      go(url.path().isEmpty ? "/" : url.path() + (url.query().map { "?" + $0 } ?? ""))
     default: break
     }
+  }
+
+  /// `navigate` drops a location the session hears before it has booted, as it does on a launch
+  /// from a link; `openURL` keeps that one as the launch location, and navigates once booted.
+  @MainActor
+  private func go(_ location: String) {
+    URL(string: location).map { _ = session?.openURL($0) }
   }
 }

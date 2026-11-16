@@ -462,6 +462,8 @@ fn segmentInk(state: string): string = state == "done" ? "-exact-label" : state 
 fn shareKinds(): string[] = ["done", "working", "running", "needs", "asks", "failed", "unstarted"]
 fn shareOf(states: string[], kind: string): number = kind == "unstarted" ? states.filter(s => not ["done", "working", "running", "needs", "asks", "failed"].includes(s)).length : states.filter(s => s == kind).length
 
+// Only reached goals are full strength; the rest are their colour faint, so one working goal
+// doesn't read as a full bar. The count keeps one width, so bars end in a line.
 component GoalsBar
   props
     states: string[]
@@ -472,12 +474,12 @@ component GoalsBar
         row width="4.25rem" height=5 border-radius=3 overflow="hidden" aria-hidden=true
           for k in shareKinds() key=k
             if shareOf(states, k) > 0
-              box flex=shareOf(states, k) height=5 background-color=segmentInk(k)
+              box flex=shareOf(states, k) height=5 background-color=segmentInk(k) opacity=(k == "done" or k == "unstarted" ? 1 : 0.45)
       else
         row gap=3 width="4.25rem" aria-hidden=true
           for s, i in states key=i
-            box flex=1 min-width=2 height=5 border-radius=3 background-color=segmentInk(s)
-      text `${reached} of ${states.length}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap"
+            box flex=1 min-width=2 height=5 border-radius=3 background-color=segmentInk(s) opacity=(s == "done" or segmentInk(s) == "-exact-tertiary-fill" ? 1 : 0.45)
+      text `${reached} of ${states.length}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap" min-width="4rem" text-align="right"
 
 // A project over its goals: a chevron that turns as it opens in place, its name, and its bar.
 component GoalProject

@@ -4,7 +4,7 @@
 // it's reached, each confirmed on its own row with Undo. "Add to this goal" is docked at the foot
 // and goes to its topic. A page over Home, or with two columns the page beside it.
 use Goal, Goals, Media from "./shapes.contract"
-use Mark, Note, Tap, Composer, ComposerField, whenOf from "./parts.contract"
+use Mark, Note, Tap, Composer, ComposerField, Send, whenOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Confirmed from "./ask.contract"
 use AddMedia, Waiting from "./media.contract"
@@ -47,7 +47,7 @@ component GoalPage
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="goal"
       Chrome(room=room, on="goal", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        GoalBody(foot=room.foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+        GoalBody(foot=room.foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), footRight=max(12, room.clear.x + room.clear.width - room.footEnd), id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
 
 component GoalBody
   inject
@@ -57,6 +57,8 @@ component GoalBody
     foot: number
     // Room kept at the heading's end, clear of the status icons beside the chrome row.
     end: number
+    // Room kept at the composer's end, clear of a camera at the foot (folded on its side).
+    footRight: number
     id: string
     goals: Goals
     now: number
@@ -133,7 +135,7 @@ component GoalBody
             else if g.id != ""
               GoalAnswer(label="Not needed", detail="hex stops and takes it off your goals", dashed=true, id="goal-drop", press=change(id, "drop"))
       if g.run != ""
-        column padding=`6px 12px ${foot}px` testId="goal-foot"
+        column padding=`6px ${footRight}px ${foot}px 12px` testId="goal-foot"
           AddToGoal(run=g.run, title=g.title, draft=draftOf(drafts, `thread:${g.run}`), keep=keepDraft, message=message, attached=(attachedTo == `thread:${g.run}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${g.run}` ? addError : ""), attach=attach, detach=detach)
 
 // An answer row at a goal's or watch's foot: a ring (dashed when it takes something away), what
@@ -188,5 +190,5 @@ component AddToGoal
         AddMedia(menu="goal-add-media", label="Add a photo or video", glass=false, size=44, disabled=(attached.length >= 4), add=add)
         row class=Composer flex=1 min-width=0
           textarea id="goal-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=130 placeholder="Add to this goal" aria-label=`Add to ${title}` testId="goal-field"
-          button press=send disabled=empty buttonStyle="filled" retainFocus=true margin="4px 0" aria-label="Send to its topic" testId="goal-send"
-            image "symbol:send"
+          button press=send disabled=empty class=Send retainFocus=true aria-label="Send to its topic" testId="goal-send"
+            image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")

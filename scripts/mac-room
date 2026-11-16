@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the server: whether the Mac's disk has room for a build, a ship, a publish or a simulator
+# Runs where hex runs (server or twin): whether the Mac's disk has room for a build, a ship, a publish or a simulator
 # run (MAC_ROOM_GB, 15 by default). It is his laptop, shared with every other project: a full disk
 # stopped every build, publish and run on Nov 15, so ours stop first, saying so, and leave what
 # isn't ours alone.

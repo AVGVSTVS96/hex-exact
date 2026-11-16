@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the server: builds hex Exact for the simulator on the Mac, unless the last build was of
+# Runs where hex runs (server or twin): builds hex Exact for the simulator on the Mac, unless the last build was of
 # the same app (BUILT=1 takes the last build as it is), installs it on one of its own iPhone Duo
 # simulators ("hexexact Duo 1" and "2", whichever is free), and in each pose and
 # appearance screenshots each screen and plays each flow.
@@ -24,7 +24,7 @@ mkdir -p "$locks" && exec 9>"$locks/sim-build.lock" && flock 9
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 folder=Developer/hex-exact-sim
-url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
+url=${HEX_EXACT_URL:-https://updates.$(tailscale status --json | jq -r .MagicDNSSuffix)/hex-exact}
 commit=$(git -C "$here" rev-parse --short HEAD)
 shots=${SHOTS:-$HOME/hex/scratch/hex-exact/shots/$commit}
 POSES=${POSES:-cover-up cover-side open-up open-side}
@@ -94,7 +94,7 @@ sim=$(simulator "hexexact Duo $lane")
 # ssh joins its arguments into one command line, so each is quoted for the Mac's shell.
 ssh "$mac" bash -s -- "$(printf "%q " "$run" "$lane" "$sim" "$POSES" "$APPEARANCES" "$HEX_URL" "$HEX_TOKEN" "${#paths[@]}" "${paths[@]}" "${flows[@]}")" <<'MAC' || status=$?
 set -euo pipefail
-# A run stopped on the server stops here too (its ssh gone, this shell is the launchd's), so it never
+# A run stopped where it started stops here too (its ssh gone, this shell is the launchd's), so it never
 # drives a simulator the next run has taken.
 me=$$
 ( while ppid=$(ps -o ppid= -p $me) && [ "${ppid// /}" != 1 ]; do sleep 2; done; kill -0 $me && kill -TERM -- -$me ) </dev/null >/dev/null 2>&1 &

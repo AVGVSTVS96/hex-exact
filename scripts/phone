@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the server: a picture of hex Exact on the real Duo, taken through the Mac it's paired with
+# Runs where hex runs (server or twin): a picture of hex Exact on the real Duo, taken through the Mac it's paired with
 # (devicectl). It's his phone, in his hand, with his messages on it: the picture is taken only
 # while hex Exact alone fills the lit screen, and kept only if it was still there, without
 # leaving, once the picture was taken. Otherwise it says so and takes nothing; it never opens or

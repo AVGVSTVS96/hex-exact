@@ -105,7 +105,7 @@ New call facts (interrupted, reconnecting, elapsed…) go into `Bridge.stateChan
 
 ## Build, check, screenshot
 
-All from the server, in this folder:
+All from the machine hex runs on (server or twin), in this folder:
 
 ```sh
 cd app && EXACT=~/Developer/exact-src/exact bun exact.mjs contract build app.contract --json --errors-only
@@ -117,6 +117,12 @@ scripts/ship                                   # new install link on the Duo
 scripts/publish                                # screens only, over the air
 cd app && bun exact.mjs test web               # app.test.contract, about 3 minutes
 ```
+
+The install link and the update stream are `https://updates.<tailnet>/hex-exact/`, a name that
+follows hex between the server and the twin. Each machine serves the same folder there, which
+Syncthing keeps alike (folder `exact`):
+`sudo tailscale serve --service=svc:updates --set-path=/hex-exact --bg ~/.local/share/hex-exact/link`.
+Builds up to 125 have the server's own name baked in, so they hear of updates only while the server answers.
 
 `app.test.contract` drives the main flows without hex or the shell (Home, the screens it opens,
 what Settings keeps on the phone); its tests read no hex data, so they pass offline. On the server

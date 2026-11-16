@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Runs on the server (BUILT=<the Mac's built .app> skips the build): builds hex Exact on the Mac and puts it on its install link,
-# https://<server>/hex-exact/, which Bassim taps in Safari on his Duo. Signing is the stable hex
+# Runs where hex runs, server or twin (BUILT=<the Mac's built .app> skips the build): builds hex Exact on the Mac and puts it
+# on its install link, https://updates.<tailnet>/hex-exact/, which Bassim taps in Safari on his Duo. That name follows hex
+# (svc:updates serves ~/.local/share/hex-exact/link, which Syncthing keeps the same on both machines), so a build made on
+# either reaches the Duo from either. Signing is the stable hex
 # voice app's: xtool here makes the profiles for the Mac's development certificate and signs ad
 # hoc, then scripts/resign signs on the Mac, whose login keychain holds the key. Never let xtool
 # revoke that certificate to make its own.
@@ -13,7 +15,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 folder=Developer/hex-exact-ship
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
-url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
+url=${HEX_EXACT_URL:-https://updates.$(tailscale status --json | jq -r .MagicDNSSuffix)/hex-exact}
 bundle=com.shahidy.hexexact
 work=$HOME/.local/share/hex-exact/work
 mkdir -p "$link" "$work"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs on the server: sends main's screen (the Exact plan and assets) to every installed hex Exact
+# Runs where hex runs (server or twin): sends main's screen (the Exact plan and assets) to every installed hex Exact
 # over the air, through Exact's own deploy. The Mac bakes and signs the update with the stream's
-# key (~/.config/exact/keys/hexexact.pem there); the origin is the tailnet folder the app checks
+# key (~/.config/exact/keys/hexexact.pem there); the origin is the install link's updates/ folder (it follows hex, as scripts/ship says), which the app checks
 # every minute while it's open. A change to app.ts or the shell needs scripts/ship instead.
 #   scripts/publish
 set -euo pipefail
@@ -11,7 +11,7 @@ mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/ship.lock &
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
-url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
+url=${HEX_EXACT_URL:-https://updates.$(tailscale status --json | jq -r .MagicDNSSuffix)/hex-exact}
 "$here/scripts/hex-env" >/dev/null
 "$here/scripts/mac-room"
 # The folder starts as a clone of the first one (Rust's target, which names its own path, left out).

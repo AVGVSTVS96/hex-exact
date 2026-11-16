@@ -6,6 +6,7 @@ use Tasks, Asks, TaskRow from "./shapes.contract"
 use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap from "./parts.contract"
 use Said from "./said.contract"
 use FeedList, FeedView from "./feed.contract"
+use IdeasList, Ideas, Idea from "./ideas.contract"
 use Item, entriesOf, homeOf, problemOf from "./inbox.contract"
 
 // hex's face in its column: stacked (the orb over its name and live line) when the window is
@@ -84,6 +85,11 @@ component HexHome
     undo: action
     moreFeed: action
     retryFeed: action
+    ideas: Ideas
+    heldIdea: Idea
+    ideasFailed: bool
+    openIdea: action
+    retryIdeas: action
   // What the call just left (how it ended, its wrap-up), at the top of Now.
   slot
   derive known = tasks.version > 0 or asks.version > 0
@@ -131,6 +137,8 @@ component HexHome
               NowList(height=listHeight, now=now, offset=offset, tasks=tasks, needs=needs, working=working, needing=needing, workingOn=workingOn, decided=asks.decided.length, known=known, failed=failed, liveId=liveId, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
             else if p == "feed"
               FeedList(feed=feed, now=now, offset=offset, width=(width - 12), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
+            else if p == "ideas"
+              IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
 
 // hex's live line: what it's doing, two lines at most, ending in an ellipsis; a tap opens that work.
 component LiveLine

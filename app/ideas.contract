@@ -1,0 +1,104 @@
+// Ideas: what Bassim floated for later, and what hex has found on each since (plan §10). Its
+// rows go under hex's face as one of hex's pages; Home gives them their scroll. The ones hex found
+// something on come first, until he opens them; the rest follow, a few at a time.
+use Link from "./shapes.contract"
+use Head, Story, ShowMore, Note, PillTap, PillFace, whenOf from "./parts.contract"
+
+// One check of hex's on an idea: when, whether it was news, what it found (its words without the
+// links) and the links.
+shape IdeaCheck
+  at: number
+  news: bool
+  words: string
+  links: Link[]
+
+// An idea (GET /ideas): Bassim's own words, its topic (and the thread "Add to this idea" goes to),
+// whether hex still looks into it and on which day, whether it found something he hasn't opened,
+// and its checks, newest first. status: idea, or open once started, dropped once not needed.
+shape Idea
+  id: string
+  status: string
+  title: string
+  topic: string
+  thread: string
+  project: string
+  said: string
+  at: number
+  looking: bool
+  day: string
+  found: bool
+  checks: IdeaCheck[]
+
+shape Ideas
+  version: number
+  ideas: Idea[]
+
+// One idea, kept current while its page is open (GET /ideas/:id).
+shape IdeaOne
+  version: number
+  idea: Idea
+
+// What a tap on an idea's answer did.
+shape IdeaDone
+  id: string
+  verb: string
+  ok: bool
+  error: string
+
+fn foundOf(i: Idea): option<IdeaCheck> = i.checks.filter(c => c.news).at(0)
+fn foundAt(i: Idea): number = match foundOf(i) { case some(c) => c.at, case none => 0 }
+fn lastOf(i: Idea): option<IdeaCheck> = i.checks.at(0)
+// The day something happened on, without its time: "today", "yesterday", "Nov 13".
+fn dayWord(at: number, now: number, offset: number): string = formatDate(at, offset, "iso").slice(0, 10) == formatDate(now, offset, "iso").slice(0, 10) ? "today" : formatDate(at, offset, "iso").slice(0, 10) == formatDate(now - 86400000, offset, "iso").slice(0, 10) ? "yesterday" : match formatDate(at, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }
+// The list as it shows: the one whose page is open stays where it was until it's left, even once
+// it's started or put away.
+fn ideasShown(ideas: Ideas, held: Idea): Idea[] = held.id != "" and ideas.ideas.filter(i => i.id == held.id).length == 0 ? sortBy(ideas.ideas.concat([held]), i => i.at, "desc") : ideas.ideas
+fn foundIdeas(ideas: Idea[]): Idea[] = sortBy(ideas.filter(i => i.found), i => foundAt(i), "desc")
+fn otherIdeas(ideas: Idea[]): Idea[] = ideas.filter(i => not i.found)
+// A finding in a list reads as its first sentence; the idea's page has it whole.
+fn briefOf(t: string): string = t.length <= 200 ? t : match t.split(". ").at(0) { case some(s) => s.length <= 240 ? `${s}.` : `${s.slice(0, 200).trim()}…`, case none => t }
+fn metaOf(i: Idea, found: bool, now: number, offset: number): string = `${i.topic != "" ? `${i.topic} · ` : ""}${found ? `found ${dayWord(foundAt(i), now, offset)}` : `floated ${dayWord(i.at, now, offset)}`}`
+
+component IdeasList
+  props
+    ideas: Ideas
+    // The idea whose page is open (its own read), so its row holds until it's left.
+    held: Idea
+    failed: bool
+    now: number
+    offset: number
+    // With two columns, the idea open beside the list.
+    selected: string
+    open: action
+    retry: action
+  state more = false
+  derive all = ideasShown(ideas, held)
+  derive found = foundIdeas(all)
+  derive others = otherIdeas(all)
+  derive few = more ? others : others.slice(0, 4)
+  derive known = ideas.version > 0
+  action toggleMore
+    more = not more
+  view
+    column testId="ideas"
+      if failed and not known
+        row gap=4 align-items="center" padding="16px 10px"
+          Note(kind="failed", text="Can't reach hex, so no ideas yet", pad="0", id="ideas-offline")
+          box flex=1
+          button press=retry class=PillTap testId="ideas-retry"
+            box class=PillFace
+              text "Try again" font="-exact-subheadline" font-weight=600
+      else if not known
+        Note(kind="loading", text="Loading your ideas", pad="24px 10px", id="ideas-loading")
+      else if all.length == 0
+        Note(kind="empty", text="No ideas yet. Say one to hex and it keeps it here.", pad="20px 10px", id="ideas-empty")
+      if found.length > 0
+        Head(label="hex found something", n=found.length, pad="16px 10px 4px", id="ideas-head-found")
+        for i in found key=i.id
+          Story(mark="found", title=i.title, body=match foundOf(i) { case some(c) => briefOf(c.words), case none => "" }, quoted=false, meta=metaOf(i, true, now, offset), offer="", selected=(selected == i.id), id=`idea-row-${i.id}`, open=open(i.id), act=open(i.id))
+      if others.length > 0
+        Head(label=(found.length > 0 ? "Other ideas" : "Your ideas"), n=others.length, pad="20px 10px 4px", id="ideas-head-other")
+        for i in few key=i.id
+          Story(mark="idea", title=i.title, body=match lastOf(i) { case some(c) => briefOf(c.words), case none => briefOf(i.said) }, quoted=(i.checks.length == 0), meta=metaOf(i, false, now, offset), offer="", selected=(selected == i.id), id=`idea-row-${i.id}`, open=open(i.id), act=open(i.id))
+        if others.length > 4
+          ShowMore(n=others.length - 4, shown=more, pad="6px 10px", id="ideas-more", press=toggleMore)

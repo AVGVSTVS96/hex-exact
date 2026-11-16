@@ -47,6 +47,24 @@ const feed = (before) =>
         ],
       };
 
+// Ideas (/ideas, /ideas/:id) are made up too: two with something found (Feed's rail and strike), the rest
+// floated, some checked.
+const check = (back, hour, news, finding) => ({ at: day(back, hour, news ? 40 : 0), news, finding });
+const idea = (id, title, topic, said, back, day_, checks) => ({ id, status: "idea", title, topic, thread: `standin:${topic}`, project: "", said, at: day(back, 10, 0), looking: day_ !== "", day: day_, found: checks.some((c) => c.news), checks });
+const ideas = [
+  idea("t-2", "A pot rail over the island", "Kitchen remodel", "what about a rail over the island for the pans, brass maybe, about 90 cm", 12, "Sunday", [
+    check(0, 13, true, "Two makers cut brass to 90 cm. Forge & Co: €64, ships in a week (https://forge.example/rails). Atelier Laiton: €92, three weeks (https://laiton.example). Nobody stocks one ready-made."),
+    check(7, 9, false, "Still nothing ready-made at 90 cm; the nearest is 100 cm, too long for the island."),
+    check(14, 9, false, "Looked at three shops; all sell 60 or 100 cm only."),
+  ]),
+  idea("t-3", "The night train home from Lisbon", "Lisbon trip", "could we take the night train back instead of flying", 9, "Friday", [check(2, 9, true, "No rail strike is called for the 22nd: the union vote was put off to December. The sleeper still runs Fridays, €89 a berth.")]),
+  idea("t-8", "Ask readers what they want more of", "Newsletter", "maybe a short survey before issue 20, not now", 5, "", []),
+  idea("t-9", "A second bike for guests", "Bike repair", "if a cheap one turns up, something to lend people", 20, "Saturday", [check(1, 9, false, "Nothing under €150 in a medium frame this week.")]),
+  idea("t-10", "Open shelves instead of the top cupboards", "Kitchen remodel", "would open shelves look better than the top cupboards", 30, "", []),
+  idea("t-11", "A reading light by the sofa", "Home", "the corner is too dark to read in", 3, "", []),
+  idea("t-12", "Move the newsletter to Sundays", "Newsletter", "sunday mornings might get more opens", 40, "", [check(25, 9, false, "Sunday sends open about 4% better in two studies; the gap is small.")]),
+];
+
 let writes = 0;
 createServer(async (request, response) => {
   const url = new URL(request.url, "http://standin");
@@ -54,6 +72,16 @@ createServer(async (request, response) => {
     // A long poll for what's new waits as hex would, and nothing changes.
     if (url.searchParams.get("after")) await new Promise((done) => setTimeout(done, 25_000));
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(feed(url.searchParams.get("before"))));
+    return;
+  }
+  // Ideas are his own where his hex serves /ideas; made up only where it doesn't yet.
+  const one = /^\/ideas(?:\/([^/]+))?$/.exec(url.pathname);
+  const served = one && (await fetch(`${HEX_URL}/ideas`, { headers }).then((r) => r.status !== 404, () => false));
+  if (request.method === "GET" && one && !served) {
+    if (url.searchParams.get("after")) await new Promise((done) => setTimeout(done, 25_000));
+    const found = one[1] ? ideas.find((i) => i.id === one[1]) : { ideas };
+    if (found) response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ version: 1, ...found }));
+    else response.writeHead(404).end();
     return;
   }
   if (request.method === "GET") {

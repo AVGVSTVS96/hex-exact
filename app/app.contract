@@ -22,6 +22,8 @@ use firstNeed from "./home.contract"
 use Room, roomOf, belowIn from "./room.contract"
 use DecidedPage, decidedPath from "./decided.contract"
 use Feed, FeedEntry, FeedView from "./feed.contract"
+use Ideas, IdeaOne, IdeaDone from "./ideas.contract"
+use IdeaScreen, IdeaPane, IdeaAct, ideaActOf, ideaActLine, undoOf, weekdayNumber from "./idea.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
 // Every screen and sheet. Home is hex, and the call; the rest open over it. hexexact://go/<path> opens any
@@ -29,6 +31,7 @@ use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, wit
 routes nav
   home "/"
     decided "/decided"
+    idea "/ideas/:id"
     calls "/calls"
       pastCall "/calls/:id"
     tasks "/tasks"
@@ -128,6 +131,25 @@ component App
   derive feedFresh = hexPage != "feed" and feedLatest > feedSeen
   derive feed = FeedView(entries=newestFeed.entries.concat(olderFeed.entries.filter(e => e.at < (match newestFeed.entries.at(-1) { case some(l) => l.at, case none => now }))).filter(e => not (e.kind == "decided" and takingBack.includes(e.opens))), mark=feedMark, known=(newestFeed.version > 0), failed=failed(liveFeed), error=(match failure(liveFeed) { case some(f) => f.message, case none => "" }), more=(newestFeed.older > 0 and (feedReach == 0 or olderFeed.older > 0)), loadingOlder=(feedReach > 0 and not current(olderFeed)))
 
+  // Ideas (ideas.contract, idea.contract): the last list hex gave shows until it answers. The idea
+  // open (over Home, or beside with two columns) is read on its own, so its page holds once it's
+  // started or put away; what Bassim did on it is a line in ideaActs, his last words to it ideaSent
+  // (`${id}\t${status}\t${error}`). ideaOpen is the idea last shown: leaving it tells hex it was seen.
+  state ideaActs = [""].slice(0, 0)
+  state ideaSent = ""
+  state ideaOpen = ""
+  resource liveIdeas = watchIdeas() as shape Ideas else empty()
+  resource keptIdeas = keptIdeas() as shape Ideas else empty()
+  derive ideas = liveIdeas.version > 0 ? liveIdeas : keptIdeas
+  resource keepingIdeas = keep("/ideas", `${liveIdeas.version}`) when liveIdeas.version > 0 as shape Reply else empty()
+  derive ideaId = top(nav).name == "idea" ? top(nav).params.id : (top(nav).name == "home" and room.columns == 2 and beside.startsWith("idea:") ? beside.slice(5) : "")
+  resource idea = watchIdea(ideaId) when ideaId != "" as shape IdeaOne else empty()
+  derive ideaAct = match ideaActs.map(l => ideaActOf(l)).filter(a => a.id == ideaId).at(-1) { case some(a) => a, case none => IdeaAct(id="", verb="", status="", error="") }
+  mutation ideaDid as shape IdeaDone queue then settleIdea
+  mutation ideaAdded as shape Reply queue then settleIdeaAdd
+  task ideaLeft key=ideaId
+    change(leftIdea)
+
   // The live call, as the shell holds it, and its words. These follow the shell, not a timer.
   resource call = callState() as shape CallState else empty()
   resource captions = captions() as shape Captions else empty()
@@ -185,7 +207,7 @@ component App
   derive chatOpen = names.includes("thread") or names.includes("task") or besideId != ""
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
   // A topic (`topic:<name>`) or a finished item (`done:<id>`) opens a page made from the lists.
-  derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") ? "" : taskId
+  derive threadId = taskId.startsWith("topic:") or taskId.startsWith("done:") or taskId.startsWith("idea:") ? "" : taskId
   resource task = watchTask(threadId) when threadId != "" as shape TaskPage else empty()
   resource chat = watchChat(threadId) when threadId != "" and chatOpen as shape Chat else empty()
   resource check = loadCheck() when names.includes("check") as shape Check else empty()
@@ -353,6 +375,56 @@ component App
       send talked = discussFeed(id)
     else
       send commanded = callCommand("start", voice, `feed:${id}`, phone)
+
+  // Ideas
+  action retryIdeas
+    refresh liveIdeas
+  // An idea opens beside hex's column with two columns, else over Home.
+  action openIdea(id: string)
+    if room.columns == 2
+      besidePage(`idea:${id}`)
+    else
+      nav = push(nav, path("idea", id))
+  // A tap on an answer: start | stop | look | drop. Undo sends the opposite (undoOf).
+  action doIdea(id: string, verb: string)
+    ideaActs = ideaActs.filter(l => ideaActOf(l).id != id).concat([ideaActLine(IdeaAct(id=id, verb=verb, status="sending", error=""))])
+    if haptics
+      haptic("selection")
+    send ideaDid = ideaDo(id, verb, weekdayNumber(now, clock.utcOffset))
+  action redoIdea(id: string)
+    match ideaActs.map(l => ideaActOf(l)).filter(a => a.id == id).at(-1)
+      case some(a)
+        ideaActs = ideaActs.map(l => ideaActOf(l).id == id ? ideaActLine(IdeaAct(a, status="sending", error="")) : l)
+        send ideaDid = ideaDo(id, a.verb, weekdayNumber(now, clock.utcOffset))
+      case none
+        ideaActs = ideaActs
+  action undoIdea(id: string, verb: string)
+    ideaActs = ideaActs.filter(l => ideaActOf(l).id != id)
+    if haptics
+      haptic("selection")
+    send ideaDid = ideaDo(id, verb, weekdayNumber(now, clock.utcOffset))
+  action settleIdea
+    match ideaDid
+      case some(r)
+        ideaActs = ideaActs.map(l => ideaActOf(l).id == r.id and ideaActOf(l).verb == r.verb and ideaActOf(l).status == "sending" ? ideaActLine(IdeaAct(ideaActOf(l), status=(r.ok ? "sent" : "failed"), error=r.error)) : l)
+      case none
+        ideaActs = ideaActs
+  action addIdea(id: string, words: string)
+    ideaSent = `${id}\tsending\t`
+    drafts = drafts.filter(l => field(l, 0) != `idea:${id}`)
+    send ideaAdded = addToIdea(id, words, `app-${round(clock.epochAtZero + performanceNow())}`)
+  action settleIdeaAdd
+    match ideaAdded
+      case some(r)
+        ideaSent = `${field(ideaSent, 0)}\t${r.ok ? "sent" : "failed"}\t${r.error}`
+      case none
+        ideaSent = ideaSent
+  // Leaving an idea's page: hex hears it was seen, and what was done on it leaves the list with it.
+  action leftIdea
+    if ideaOpen != ""
+      send ideaDid = ideaDo(ideaOpen, "seen", 0)
+      ideaActs = ideaActs.filter(l => ideaActOf(l).id != ideaOpen)
+    ideaOpen = ideaId
 
   // The call
   action startCall(about: string)
@@ -593,9 +665,13 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, feedFresh=feedFresh, feed=feed, openFeed=openFeed, discuss=discussFeed, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
-            if besideId != ""
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, feedFresh=feedFresh, feed=feed, openFeed=openFeed, discuss=discussFeed, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=idea.idea, ideasFailed=failed(liveIdeas), openIdea=openIdea, retryIdeas=retryIdeas, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
+            if besideId.startsWith("idea:")
+              IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? viewport.keyboardHeight + 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
+            else if besideId != ""
               TaskBody(id=besideId, pane=true, room=room, clearTop=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+        if e.name == "idea"
+          IdeaScreen(entry=e, viewport=viewport, room=room, needsYou=counts.yours, working=counts.working, idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea, open=open, openTasks=openTasks, back=back)
         if e.name == "decided"
           DecidedPage(entry=e, room=room, now=now, offset=clock.utcOffset, asks=asks, tasks=tasks, said=saids, needsYou=counts.yours, working=counts.working, loading=(not current(liveAsks)), failed=failed(liveAsks), undo=undo, openTask=openTask, open=open, openTasks=openTasks, back=back)
         if e.name == "calls"

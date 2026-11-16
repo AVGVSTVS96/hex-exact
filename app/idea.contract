@@ -1,0 +1,243 @@
+// An idea, opened (plan §10): what Bassim said, in his words; what hex found last, with its links,
+// and the checks before it in place; then three answers, each saying what a tap does, all in view
+// on the folded Duo; and "Add to this idea" docked at the foot. Over Home when folded (IdeaScreen),
+// beside hex's column with two (IdeaBody in Home's slot).
+use Viewport from "./shapes.contract"
+use Tap, PillTap, PillFace, Composer, ComposerField, Note, springOf, whenOf from "./parts.contract"
+use Room, Chrome from "./room.contract"
+use AnswerRow from "./ask.contract"
+use Idea, IdeaCheck, dayWord from "./ideas.contract"
+
+// What Bassim did with an idea here, as a root line: `${id}\t${verb}\t${status}\t${error}`, verb
+// start | stop | look | drop, status sending | sent | failed.
+shape IdeaAct
+  id: string
+  verb: string
+  status: string
+  error: string
+
+fn ideaActOf(l: string): IdeaAct = IdeaAct(id=match l.split("\t").at(0) { case some(x) => x, case none => "" }, verb=match l.split("\t").at(1) { case some(x) => x, case none => "" }, status=match l.split("\t").at(2) { case some(x) => x, case none => "" }, error=match l.split("\t").at(3) { case some(x) => x, case none => "" })
+fn ideaActLine(a: IdeaAct): string = `${a.id}\t${a.verb}\t${a.status}\t${a.error.replaceAll("\t", " ")}`
+// What takes a tap back: started → kept as an idea, stopped → looked into again, and so on.
+fn undoOf(verb: string): string = verb == "start" or verb == "drop" ? "keep" : verb == "stop" ? "look" : verb == "look" ? "stop" : ""
+
+// Sunday is 0, as cron counts; the epoch's first day was a Thursday.
+fn weekdayNumber(now: number, offset: number): number = (floor((now + offset * 60000) / 86400000) + 4) % 7
+fn weekdayName(n: number): string = match ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].at(n) { case some(d) => d, case none => "" }
+fn checkName(day: string): string = day == "daily" ? "daily check" : day != "" ? `${day} check` : "checks"
+// The head over a check: "Found today, 1:40 PM" when it was news, else "Checked …".
+fn checkHead(c: IdeaCheck, now: number, offset: number): string = `${c.news ? "Found" : "Checked"} ${dayWord(c.at, now, offset)}, ${formatTime(c.at, offset, "short")}`
+
+// One check: its words, its links (each leaves the app, so its arrow says so).
+component CheckWords
+  inject
+    haptics: bool
+  props
+    check: IdeaCheck
+    lines: number
+    id: string
+  view
+    column gap=10
+      text check.words font="-exact-body" color="-exact-label" line-clamp=lines user-select="text"
+      if check.links.length > 0
+        row gap=4 flex-wrap="wrap" margin-left=-8
+          for l in check.links key=l.url
+            link href=l.url class=Tap min-height=44 padding="0 8px" display="flex" flex-direction="row" align-items="center" gap=4 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${l.label}, opens in Safari` testId=`${id}-link-${l.label}`
+              text l.label font="-exact-subheadline" font-weight=600 color="-exact-label"
+              image "symbol:sf/arrow.up.right" width=10 height=10 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+
+// An answer that has been tapped, in its row's place: what it did, and Undo.
+component IdeaDoneRow
+  inject
+    haptics: bool
+  props
+    label: string
+    detail: string
+    act: IdeaAct
+    id: string
+    undo: action
+    again: action
+  view
+    row gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" min-height=44 aria-live="polite" testId=id
+      box width=22 height=22 border-radius=11 flex-shrink=0 background-color=(act.status == "failed" ? "hex.danger" : "AccentColor") display="flex" align-items="center" justify-content="center" opacity=(act.status == "sending" ? 0.6 : 1) aria-hidden=true
+        image (act.status == "failed" ? "symbol:sf/exclamationmark" : "symbol:checkmark") width=11 height=11 object-fit="contain" color="ink.on-accent"
+      column flex=1 min-width=0 gap=2
+        text label font="-exact-body" font-weight=600 color="-exact-label"
+        text (act.status == "failed" ? `Didn't go · ${act.error}` : detail) font="-exact-subheadline" color=(act.status == "failed" ? "hex.danger" : "-exact-secondary-label")
+      if act.status == "failed"
+        button press=again class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") testId=`${id}-again`
+          box class=PillFace
+            text "Try again" font="-exact-subheadline" font-weight=600
+      else
+        button press=undo class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo: ${label}` testId=`${id}-undo`
+          box class=PillFace
+            text "Undo" font="-exact-subheadline" font-weight=600
+
+// The idea's page, without its frame: shared by the page over Home and the page beside.
+component IdeaBody
+  inject
+    still: bool
+  props
+    idea: Idea
+    loading: bool
+    failed: bool
+    now: number
+    offset: number
+    // The last thing done with this idea here.
+    act: IdeaAct
+    // do(id, verb), redo(id), undo(id, verb).
+    do: action
+    redo: action
+    undo: action
+  state earlier = false
+  state saidWhole = false
+  state foundWhole = false
+  derive last = idea.checks.at(0)
+  derive older = idea.checks.slice(1)
+  derive today = weekdayNumber(now, offset)
+  derive acted = act.id == idea.id and act.verb != ""
+  action toggleEarlier
+    earlier = not earlier
+  action toggleSaid
+    saidWhole = not saidWhole
+  action toggleFound
+    foundWhole = not foundWhole
+  view
+    column gap=16 padding="0 4px" testId="idea"
+      if idea.id == ""
+        if failed
+          Note(kind="failed", text="Can't reach hex, so this idea can't open. Trying again…", pad="24px 0", id="idea-offline")
+        else
+          Note(kind="loading", text="Opening the idea", pad="24px 0", id="idea-loading")
+      else
+        column gap=4
+          text idea.title font="-exact-title1" font-weight=700 color="-exact-label" line-clamp=2 testId="idea-title"
+          text `Idea${idea.topic != "" ? ` · ${idea.topic}` : ""} · floated ${dayWord(idea.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
+        if idea.said != ""
+          button press=toggleSaid class=Tap display="flex" flex-direction="column" align-items="stretch" gap=4 padding="2px 0 2px 14px" border-left="2.5px solid -exact-separator" text-align="left" aria-expanded=saidWhole aria-label=`You said: ${idea.said}` testId="idea-said"
+            text "You said" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
+            text idea.said font="-exact-body" color="-exact-label" line-clamp=(saidWhole ? 0 : 3)
+        match last
+          case some(c)
+            column gap=8
+              row gap=8 align-items="center" min-height=44
+                text checkHead(c, now, offset) font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1 line-clamp=1
+                if older.length > 0
+                  button press=toggleEarlier class=Tap display="flex" flex-direction="row" align-items="center" gap=6 min-height=44 aria-expanded=earlier testId="idea-earlier"
+                    text `${older.length} earlier ${older.length == 1 ? "check" : "checks"}` font="-exact-subheadline" color="-exact-secondary-label"
+                    image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-secondary-label" rotate=(earlier ? "90deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
+              button press=toggleFound class=Tap display="flex" flex-direction="column" align-items="stretch" text-align="left" aria-expanded=foundWhole testId="idea-found"
+                CheckWords(check=c, lines=(foundWhole ? 0 : 4), id="idea-found")
+              if earlier
+                for o, n in older key=n
+                  column gap=6 padding="10px 0 0 14px" border-left="2.5px solid -exact-separator" testId=`idea-check-${n}`
+                    text checkHead(o, now, offset) font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
+                    CheckWords(check=o, lines=0, id=`idea-check-${n}`)
+          case none
+            text (idea.looking ? `hex hasn't looked yet; its first look is on its ${checkName(idea.day)}.` : "hex isn't looking into it.") font="-exact-subheadline" color="-exact-secondary-label"
+        column border-top="0.5px solid -exact-separator" testId="idea-answers"
+          if acted and act.verb == "start"
+            IdeaDoneRow(label="Started", detail="It's a goal now; hex is on it", act=act, id="idea-start", undo=undo(idea.id, "keep"), again=redo(idea.id))
+          else
+            AnswerRow(label="Start it", detail="Becomes a goal hex works on", pick=false, chosen=false, role="", disabled=(acted and act.verb == "drop"), id="idea-start", press=do(idea.id, "start"))
+          if acted and (act.verb == "stop" or act.verb == "look")
+            IdeaDoneRow(label=(act.verb == "stop" ? "hex stopped looking into it" : "hex looks into it every week"), detail=(act.verb == "stop" ? `Its ${checkName(idea.day)} is off` : `Each ${weekdayName(today)}`), act=act, id="idea-look", undo=undo(idea.id, undoOf(act.verb)), again=redo(idea.id))
+          else if idea.looking
+            AnswerRow(label="Stop looking into it", detail=`hex stops its ${checkName(idea.day)}`, pick=false, chosen=false, role="", disabled=false, id="idea-look", press=do(idea.id, "stop"))
+          else
+            AnswerRow(label="Look into it every week", detail=`hex checks on it each ${weekdayName(today)}`, pick=false, chosen=false, role="", disabled=false, id="idea-look", press=do(idea.id, "look"))
+          if acted and act.verb == "drop"
+            IdeaDoneRow(label="Not needed", detail="Off your ideas", act=act, id="idea-drop", undo=undo(idea.id, "keep"), again=redo(idea.id))
+          else
+            AnswerRow(label="Not needed", detail="Take it off your ideas", pick=false, chosen=false, role="", disabled=(acted and act.verb == "start"), id="idea-drop", press=do(idea.id, "drop"))
+
+// "Add to this idea", docked at the page's foot: Bassim's words go to the idea's topic. The
+// keyboard stays up through a send, and the draft is kept if he leaves.
+component AddToIdea
+  props
+    idea: Idea
+    draft: string
+    // sending | sent | failed, and why, for the last words sent from here.
+    sent: string
+    error: string
+    keep: action
+    add: action
+  state text = ""
+  state started = false
+  derive words = started ? text : draft
+  derive empty = words.trim() == ""
+  action edit(v: string)
+    text = v
+    started = true
+    keep(`idea:${idea.id}`, v)
+  action submit
+    if not empty
+      add(idea.id, words.trim())
+      text = ""
+      started = true
+  view
+    column gap=4 testId="idea-add"
+      row class=Composer
+        textarea id="idea-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=120 placeholder="Add to this idea" aria-label=`Add to this idea; goes to ${idea.topic != "" ? idea.topic : "its topic"}` testId="idea-field"
+        button press=submit disabled=empty buttonStyle="filled" retainFocus=true margin="4px 0" aria-label="Send" testId="idea-send"
+          image "symbol:send"
+      if sent != ""
+        text (sent == "failed" ? `Not sent · ${error}` : sent == "sending" ? "Sending…" : `Sent to ${idea.topic != "" ? idea.topic : "its topic"}`) font="-exact-footnote" color=(sent == "failed" ? "hex.danger" : "-exact-secondary-label") padding="0 14px" aria-live="polite" testId="idea-sent"
+
+// The page itself: the idea scrolling, the composer at its foot with what scrolls fading out
+// behind it. `bottom` is how far the foot stands off the window's edge (the keyboard when it's up).
+component IdeaPane
+  props
+    idea: Idea
+    loading: bool
+    failed: bool
+    now: number
+    offset: number
+    act: IdeaAct
+    draft: string
+    sent: string
+    error: string
+    bottom: number
+    do: action
+    redo: action
+    undo: action
+    keep: action
+    add: action
+  view
+    column flex=1 min-height=0 padding-bottom=bottom testId="idea-pane"
+      scroll flex=1 min-height=0 padding="4px 16px 24px" box-sizing="border-box" testId="idea-scroll"
+        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, do=do, redo=redo, undo=undo)
+      if idea.id != ""
+        column margin-top=-24 padding="24px 16px 0" background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 position="relative" testId="idea-foot"
+          AddToIdea(idea=idea, draft=draft, sent=sent, error=error, keep=keep, add=add)
+
+// The idea over Home, folded: the chrome with Back, and the page under it.
+component IdeaScreen
+  props
+    entry: Entry
+    viewport: Viewport
+    room: Room
+    needsYou: number
+    working: number
+    idea: Idea
+    loading: bool
+    failed: bool
+    now: number
+    offset: number
+    act: IdeaAct
+    draft: string
+    sent: string
+    error: string
+    do: action
+    redo: action
+    undo: action
+    keep: action
+    add: action
+    open: action
+    openTasks: action
+    back: action
+  view
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="idea-screen"
+      Chrome(room=room, on="idea", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
+      column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="idea-column"
+        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? viewport.keyboardHeight + 8 : room.foot + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)

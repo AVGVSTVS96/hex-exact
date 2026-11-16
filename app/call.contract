@@ -14,6 +14,7 @@ use HexHome, faceOf from "./home.contract"
 use AnswerRow from "./ask.contract"
 use Room, Chrome from "./room.contract"
 use FeedView from "./feed.contract"
+use Ideas, Idea from "./ideas.contract"
 
 // How an answer from the call went out, as the stable app says it: " and cleared its Telegram
 // buttons", or which places were out of reach.
@@ -85,6 +86,11 @@ component Home
     undo: action
     moreFeed: action
     retryFeed: action
+    ideas: Ideas
+    heldIdea: Idea
+    ideasFailed: bool
+    openIdea: action
+    retryIdeas: action
     // hex as the home whenever no call is on: what needs Bassim and what hex is doing; with two columns
     // the page a row opens shows beside (the slot), `beside` its id.
     offset: number
@@ -224,7 +230,7 @@ component Home
       // hex as the home: in hex's column under the chrome, down to the tabs and Call; with two columns
       // the page a row opens beside it.
       column position="absolute" top=below bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
-        HexHome(width=hexW, height=(H - footTop - below), compact=compact, face=false, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed)
+        HexHome(width=hexW, height=(H - footTop - below), compact=compact, face=false, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas)
           column align-items="center" gap=8 padding="12px 0 0"
             CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
             if wrapped

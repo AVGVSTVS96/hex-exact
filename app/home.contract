@@ -45,13 +45,13 @@ keyframes liveDot
 
 component HexHome
   props
-    // hex's room, from the window's top: hex floats `top` down at `x`; each page scrolls under it to
-    // the top edge and under Call to the foot, its last `pad` clear of Call.
+    // hex's room, from the window's top: hex floats `top` down at `x`, and each page scrolls between
+    // its pill and what floats at the room's foot, `foot` high, so nothing sits under either at rest.
     width: number
     height: number
     top: number
     x: number
-    pad: number
+    foot: number
     // The glow is drawn from the orb as each appearance shows it.
     dark: bool
     still: bool
@@ -110,6 +110,10 @@ component HexHome
   derive working = sortBy(entriesOf(tasks, asks, now).filter(e => e.stage == "working"), e => e.at, "desc")
   derive liveText = working.length > 1 ? `Working on ${liveTopic} +${working.length - 1}` : `Working on ${liveTopic}`
   derive under = top + hexHeight()
+  // Each page's scroll: from just under the pill to above the foot's float, fading at both ends.
+  derive listTop = under - 4
+  derive listH = max(height - listTop - foot, 0)
+  derive edges = `linear-gradient(to bottom, transparent 0, #000 12px, #000 ${max(listH - 20, 12)}px, transparent ${listH}px)`
   // The pill is centred on hex and never wider than the room either side of it allows.
   derive half = max(min(x, width - x), 0)
   action goLive
@@ -123,19 +127,16 @@ component HexHome
       image (dark ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(x - 260) top=(top - 173) width=520 height=390 pointer-events="none" aria-hidden=true testId="hex-glow"
       // Each tab keeps its own scroll, mounted while another shows, so it keeps its place.
       for p in pages key=p
-        scroll position="absolute" inset=0 padding=`${under}px 6px ${pad}px` box-sizing="border-box" opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
+        scroll position="absolute" top=listTop bottom=foot left=0 right=0 padding="10px 6px 24px" box-sizing="border-box" mask-image=edges opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
           if p == "now"
             children
-            NowList(wide=(width > height), width=(width - 12), height=(height - under - pad), now=now, offset=offset, tasks=tasks, needs=needs, shelf=shelf, said=said, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, undo=undo, again=again)
+            NowList(wide=(width > height), width=(width - 12), height=(listH - 34), now=now, offset=offset, tasks=tasks, needs=needs, shelf=shelf, said=said, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, undo=undo, again=again)
           else if p == "feed"
             FeedList(feed=feed, now=now, offset=offset, width=(width - 12), wide=(width > height), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
           else if p == "ideas"
             IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, wide=(width > height), selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
           else if p == "goals"
             GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
-      // The page fades out under hex at the top and at the foot, so no row shows cut in half.
-      box position="absolute" top=0 left=0 right=0 height=(top + 68) background-color="-exact-background" mask-image="linear-gradient(to bottom, #000 0, transparent 100%)" pointer-events="none" aria-hidden=true
-      box position="absolute" bottom=0 left=0 right=0 height=60 background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 92%)" pointer-events="none" aria-hidden=true
       row position="absolute" top=(top + hexOrb() - 9) left=(x - half) width=(2 * half) justify-content="center" testId="hex"
         button press=goLive disabled=(liveId == "") class=Tap display="flex" flex-direction="row" align-items="center" gap=7 max-width=min(330, 2 * half - 24) min-width=0 padding="13px 14px 6px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(liveId == "" ? "hex" : `hex is working on ${liveTopic}`) testId="live-line"
           text "hex" font="-exact-footnote" font-weight=600 color="-exact-label" flex-shrink=0

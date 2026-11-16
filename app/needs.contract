@@ -58,8 +58,8 @@ component NeedsPage
   state tapped = ""
   derive two = room.columns == 2
   derive across = stacked(room)
-  derive known = tasks.version > 0 or asks.version > 0
-  derive needs = needsOf(tasks, asks, said, now)
+  derive known = tasks.version > 0 and asks.version > 0
+  derive needs = needsOf(tasks, asks, said, now).filter(e => known)
   derive kinds = needKinds().filter(k => needs.filter(e => kindOf(e, asks.asks) == k).length > 0)
   derive picks = picksOf(asks.asks, said)
   derive taking = picks.filter(a => choiceOf(picked, a) != "")
@@ -99,10 +99,6 @@ component NeedsPage
       Chrome(room=room, on="needs", needsYou=counts, working=working, open=open, openTasks=openTasks, back=back)
       scroll id="needs-list" position="absolute" top=room.below bottom=(across ? room.height - room.across : callOn ? room.foot + 64 + 6 : floating ? room.foot + 8 + 50 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(callOn or floating ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)") testId="needs-list"
         column padding=`0 ${right + 6}px ${floating or callOn ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
-          if failed and not known
-            Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="needs-offline")
-          if loading and not known and not failed
-            Note(kind="loading", text="Loading what needs you", pad="24px 10px", id="needs-loading")
           row gap=(wide ? 4 : 0) flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch")
             column flex=(wide ? 1 : 0) min-width=0
               // The title and its line stand beside the status icons; the rows start under their cover.
@@ -111,7 +107,11 @@ component NeedsPage
                   text "Needs you" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"
                   if known
                     text `${needs.length}` font="-exact-title1" font-weight=400 color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
-              if needs.length > 0
+              if failed and not known
+                Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="needs-offline")
+              if loading and not known and not failed
+                Note(kind="loading", text="Loading what needs you", pad="24px 10px", id="needs-loading")
+              if known and needs.length > 0
                 Mix(needs=needs, asks=asks.asks, kinds=kinds)
               column margin="12px 0 6px"
                 if picks.length > 0
@@ -198,9 +198,9 @@ component GoThrough
     press: action
     inline: bool
   view
-    button press=press class=Primary min-height=50 padding="0 22px" margin=(inline ? "4px 10px 10px" : "0") gap=8 pointer-events="auto" box-shadow=(inline ? "none" : "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))") aria-label="Go through them with hex, in a call" testId=(inline ? "needs-go-inline" : "needs-go")
-      image "symbol:waveform" width=20 height=20 object-fit="contain" color="-exact-background" aria-hidden=true
-      text "Go through them with hex" font="-exact-headline" color="-exact-background" white-space="nowrap"
+    button press=press class=Primary min-height=(inline ? 44 : 50) padding=(inline ? "0 14px" : "0 22px") margin=(inline ? "4px 10px 10px" : "0") gap=8 justify-content="center" pointer-events="auto" box-shadow=(inline ? "none" : "0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))") aria-label="Go through them with hex, in a call" testId=(inline ? "needs-go-inline" : "needs-go")
+      image "symbol:waveform" width=(inline ? 17 : 20) height=(inline ? 17 : 20) object-fit="contain" color="-exact-background" aria-hidden=true
+      text "Go through them with hex" font=(inline ? "-exact-subheadline" : "-exact-headline") font-weight=600 color="-exact-background" white-space="nowrap"
 
 // One section: its head, its first few rows, then "Show N more", which opens the rest in place.
 component Section

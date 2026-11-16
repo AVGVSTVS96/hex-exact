@@ -36,7 +36,7 @@ component LastCheck
         CheckBody(check=check, loading=loading, failed=failed, now=now, offset=offset, width=(two ? room.first.width : room.clear.width), height=(across ? room.across : room.height), foot=(across ? 0 : room.foot), part=(two ? "head" : "all"), top=(two ? 0 : max(0, room.headBottom - room.below)), id="check-page")
       if two
         column position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width
-          CheckBody(check=check, loading=loading, failed=failed, now=now, offset=offset, width=room.second.width, height=(across ? room.height - room.across : room.height), foot=room.foot, part="notes", top=0, id="check-notes")
+          CheckBody(check=check, loading=loading, failed=failed, now=now, offset=offset, width=room.second.width, height=(across ? room.height - room.across : room.height), foot=(across ? room.height - room.tabs.top : room.foot), part="notes", top=0, id="check-notes")
 
 // The check itself, scrolling in the column it's given. part: all | head (title, read, outcomes,
 // what came back) | notes (flagged, fixed). Wider than tall, all of it in two columns, head first.

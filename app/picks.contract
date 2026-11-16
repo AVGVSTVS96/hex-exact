@@ -74,7 +74,7 @@ component Picks
             row gap=10 align-items="baseline" padding="0 10px 4px" testId="picks-title"
               text "hex’s picks" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"
               text `${picks.length}` font="-exact-title1" font-weight=400 color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
-          row gap=16 align-items="center" min-height=(wide ? 44 : 0) padding="0 10px 8px" flex-wrap="wrap" testId="picks-counts"
+          row gap="4px 16px" align-items="center" min-height=(wide ? 44 : 0) padding="0 10px 8px" flex-wrap="wrap" testId="picks-counts"
             if sends > 0
               row gap=5 align-items="center"
                 image "symbol:sf/paperplane.fill" width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
@@ -107,7 +107,7 @@ component Picks
         button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(colX + (colW - takeW) / 2) width=takeW min-height=50 background-color=(taking.length == 0 ? "-exact-tertiary-fill" : "hex.accent") box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" testId="picks-answer"
           text `Take all ${taking.length}` font="-exact-headline" color=(taking.length == 0 ? "-exact-tertiary-label" : "ink.on-accent")
       if two
-        scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`8px 20px ${room.foot + 24}px` box-sizing="border-box" testId="picks-beside"
+        scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`8px 20px ${(across ? room.height - room.tabs.top : room.foot) + 24}px` box-sizing="border-box" testId="picks-beside"
           for a in picks.filter(x => x.id == beside) key=a.id
             PickBody(ask=a, width=(room.second.width - 40), now=now, offset=offset, picked=picked, words=words, wordsAsk=wordsAsk, choose=choose)
 
@@ -132,15 +132,15 @@ component PickRow
         Mark(state="decided", size=22)
       column flex=1 min-width=0 gap=2
         row gap=8 align-items="baseline"
-          text a.topic font="-exact-headline" color="-exact-label" line-clamp=1 flex-shrink=1 min-width=0
+          text a.topic font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
           if a.tag != ""
-            text a.tag font-size=12 line-height="18px" font-weight=600 color="-exact-secondary-label" padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" white-space="nowrap" flex-shrink=0
+            text a.tag font-size=12 line-height="18px" font-weight=600 color="-exact-secondary-label" padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=2 min-width=0
           if a.sends
             row gap=3 align-items="center" align-self="center" height=18 padding="0 6px" border-radius=9 background-color="-exact-quaternary-fill" flex-shrink=0 aria-label="sends in your name"
               image "symbol:sf/paperplane.fill" width=9 height=9 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
               text "sends" font-size=12 line-height="18px" font-weight=600 color="-exact-secondary-label"
           box flex=1
-          text whenOf(a.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+          text whenOf(a.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" flex-shrink=0
         text a.question font="-exact-subheadline" color="-exact-label" line-clamp=2
         row gap=10 align-items="center" margin-top=4
           row gap=4 align-items="center" flex-shrink=1 min-width=0

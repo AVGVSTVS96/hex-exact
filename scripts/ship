@@ -71,9 +71,6 @@ ssh "$mac" "cd $folder-build/signed && rm -rf Payload HexExact.ipa && mkdir Payl
   ditto -c -k --norsrc --noextattr --keepParent Payload HexExact.ipa && rm -rf Payload" </dev/null
 scp -q "$mac:$folder-build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
 mv "$link/hex-exact-$number.ipa.part" "$link/hex-exact-$number.ipa"
-find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
-# What the app's update toast reads: the newest build on the link.
-printf '{"number":%s,"install":"%s/"}\n' "$number" "$url" >"$link/latest.json"
 # hangar, where the app's toast hears of the build and installs it in one tap.
 hangar=$HOME/Developer/hangar/bin/hangar
 [ ! -x "$hangar" ] || "$hangar" put "$link/hex-exact-$number.ipa" --notes "$title"
@@ -99,4 +96,9 @@ p {{ opacity: .6; font-size: 15px; margin-top: 20px }}
 <p>{html.escape(title)}</p>
 """)
 PY
+# What the app's update toast reads, and what tells the next ship this one is done, written last:
+# a ship stopped part way (hex moving machines) never offers a build its page or hangar lacks.
+printf '{"number":%s,"install":"%s/"}\n' "$number" "$url" >"$link/latest.json.part"
+mv "$link/latest.json.part" "$link/latest.json"
+find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
 echo "$title is on the install link: $url/"

@@ -75,8 +75,15 @@ if [ -z "${BUILT:-}" ] && [ "$tree" != "$built" ]; then
   ssh "$mac" "rm -f $folder-build/sim/tree && SIM=1 EXACT_SIM=$(simulator "hexexact Duo 1") HEX_URL='$standin' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build && echo $tree >$folder-build/sim/tree" </dev/null | tail -1
 fi
 # This run's own copy of the app and of the scripts that play it (APFS clones, so instant).
-# The run's folder goes when the run does, however it ends, so runs don't fill the Mac's disk.
+# The run's folder goes when the run does, however it ends, so runs don't fill the Mac's disk
+# (bash runs an EXIT trap on a signal only when that signal is trapped). A run killed outright,
+# as when hex moves machines, leaves its folder to the next run started on the same machine.
 trap 'ssh "$mac" rm -rf "$run" </dev/null' EXIT
+trap 'exit 143' TERM HUP
+trap 'exit 130' INT
+for gone in $(ssh "$mac" ls Developer/hex-exact-sim-build/runs 2>/dev/null </dev/null | sed -n "s/^$(hostname -s)-//p"); do
+  kill -0 "$gone" 2>/dev/null || ssh "$mac" rm -rf "Developer/hex-exact-sim-build/runs/$(hostname -s)-$gone" </dev/null
+done
 ssh "$mac" "rm -rf $run && mkdir -p $run && cp -cR $folder-build/sim/Build/Products/Release-iphonesimulator/HexExact.app $run/" </dev/null
 rsync -a --exclude Flows.xcodeproj "$here/scripts/" "$mac:$run/scripts/"
 flock -u 9

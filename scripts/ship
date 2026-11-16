@@ -8,6 +8,8 @@
 # revoke that certificate to make its own.
 #   scripts/ship
 set -euo pipefail
+hold=$HOME/.local/share/hex-exact/hold
+[ ! -e "$hold" ] || { echo "installs are on hold: $(cat "$hold")" >&2; exit 1; }
 # Ships and publishes take turns in a Mac folder of their own (scripts/sim has another), so what's
 # on main never waits behind pictures.
 mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/ship.lock && flock 9

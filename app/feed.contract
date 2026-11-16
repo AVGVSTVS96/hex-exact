@@ -1,0 +1,115 @@
+// Feed: what hex did and found, newest first, by day (Muse's Feed, with hex's own news in it). Each
+// entry is hex's own words from what it keeps: a goal it reached, with its proof; something its
+// check on an idea found; something it decided for Bassim. hex's server decides what's worth his eye.
+//
+// Rows only: Home draws hex's face and the scroll this sits in (home.contract's hex pages).
+use Link, Picture, Media from "./shapes.contract"
+use Story, Head, Earlier, Note, PillTap, PillFace, dayWordOf from "./parts.contract"
+use Pictures from "./media.contract"
+
+// kind: done (a goal reached; opens is its task) | found (an idea's check found news; opens is the
+// idea's task) | decided (hex decided it for Bassim; opens is the question).
+shape FeedEntry
+  id: string
+  kind: string
+  title: string
+  body: string
+  topic: string
+  at: number
+  opens: string
+  links: Link[]
+  pictures: Picture[]
+
+// older: where the next older stretch starts (0: nothing older).
+shape Feed
+  version: number
+  entries: FeedEntry[]
+  older: number
+
+// Feed as its list shows it: the newest stretch and the older ones loaded, where this visit's
+// Earlier line sits (0: the first visit, no line), whether hex has answered or failed (and why),
+// and whether older days are left to load or loading.
+shape FeedView
+  entries: FeedEntry[]
+  mark: number
+  known: bool
+  failed: bool
+  error: string
+  more: bool
+  loadingOlder: bool
+
+fn markOf(e: FeedEntry): string = e.kind == "decided" ? "decided" : e.kind == "found" ? "found" : "done"
+// The page an entry opens beside Feed with two columns: its goal, its idea, or what hex decided.
+fn besideOf(e: FeedEntry): string = e.kind == "done" ? `done:${e.opens}` : e.kind == "found" ? `idea:${e.opens}` : `decided:${e.opens}`
+fn dayAt(es: FeedEntry[], i: number, now: number, offset: number): string = match es.at(i) { case some(e) => dayWordOf(e.at, now, offset), case none => "" }
+// The days a run of entries falls on, newest first, each once (the entries come newest first).
+fn daysOf(es: FeedEntry[], now: number, offset: number): string[] = range(es.length).filter(i => i == 0 or dayAt(es, i, now, offset) != dayAt(es, i - 1, now, offset)).map(i => dayAt(es, i, now, offset))
+
+component FeedList
+  props
+    feed: FeedView
+    now: number
+    offset: number
+    // The width the rows have, for pictures.
+    width: number
+    // With two columns, the page beside (besideOf), marked open in the list.
+    beside: string
+    open: action
+    discuss: action
+    undo: action
+    older: action
+    retry: action
+  derive entries = feed.entries
+  derive mark = feed.mark
+  derive fresh = entries.filter(e => mark > 0 and e.at > mark)
+  derive seen = entries.filter(e => not (mark > 0 and e.at > mark))
+  action reach(e: IntersectionObserverEntry)
+    if e.isIntersecting and feed.more and not feed.loadingOlder
+      older()
+  view
+    column testId="feed"
+      if feed.failed and not feed.known
+        Note(kind="failed", text=(feed.error != "" ? feed.error : "Can't reach hex."), pad="24px 10px 4px", id="feed-failed")
+        row justify-content="center"
+          button press=retry class=PillTap testId="feed-retry"
+            box class=PillFace
+              text "Try again" font="-exact-subheadline" font-weight=600
+      else if not feed.known
+        Note(kind="loading", text="Loading Feed", pad="24px 10px", id="feed-loading")
+      else if entries.length == 0
+        Note(kind="empty", text="Nothing new yet. What hex finishes and finds shows here.", pad="20px 10px", id="feed-empty")
+      for d in daysOf(fresh, now, offset) key=`new-${d}`
+        Head(label=d, n=-1, pad="18px 10px 2px", id=`feed-day-new-${d}`)
+        for e in fresh.filter(x => dayWordOf(x.at, now, offset) == d) key=e.id
+          FeedStory(entry=e, offset=offset, width=width, selected=(beside != "" and beside == besideOf(e)), open=open, discuss=discuss, undo=undo)
+      if fresh.length > 0 and seen.length > 0
+        Earlier(pad="14px 10px 0")
+      for d in daysOf(seen, now, offset) key=`seen-${d}`
+        Head(label=d, n=-1, pad="18px 10px 2px", id=`feed-day-${d}`)
+        for e in seen.filter(x => dayWordOf(x.at, now, offset) == d) key=e.id
+          FeedStory(entry=e, offset=offset, width=width, selected=(beside != "" and beside == besideOf(e)), open=open, discuss=discuss, undo=undo)
+      if feed.more
+        row justify-content="center" min-height=44 align-items="center" intersect=reach testId="feed-older"
+          if feed.loadingOlder
+            progress aria-label="Loading older days"
+
+// One entry: its mark, the news in bold, said in full, pictures of what hex found, then its topic
+// and time (the day is its head's), with Discuss, or Undo on what hex decided.
+component FeedStory
+  props
+    entry: FeedEntry
+    offset: number
+    width: number
+    selected: bool
+    open: action
+    discuss: action
+    undo: action
+  action act
+    if entry.kind == "decided"
+      undo(entry.opens)
+    else
+      discuss(entry.id)
+  view
+    Story(mark=markOf(entry), title=entry.title, body=(entry.body == entry.title ? "" : entry.body), quoted=false, meta=(entry.topic == "" ? formatTime(entry.at, offset, "short") : `${entry.topic} · ${formatTime(entry.at, offset, "short")}`), offer=(entry.kind == "decided" ? "undo" : "discuss"), selected=selected, id=`feed-${entry.id}`, open=open(entry), act=act)
+      if entry.pictures.length > 0
+        Pictures(media=entry.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=max(width - 64, 120), height=180)

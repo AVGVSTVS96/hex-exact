@@ -22,9 +22,40 @@ const replies = [
   [/^POST \/media$/, (_, n) => ({ id: `standin-${n}`, kind: "photo" })],
 ];
 
+// Feed (/feed) is made up, the same each run, so its flows show the drawn days without hex.
+const day = (back, hour, minute) => {
+  const d = new Date();
+  d.setDate(d.getDate() - back);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+};
+const story = (id, kind, title, body, topic, at, opens) => ({ id, kind, title, body, topic, at, opens, links: [], pictures: [] });
+const feed = (before) =>
+  before
+    ? { version: 0, older: 0, entries: [story("done:t-7", "done", "Renewed the domain for two years", "bassim.run is paid through November 2028, €24.", "Sites", day(3, 11, 5), "t-7")] }
+    : {
+        version: 1,
+        older: Date.parse(day(1, 0, 0)),
+        entries: [
+          story("done:t-1", "done", "Booked both flights, aisle seats", "Out Friday 9:05, back Sunday 7:05, both direct. €296 for the two of you.", "Lisbon trip", day(0, 15, 10), "t-1"),
+          story("found:rail:1", "found", "Two makers will cut a brass pot rail to length", "Nobody stocks one at 90 cm, but both cut to order. The cheaper is €64 and ships in a week.", "Kitchen remodel", day(0, 13, 40), "t-2"),
+          story("decided:standin-ask", "decided", "Took the Saturday slot at the bike shop", "It was Saturday at 10 or a ten-day wait, and you ride on Sunday.", "Bike repair", day(0, 9, 12), "standin-ask"),
+          story("found:strike:1", "found", "No rail strike is called for the 22nd", "The union vote was put off to December.", "Lisbon trip", day(0, 9, 0), "t-3"),
+          story("done:t-4", "done", "Issue 13 went out to 412 readers", "Opened by 61% in the first hour. Two replies are waiting in the topic.", "Newsletter", day(0, 8, 30), "t-4"),
+          story("done:t-5", "done", "Booked the installer for the 22nd", "Morning slot, two hours, €180 paid on the day.", "Kitchen remodel", day(1, 16, 20), "t-5"),
+          story("found:hinge:1", "found", "The soft-close hinges are back in stock", "Same price as before, €8 each; twelve would do every door.", "Kitchen remodel", day(1, 10, 0), "t-6"),
+        ],
+      };
+
 let writes = 0;
 createServer(async (request, response) => {
   const url = new URL(request.url, "http://standin");
+  if (request.method === "GET" && url.pathname === "/feed") {
+    // A long poll for what's new waits as hex would, and nothing changes.
+    if (url.searchParams.get("after")) await new Promise((done) => setTimeout(done, 25_000));
+    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(feed(url.searchParams.get("before"))));
+    return;
+  }
   if (request.method === "GET") {
     try {
       const upstream = await fetch(HEX_URL + url.pathname + url.search, { headers });

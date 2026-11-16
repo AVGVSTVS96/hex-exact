@@ -21,6 +21,7 @@ use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
 use Room, roomOf from "./room.contract"
 use DecidedPage from "./decided.contract"
+use Feed, FeedEntry, FeedView from "./feed.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
 // Every screen and sheet. Home is hex, and the call; the rest open over it. hexexact://go/<path> opens any
@@ -107,6 +108,21 @@ component App
   derive room = roomOf(viewport, pose)
   // hex's own pages that are built: Now until Feed, Ideas and Goals join it. With one, no tabs show.
   derive hexPages = ["now"]
+
+  // Feed (feed.contract): the last Feed hex gave shows until it answers; older stretches load as
+  // the list reaches its end. feedSeen is the newest entry Bassim has had Feed open for; feedMark,
+  // where this visit's Earlier line sits, holds until he leaves Feed.
+  state feedSeen = 0 persist
+  state feedMark = 0
+  state feedReach = 0
+  resource liveFeed = watchFeed() as shape Feed else empty()
+  resource keptFeed = keptFeed() as shape Feed else empty()
+  derive newestFeed = liveFeed.version > 0 ? liveFeed : keptFeed
+  resource keepingFeed = keep("/feed", `${liveFeed.version}`) when liveFeed.version > 0 as shape Reply else empty()
+  resource olderFeed = olderFeed(newestFeed.older, feedReach) when feedReach > 0 and newestFeed.older > 0 as shape Feed else empty()
+  derive feedLatest = match newestFeed.entries.at(0) { case some(e) => e.at, case none => 0 }
+  derive feedFresh = hexPage != "feed" and feedLatest > feedSeen
+  derive feed = FeedView(entries=newestFeed.entries.concat(olderFeed.entries.filter(e => e.at < (match newestFeed.entries.at(-1) { case some(l) => l.at, case none => now }))).filter(e => not (e.kind == "decided" and takingBack.includes(e.opens))), mark=feedMark, known=(newestFeed.version > 0), failed=failed(liveFeed), error=(match failure(liveFeed) { case some(f) => f.message, case none => "" }), more=(newestFeed.older > 0 and (feedReach == 0 or olderFeed.older > 0)), loadingOlder=(feedReach > 0 and not current(olderFeed)))
 
   // The live call, as the shell holds it, and its words. These follow the shell, not a timer.
   resource call = callState() as shape CallState else empty()
@@ -302,7 +318,34 @@ component App
     if haptics
       haptic("selection")
   action pickPage(page: string)
+    if page == "feed" and hexPage != "feed"
+      feedMark = feedSeen
+    if page == "feed" or hexPage == "feed"
+      feedSeen = max(feedSeen, feedLatest)
     hexPage = page
+
+  // Feed
+  action moreFeed
+    feedReach = feedReach + 1
+  action retryFeed
+    refresh liveFeed
+  // An entry opens its goal, its idea or what hex decided: beside Feed with two columns, else over Home.
+  action openFeed(e: FeedEntry)
+    if haptics
+      haptic("selection")
+    if room.columns == 2 and e.kind == "done"
+      besidePage(`done:${e.opens}`)
+    else if e.kind == "done"
+      openTask(`done:${e.opens}`)
+    else if e.kind == "decided"
+      open(`${path("decided")}?open=${e.opens}`)
+  // Discuss: a call that opens on this entry, or the entry brought into the call that's on.
+  action discussFeed(id: string)
+    if call.status == "live"
+      tried = `${call.id}|talk`
+      send talked = discussFeed(id)
+    else
+      send commanded = callCommand("start", voice, `feed:${id}`, phone)
 
   // The call
   action startCall(about: string)

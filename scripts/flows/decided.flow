@@ -1,0 +1,12 @@
+# hex decided from Home: the list, one opened in place, Undo; then opened at a row as Tasks and
+# Feed open it.
+launch /
+reveal home-decided
+tap home-decided
+shoot decided
+tap decided-open-*
+shoot decided-open
+tap decided-undo-*
+shoot decided-undone
+launch /decided
+shoot decided-link

@@ -1,10 +1,20 @@
-# Home, the first Needs you row, its question, Not needed, Undo. The stand-in keeps every write
-# from reaching hex.
+# Home, the first Needs you row, its question: Why, an answer and Undo, Not needed and Undo, his
+# own words in the reply box. The stand-in keeps every write from reaching hex.
 launch /
 shoot home
 tap home-row-*
 shoot question
+tap ask-from-*
+shoot why
+tap ask-option-*
+shoot answered
+tap Undo
+shoot undone
+reveal ask-dismiss-*
 tap ask-dismiss-*
 shoot put-away
 tap Undo
-shoot undone
+shoot put-back
+type reply-field Quartz, but ask about the edge first
+above-keyboard reply-field
+shoot typing

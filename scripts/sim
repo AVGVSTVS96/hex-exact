@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Runs on the server: builds hex Exact for the simulator on the Mac (BUILT=1 reuses the last build),
-# installs it on its own iPhone Duo simulator ("hexexact Duo"), and in each pose and appearance
-# screenshots each screen and plays each flow.
+# Runs on the server: builds hex Exact for the simulator on the Mac, unless the last build was of
+# the same app (BUILT=1 takes the last build as it is), installs it on one of its own iPhone Duo
+# simulators ("hexexact Duo 1" and "2", whichever is free), and in each pose and
+# appearance screenshots each screen and plays each flow.
 #   scripts/sim [path|flow…]                   (default: / /calls /tasks /settings)
 #   POSES="cover-up open-up" APPEARANCES="dark light" scripts/sim /tasks scripts/flows/answer.flow
 # A path (`/`, `/tasks`, `/tasks/t/<id>`) is a fresh launch at that screen (hexexact://go/<path>),
@@ -15,17 +16,21 @@
 # Poses: cover-up (folded), cover-side, open-up (a book), open-side (a laptop); all four by default.
 # Shots land in $SHOTS (~/hex/scratch/hex-exact/shots/<commit>/).
 set -euo pipefail
-# One Mac build or simulator run at a time: builders share its one folder and simulator.
-mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/mac.lock && flock 9
+# One simulator build at a time, in the Mac's one folder for them; each run then takes its own
+# copy of the app and a free simulator, so the next build goes on while it plays. scripts/ship
+# has a folder and a lock of its own, so a ship never waits on pictures.
+locks=~/.local/share/hex-exact
+mkdir -p "$locks" && exec 9>"$locks/sim-build.lock" && flock 9
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
-folder=Developer/hex-exact
+folder=Developer/hex-exact-sim
 url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
 commit=$(git -C "$here" rev-parse --short HEAD)
 shots=${SHOTS:-$HOME/hex/scratch/hex-exact/shots/$commit}
 POSES=${POSES:-cover-up cover-side open-up open-side}
 APPEARANCES=${APPEARANCES:-dark}
-standin=http://127.0.0.1:47390
+standin=http://127.0.0.1:47391
+run=Developer/hex-exact-sim-build/runs/$(hostname -s)-$$
 paths=() flows=()
 for arg in "${@:-/ /calls /tasks /settings}"; do
   for one in $arg; do
@@ -38,61 +43,87 @@ eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 # The simulator's build reaches hex only through the stand-in.
 sed -i "s|^export const HEX_URL = .*|export const HEX_URL = \"$standin\";|" "$here/app/hex.ts"
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer" >&2; exit 1; }
-# The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
-rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj --exclude /scripts/uitests/Flows.xcodeproj "$here/" "$mac:$folder/"
-# Its own simulator, so other apps' checks keep theirs.
-sim=$(ssh "$mac" bash -s <<'MAC'
+# Its own simulators, so other apps' checks keep theirs.
+simulator() {
+  ssh "$mac" bash -s -- "$(printf %q "$1")" <<'MAC'
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-id=$(xcrun simctl list devices -j | /opt/homebrew/bin/jq -r '[.devices[][] | select(.name == "hexexact Duo")][0].udid // empty')
+id=$(xcrun simctl list devices -j | /opt/homebrew/bin/jq -r --arg name "$1" '[.devices[][] | select(.name == $name)][0].udid // empty')
 if [ -z "$id" ]; then
   runtime=$(xcrun simctl list runtimes -j | /opt/homebrew/bin/jq -r '[.runtimes[] | select(.name == "iOS 27.1")][0].identifier')
-  id=$(xcrun simctl create "hexexact Duo" "iPhone Duo" "$runtime")
+  id=$(xcrun simctl create "$1" "iPhone Duo" "$runtime")
 fi
 echo "$id"
 MAC
-)
-if [ -z "${BUILT:-}" ]; then
+}
+# What the app is built from: a run that changes only flows, scripts or docs reuses the last build.
+tree=$(cd "$here" && { git ls-files -co --exclude-standard app shell; echo app/hex.ts; } | sort -u | xargs sha1sum | sha1sum | cut -c1-40)
+built=$(ssh "$mac" cat $folder-build/sim/tree 2>/dev/null </dev/null || true)
+if [ -z "${BUILT:-}" ] && [ "$tree" != "$built" ]; then
+  # The folder starts as a clone of the first one, so its first build isn't cold.
+  ssh "$mac" "[ -d $folder ] || cp -cR Developer/hex-exact $folder" </dev/null
+  # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
+  rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj --exclude /scripts/uitests/Flows.xcodeproj "$here/" "$mac:$folder/"
   echo "building for the simulator on the Mac"
-  ssh "$mac" "SIM=1 EXACT_SIM=$sim HEX_URL='$standin' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build" </dev/null | tail -1
+  ssh "$mac" "rm -f $folder-build/sim/tree && SIM=1 EXACT_SIM=$(simulator "hexexact Duo 1") HEX_URL='$standin' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build && echo $tree >$folder-build/sim/tree" </dev/null | tail -1
 fi
+# This run's own copy of the app and of the scripts that play it (APFS clones, so instant).
+ssh "$mac" "rm -rf $run && mkdir -p $run && cp -cR $folder-build/sim/Build/Products/Release-iphonesimulator/HexExact.app $run/" </dev/null
+rsync -a --exclude Flows.xcodeproj "$here/scripts/" "$mac:$run/scripts/"
+flock -u 9
+# The first free simulator; each has its own lock, stand-in port and folders on the Mac.
+lane=
+until [ -n "$lane" ]; do
+  for n in 1 2; do
+    exec 8>"$locks/sim-$n.lock"
+    if flock -n 8; then lane=$n && break; fi
+  done
+  [ -n "$lane" ] || sleep 3
+done
+sim=$(simulator "hexexact Duo $lane")
 
 # ssh joins its arguments into one command line, so each is quoted for the Mac's shell.
-ssh "$mac" bash -s -- "$(printf "%q " "$folder" "$sim" "$POSES" "$APPEARANCES" "$HEX_URL" "$HEX_TOKEN" "${#paths[@]}" "${paths[@]}" "${flows[@]}")" <<'MAC'
+ssh "$mac" bash -s -- "$(printf "%q " "$run" "$lane" "$sim" "$POSES" "$APPEARANCES" "$HEX_URL" "$HEX_TOKEN" "${#paths[@]}" "${paths[@]}" "${flows[@]}")" <<'MAC'
 set -euo pipefail
-folder=$1 id=$2 poses=$3 appearances=$4 hex_url=$5 hex_token=$6 npaths=$7
-shift 7
+run=~/$1 lane=$2 id=$3 poses=$4 appearances=$5 hex_url=$6 hex_token=$7 npaths=$8
+shift 8
 paths=("${@:1:npaths}")
 shift "$npaths"
 flows=("$@")
-. ~/$folder/scripts/mac-env
+. $run/scripts/mac-env
 # The Duo simulator runs iOS 27.1, which Xcode-beta carries. Its boot takes a turn (the Mac's
 # ~/.local/share/turn), so it may wait for room.
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer PATH=/opt/homebrew/bin:$PATH
 xcrun simctl boot "$id" 2>/dev/null || true
 xcrun simctl bootstatus "$id" -b >/dev/null
-app=$HOME/Developer/hex-exact-build/sim/Build/Products/Release-iphonesimulator/HexExact.app
-out=$HOME/Developer/hex-exact-build/shots
-tests=$HOME/Developer/hex-exact-build/flows
+app=$run/HexExact.app out=$run/shots tests=$HOME/Developer/hex-exact-sim-build/flows-$lane
 rm -rf "$out" && mkdir -p "$out"
 # The stand-in is plain http on this Mac, which App Transport Security lets through as local.
 /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true' "$app/Info.plist" 2>/dev/null || true
-lsof -ti tcp:47390 -sTCP:LISTEN | xargs kill 2>/dev/null || true
-HEX_URL=$hex_url HEX_TOKEN=$hex_token PORT=47390 WRITES=$out/writes.txt node ~/$folder/scripts/standin.mjs &
-standin=$!
-trap 'kill $standin 2>/dev/null; xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true' EXIT
+# Both simulators' builds reach the one stand-in, kept running between runs and started afresh
+# when its script changes. Writes from both land in one list, so a flow's list can hold the
+# other simulator's when both play at once.
+writes=$HOME/Developer/hex-exact-sim-build/writes.txt
+kept=$HOME/Developer/hex-exact-sim-build/standin.mjs
+if ! cmp -s "$kept" $run/scripts/standin.mjs || ! lsof -ti tcp:47391 -sTCP:LISTEN >/dev/null; then
+  lsof -ti tcp:47391 -sTCP:LISTEN | xargs kill 2>/dev/null || true
+  cp $run/scripts/standin.mjs "$kept"
+  HEX_URL=$hex_url HEX_TOKEN=$hex_token PORT=47391 WRITES=$writes nohup node "$kept" >/dev/null 2>&1 &
+  sleep 1
+fi
+trap 'xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true' EXIT
 xcrun simctl status_bar "$id" override --time 9:41 --batteryLevel 100 --cellularBars 4 2>/dev/null || true
-hub=~/$folder/scripts/devicehub-sim
-[ "$hub" -nt ~/$folder/scripts/devicehub.c ] || {
+hub=~/Developer/hex-exact-sim-build/devicehub-sim
+[ "$hub" -nt $run/scripts/devicehub.c ] || {
   xcrun -sdk iphonesimulator clang -arch arm64 -mios-simulator-version-min=27.0 -O2 -o "$hub" \
-    ~/$folder/scripts/devicehub.c -framework IOKit -framework CoreFoundation
+    $run/scripts/devicehub.c -framework IOKit -framework CoreFoundation
   codesign -f -s - "$hub" 2>/dev/null
 }
 hubdo() { xcrun simctl spawn "$id" "$hub" "$@" </dev/null; }
 xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true
 xcrun simctl install "$id" "$app"
 if [ ${#flows[@]} -gt 0 ]; then
-  (cd ~/$folder/scripts/uitests && xcodegen generate -q)
-  xcodebuild build-for-testing -project ~/$folder/scripts/uitests/Flows.xcodeproj -scheme Flows \
+  (cd $run/scripts/uitests && xcodegen generate -q)
+  xcodebuild build-for-testing -project $run/scripts/uitests/Flows.xcodeproj -scheme Flows \
     -destination "id=$id" -derivedDataPath "$tests" -quiet >"$tests.log" 2>&1 || {
     grep -E 'error:' "$tests.log" | sort -u >&2
     echo "the flows' UI tests didn't build" >&2
@@ -120,7 +151,7 @@ play() {
   local name=$1 script=$2 pose=$3 appearance=$4 dir=$out/$1 step=0 answered=0 line shot at=$3 where
   mkdir -p "$dir"
   rm -rf "$tests/sync" "$tests/result.xcresult" "$tests/attachments" && mkdir -p "$tests/sync"
-  : >"$out/writes.txt"
+  local from=$(($(wc -c <"$writes" 2>/dev/null || echo 0) + 1))
   # The loop reads from a process substitution, not a pipe, so the poses it moves to stay known here.
   while IFS= read -r line; do
     case $line in
@@ -140,10 +171,10 @@ play() {
       *error:* | *XCTAssert* | *" failed "*) echo "$pose $appearance: $line" >>"$dir/notes.txt" ;;
     esac
   done < <(TEST_RUNNER_FLOW=$script TEST_RUNNER_FLOW_SYNC=$tests/sync xcodebuild test-without-building \
-    -project ~/$folder/scripts/uitests/Flows.xcodeproj -scheme Flows -destination "id=$id" \
+    -project $run/scripts/uitests/Flows.xcodeproj -scheme Flows -destination "id=$id" \
     -derivedDataPath "$tests" -resultBundlePath "$tests/result.xcresult" -collect-test-diagnostics never 2>&1 |
     tee "$tests-$name-$pose-$appearance.log")
-  cp "$out/writes.txt" "$dir/writes-$pose-$appearance.txt"
+  tail -c +"$from" "$writes" >"$dir/writes-$pose-$appearance.txt" 2>/dev/null || true
   [ -d "$tests/result.xcresult" ] || return 0
   xcrun xcresulttool export attachments --path "$tests/result.xcresult" --output-path "$tests/attachments" >/dev/null 2>&1 || return 0
   jq -r '.[].attachments[] | select(.suggestedHumanReadableName | startswith("tree")) |
@@ -180,5 +211,5 @@ for pose in $poses; do
   done
 done
 MAC
-rsync -a "$mac:Developer/hex-exact-build/shots/" "$shots/"
+rsync -a "$mac:$run/shots/" "$shots/" && ssh "$mac" rm -rf "$run" </dev/null
 ls "$shots"

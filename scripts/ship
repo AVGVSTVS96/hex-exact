@@ -6,11 +6,12 @@
 # revoke that certificate to make its own.
 #   scripts/ship
 set -euo pipefail
-# One Mac build or simulator run at a time: builders share its one folder and simulator.
-mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/mac.lock && flock 9
+# Ships and publishes take turns in a Mac folder of their own (scripts/sim has another), so what's
+# on main never waits behind pictures.
+mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/ship.lock && flock 9
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
-folder=Developer/hex-exact
+folder=Developer/hex-exact-ship
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
 url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
 bundle=com.shahidy.hexexact
@@ -20,8 +21,14 @@ mkdir -p "$link" "$work"
 eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 number=$(git -C "$here" rev-list --count HEAD)
 title=$(git -C "$here" log --oneline -1 | cut -c1-80)
+# Builders ship main as they land on it, so a ship that waited its turn behind one of the same or
+# a newer main has nothing to do.
+on_link=$(jq -r .number "$link/latest.json" 2>/dev/null || echo 0)
+[ "$number" -gt "$on_link" ] || { echo "build $on_link is on the install link already, as new as this one"; exit 0; }
 
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer, so it's asleep" >&2; exit 1; }
+# The folder starts as a clone of the simulator's, so its first build isn't cold.
+ssh "$mac" "[ -d $folder ] || cp -cR Developer/hex-exact $folder" </dev/null
 # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
 rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:$folder/"
 if [ -n "${BUILT:-}" ]; then
@@ -46,8 +53,8 @@ for path in [f"{app}/Info.plist", *glob.glob(f"{app}/PlugIns/*.appex/Info.plist"
     plistlib.dump(info, open(path, "wb"), fmt=plistlib.FMT_BINARY)
 PY
 xtool sign "$work/HexExact.app" </dev/null
-signed=Developer/hex-exact-build/signed/HexExact.app
-ssh "$mac" "mkdir -p Developer/hex-exact-build/signed"
+signed=$folder-build/signed/HexExact.app
+ssh "$mac" "mkdir -p $folder-build/signed"
 rsync -a --delete "$work/HexExact.app/" "$mac:$signed/"
 serial=$(python3 -c "
 import glob, os, plistlib, subprocess
@@ -57,9 +64,9 @@ print(subprocess.run(['openssl', 'x509', '-inform', 'DER', '-noout', '-serial'],
 ssh "$mac" sh "$folder/scripts/resign" "$serial" "$signed" </dev/null
 
 echo "putting it on the install link"
-ssh "$mac" "cd Developer/hex-exact-build/signed && rm -rf Payload HexExact.ipa && mkdir Payload && cp -R HexExact.app Payload/ &&
+ssh "$mac" "cd $folder-build/signed && rm -rf Payload HexExact.ipa && mkdir Payload && cp -R HexExact.app Payload/ &&
   ditto -c -k --norsrc --noextattr --keepParent Payload HexExact.ipa && rm -rf Payload" </dev/null
-scp -q "$mac:Developer/hex-exact-build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
+scp -q "$mac:$folder-build/signed/HexExact.ipa" "$link/hex-exact-$number.ipa.part"
 mv "$link/hex-exact-$number.ipa.part" "$link/hex-exact-$number.ipa"
 find "$link" -maxdepth 1 -name 'hex-exact-*.ipa' ! -name "hex-exact-$number.ipa" -delete
 # What the app's update toast reads: the newest build on the link.

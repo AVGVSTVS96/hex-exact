@@ -5,17 +5,20 @@
 # every minute while it's open. A change to app.ts or the shell needs scripts/ship instead.
 #   scripts/publish
 set -euo pipefail
-# One Mac build or simulator run at a time: builders share its one folder and simulator.
-mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/mac.lock && flock 9
+# Ships and publishes take turns in a Mac folder of their own (scripts/sim has another), so what's
+# on main never waits behind pictures.
+mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/ship.lock && flock 9
 here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
 url=${HEX_EXACT_URL:-https://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')/hex-exact}
 "$here/scripts/hex-env" >/dev/null
+# The folder starts as a clone of the simulator's, so its first build isn't cold.
+ssh "$mac" "[ -d Developer/hex-exact-ship ] || cp -cR Developer/hex-exact Developer/hex-exact-ship" </dev/null
 # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
-rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:Developer/hex-exact/"
+rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj "$here/" "$mac:Developer/hex-exact-ship/"
 rsync -a "$link/updates/" "$mac:Developer/hex-exact-origin/"
-ssh "$mac" ". Developer/hex-exact/scripts/mac-env && cd Developer/hex-exact/app && ../scripts/mac-app-json app.json '$url/updates' &&
-  cd ~/Developer/exact && EXACT_APP_DIR=\$HOME/Developer/hex-exact/app bun scripts/deploy.mjs app --origin ~/Developer/hex-exact-origin --platform ios --dirty --yes" </dev/null 2>&1 |
+ssh "$mac" ". Developer/hex-exact-ship/scripts/mac-env && cd Developer/hex-exact-ship/app && ../scripts/mac-app-json app.json '$url/updates' &&
+  cd ~/Developer/exact && EXACT_APP_DIR=\$HOME/Developer/hex-exact-ship/app bun scripts/deploy.mjs app --origin ~/Developer/hex-exact-origin --platform ios --dirty --yes" </dev/null 2>&1 |
   rg -v 'Compiling|Checking|UNCOMMITTED'
 rsync -a "$mac:Developer/hex-exact-origin/" "$link/updates/"

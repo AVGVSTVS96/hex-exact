@@ -9,8 +9,8 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 . "$here/scripts/mac-env"
 exact=${EXACT:-$HOME/Developer/exact}
 # Xcode's output stays outside the repository, where Exact's deploy would read its package
-# checkouts as submodules.
-out=$HOME/Developer/hex-exact-build${SIM:+/sim}
+# checkouts as submodules: beside it, one for each of the Mac's copies (scripts/sim's, scripts/ship's).
+out=$here-build${SIM:+/sim}
 mkdir -p "$out"
 if [ -n "${SIM:-}" ]; then
   device=() sdk=iphonesimulator destination='generic/platform=iOS Simulator' trust=development products=Release-iphonesimulator

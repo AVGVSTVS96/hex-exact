@@ -6,7 +6,8 @@ import { at, bool, list, num, obj, str, strings, type Json } from './parse.ts';
 const call = (c: Json, live: string): Result<'watchCalls'>['calls'][number] => ({
   id: str(c.id), started: at(c.started), ended: at(c.ended), ending: str(c.end), source: str(c.from), voice: str(c.voice),
   title: str(c.title), why: str(c.why), summary: str(c.summary), waiting: strings(c.waiting),
-  seconds: num(c.seconds), tasks: typeof c.tasks === 'number' ? c.tasks : Array.isArray(c.tasks) ? c.tasks.length : 0,
+  // A call's own record can come without its length; its start and end say it.
+  seconds: num(c.seconds) || (c.ended !== undefined && at(c.ended) > at(c.started) ? (at(c.ended) - at(c.started)) / 1000 : 0), tasks: typeof c.tasks === 'number' ? c.tasks : Array.isArray(c.tasks) ? c.tasks.length : 0,
   preview: str(c.preview), live: str(c.id) === live || (c.ended === undefined && str(c.id) !== ''),
 });
 

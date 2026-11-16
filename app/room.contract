@@ -1,0 +1,94 @@
+// Room: where the app sits in its window, worked out once at the root from the window's size and
+// what covers it (the status icons and cameras, the hinge, the home indicator). Every screen takes
+// `room`; none reads the fold or a width itself.
+//
+// The Duo gives its status icons either a column down one side (folded upright, open like a book)
+// or a band along the top (on its side); iOS reports either as a safe-area inset and the icons in
+// it as occlusions. The chrome row sits beside them, never under them: inside the band when the
+// band has room clear of the icons, else just under it, its trailing end at the column's edge.
+use Viewport, Pose, Rect from "./shapes.contract"
+use Tap from "./parts.contract"
+
+shape Span
+  x: number
+  width: number
+
+// The chrome row: Back, then Calls, Tasks and Settings in one capsule ending at `end`; `start` is
+// where its free space begins on the leading side, `top` the row's top.
+shape Bar
+  top: number
+  start: number
+  end: number
+
+shape Room
+  width: number
+  height: number
+  // The rectangle nothing covers.
+  clear: Rect
+  // One column, or two side by side: `first` is hex's (or a list's), `second` the page it opens.
+  // With one, `second` is empty.
+  columns: number
+  first: Span
+  second: Span
+  bar: Bar
+  // Where a page's content starts, under the chrome row.
+  below: number
+  // How far fixed controls at the foot stand off the window's bottom edge.
+  foot: number
+
+// A chrome row is 44 tall; the capsule of three is 140 wide.
+fn barHeight(): number = 44
+fn capsuleWidth(): number = 140
+
+fn clearOf(v: Viewport): Rect = Rect(x=v.safeAreaLeft, y=v.safeAreaTop, width=v.width - v.safeAreaLeft - v.safeAreaRight, height=v.height - v.safeAreaTop - v.safeAreaBottom)
+// The status icons and cameras in the top band.
+fn bandCovers(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.y + o.height / 2 < v.safeAreaTop)
+// The widest stretch of [from, to] clear of every box in `taken`, 12 points off each.
+fn widestClear(from: number, to: number, taken: Rect[]): Span = match sortBy(range(taken.length + 1).map(i => Span(x=(i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from }), width=((i == taken.length ? to : match sortBy(taken, t => t.x).at(i) { case some(t) => t.x - 12, case none => to }) - (i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from })))), s => s.width, "desc").at(0) { case some(s) => s, case none => Span(x=from, width=to - from) }
+fn bandSpan(v: Viewport, p: Pose): Span = widestClear(v.safeAreaLeft + 16, v.width - v.safeAreaRight - 16, bandCovers(v, p))
+// The row goes inside the top band when the band is tall enough and, clear of the icons, wide
+// enough for the capsule and Back; else under it, across the clear rectangle.
+fn inBand(v: Viewport, p: Pose): bool = v.safeAreaTop >= barHeight() and bandCovers(v, p).length > 0 and bandSpan(v, p).width >= capsuleWidth() + 60
+fn barOf(v: Viewport, p: Pose): Bar = inBand(v, p) ? Bar(top=max(v.safeAreaTop / 2 - barHeight() / 2, 4), start=bandSpan(v, p).x, end=bandSpan(v, p).x + bandSpan(v, p).width) : Bar(top=v.safeAreaTop + 8, start=v.safeAreaLeft + 16, end=v.width - v.safeAreaRight - (v.safeAreaRight > 0 ? 8 : 16))
+
+// Two columns only when both read well: each at least 300 wide. They part at the hinge when the
+// window has one down its middle, else at the middle of the window, where a book's fold lies.
+fn twoOf(v: Viewport): bool = clearOf(v).width >= 600
+fn foldOf(v: Viewport, p: Pose): Span = v.horizontalViewportSegments == 2 ? match v.segments.at(0) { case some(s) => Span(x=s.x + s.width, width=match v.segments.at(1) { case some(t) => max(t.x - s.x - s.width, 0), case none => 0 }), case none => Span(x=v.width / 2, width=0) } : p.fold.height >= v.height / 2 and p.fold.width < v.width / 4 ? Span(x=p.fold.x, width=p.fold.width) : Span(x=v.width / 2, width=0)
+fn firstOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=clearOf(v).x, width=foldOf(v, p).x - clearOf(v).x) : Span(x=clearOf(v).x, width=clearOf(v).width)
+fn secondOf(v: Viewport, p: Pose): Span = twoOf(v) ? Span(x=foldOf(v, p).x + foldOf(v, p).width, width=clearOf(v).x + clearOf(v).width - foldOf(v, p).x - foldOf(v, p).width) : Span(x=v.width, width=0)
+
+fn roomOf(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=(inBand(v, p) ? v.safeAreaTop + 8 : v.safeAreaTop + 8 + barHeight() + 10), foot=max(v.safeAreaBottom, 12))
+
+// Where the capsule starts, and so where Back and the free space on its leading side end.
+fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()
+
+// The chrome: Calls, Tasks (a dot when something needs Bassim) and Settings in one capsule at the
+// row's trailing end, beside the status icons; on a page over Home, Back to its left. It keeps one
+// place on every page.
+component Chrome
+  inject
+    haptics: bool
+  props
+    room: Room
+    // The page that's open: "" on Home, else calls | tasks | settings | another page's name.
+    on: string
+    needsYou: number
+    working: number
+    open: action
+    openTasks: action
+    back: action
+  view
+    row position="absolute" top=room.bar.top left=(capsuleX(room) - (on == "" ? 0 : 54)) height=barHeight() gap=10 align-items="center" z-index=4 testId="chrome"
+      if on != ""
+        button press=back class=Tap width=44 height=44 border-radius=22 backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" aria-label="Back" -exact-press-haptic=(haptics ? "selection" : "none") testId="chrome-back"
+          image "symbol:sf/chevron.left" width=18 height=18 object-fit="contain" color="-exact-label"
+      row backgroundMaterial="glass" border-radius=22 width=capsuleWidth() height=barHeight() align-items="center" justify-content="space-around" padding="0 4px" box-sizing="border-box" position="relative" testId="toolbar"
+        button press=open(path("calls")) class=Tap width=44 height=44 border-radius=22 background-color=(on == "calls" ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label="Calls" aria-current=(on == "calls") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-calls"
+          image "symbol:sf/clock.arrow.circlepath" width=20 height=20 object-fit="contain" color="-exact-label"
+        button press=openTasks("") class=Tap width=44 height=44 border-radius=22 background-color=(on == "tasks" ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${needsYou} need you, ${working} working` aria-current=(on == "tasks") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-tasks"
+          image "symbol:list" width=20 height=20 object-fit="contain" color="-exact-label"
+        button press=open(path("settings")) class=Tap width=44 height=44 border-radius=22 background-color=(on == "settings" ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" aria-current=(on == "settings") -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
+          image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
+        if needsYou > 0 and on != "tasks"
+          box position="absolute" top=4 left=76 width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"

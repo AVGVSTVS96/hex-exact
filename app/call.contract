@@ -3,16 +3,16 @@
 // the call, what hex is doing for it, and the controls. The toolbar opens Calls, Tasks and Settings
 // over it.
 //
-// On the Duo it follows the fold: folded like a book, the orb and controls take the left screen and
-// the words the right; like a laptop, the orb sits above the fold and the words below; folded shut,
-// or on a phone, one column, the orb rising to make room for the words.
-use Viewport, Pose, Rect, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
-use Glass, endingOf, badEnding, lengthOf, Tap from "./parts.contract"
+// It follows the room: with two columns the orb and controls take the first and the words the
+// second; with one, the orb rises to make room for the words.
+use Viewport, CallState, Captions, Activity, Counts, Calls, CallRow, CallRecord, CallAsk, Ask, AgentLine, Media, Tasks, Asks from "./shapes.contract"
+use endingOf, badEnding, lengthOf, Tap from "./parts.contract"
 use WrapUp from "./wrap-up.contract"
 use Album, AddMedia from "./media.contract"
 use Said, failedWords, unreached from "./said.contract"
 use HexHome from "./home.contract"
 use AnswerRow from "./ask.contract"
+use Room, Chrome from "./room.contract"
 
 // How an answer from the call went out, as the stable app says it: " and cleared its Telegram
 // buttons", or which places were out of reach.
@@ -67,11 +67,11 @@ component Home
     finished: string
     // Why bringing a task into the call, or sharing into it, didn't go ("Not sent · …").
     trouble: string
-    // The Duo's side column, fold and cutouts; whether the words are pulled up to read.
-    pose: Pose
+    // Where everything sits (room.contract); whether the words are pulled up to read.
+    room: Room
     reading: bool
     setReading: action
-    // hex as the home whenever no call is on: what needs Bassim and what hex is doing; on a book fold
+    // hex as the home whenever no call is on: what needs Bassim and what hex is doing; with two columns
     // the page a row opens shows beside (the slot), `beside` its id.
     offset: number
     tasks: Tasks
@@ -91,11 +91,10 @@ component Home
   // hex muted itself: the last mute or unmute in the call's record says so.
   derive hushed = live and match liveRecord.moments.filter(m => m.kind == "muted" or m.kind == "unmuted").at(-1) { case some(m) => m.kind == "muted", case none => false }
   derive micOff = call.muted or call.interrupted
-  derive book = viewport.horizontalViewportSegments == 2
-  derive laptop = viewport.verticalViewportSegments == 2
-  derive single = not book and not laptop
-  derive top = viewport.safeAreaTop
-  derive bottom = max(viewport.safeAreaBottom, 12)
+  derive two = room.columns == 2
+  derive single = not two
+  derive top = room.clear.y
+  derive bottom = room.foot
   // No call on: hex is the home. A phone shows the last call's words over it while they're read.
   derive homeMode = status == "idle" and not elsewhere and not (single and reading)
 
@@ -129,40 +128,32 @@ component Home
     else
       end()
 
-  // Where things go. The Duo's cover screen and its book fold keep the system bars in a column down
-  // one side, under or over a camera: the toolbar and the call's buttons go in it, as the system
-  // places its own. Its laptop fold has a band along the top instead, beside its camera, which
-  // takes the toolbar. A phone, and the cover screen, rest the orb in the middle; a drag down (or
-  // the transcript button) docks it at the bottom and brings up the words, and a tap on it puts them
-  // away. A book fold has the orb on its left screen and the words on its right; a laptop fold the
-  // orb above the fold and the words below.
+  // Where things go, from the room: the chrome row beside the status icons, hex's column (the
+  // whole clear width with one column, the first with two) with Call at its foot, and with two
+  // columns the words or the page a row opens in the second. A phone and the cover screen rest the
+  // orb in the middle; a drag down (or the transcript button) docks it at the bottom and brings up
+  // the words, and a tap on it puts them away.
   derive W = viewport.width
   derive H = viewport.height
-  derive barSide = barOf(viewport, pose)
-  derive columned = barSide != ""
-  derive columnW = columnWidth(viewport, pose)
-  derive columnX = barSide == "left" ? 0 : W - columnW
-  derive columnTop = columnTopOf(viewport, pose)
-  derive columnFoot = columnFootOf(viewport, pose)
-  derive columnMid = columnMidOf(viewport, pose)
   derive tight = H < 520
-  derive muteSize = columned and tight ? 48 : 60
-  derive callSize = columned and tight ? 56 : columned ? 64 : 72
-  derive banded = (book or laptop) and not columned
-  // The band's widest stretch clear of the camera.
-  derive bandSpan = bandOf(viewport, pose)
-  derive left = barSide == "left" ? columnW : 0
-  derive right = barSide == "right" ? columnW : 0
-  derive contentW = W - left - right
-  // Below the toolbar, where the content starts.
-  derive below = columned ? top + 12 : banded ? top + 8 : top + 56
+  derive muteSize = tight ? 48 : 60
+  derive callSize = tight ? 56 : 72
+  derive left = room.first.x
+  derive hexW = room.first.width
+  derive right = W - room.clear.x - room.clear.width
+  // hex's column's trailing inset, and the second column's edges.
+  derive hexRight = W - room.first.x - room.first.width
+  derive secondLeft = room.second.x
+  derive below = room.below
+  // The foot of hex's column: Call and its neighbours, and where the list above them stops.
+  derive footTop = bottom + 12 + callSize + 16
 
   // Phone and cover screen: the orb at rest, or docked as the words are read (pull 0 to 1).
-  derive restSize = min(min(contentW * 0.62, H * 0.34), 280)
-  derive restX = left + contentW / 2
-  derive restY = columned ? (top + H - viewport.safeAreaBottom) / 2 : H / 2
+  derive restSize = min(min(hexW * 0.62, H * 0.34), 280)
+  derive restX = left + hexW / 2
+  derive restY = H / 2
   derive dockX = left + 50
-  derive dockY = columned ? H - viewport.safeAreaBottom - 8 - 26 : H - bottom - 12 - callSize / 2
+  derive dockY = H - bottom - 12 - callSize / 2
   derive travel = max(dockY - restY, 1)
   state pullY = 0
   state pulling = false
@@ -171,21 +162,19 @@ component Home
   // call starts.
   derive orbX = homeMode ? restX : restX + (dockX - restX) * pull
   derive orbY = homeMode ? below + 44 : restY + (dockY - restY) * pull
-  derive orbSize = single ? (homeMode ? 60 : restSize + (52 - restSize) * pull) : book ? min(viewport.width / 2 - right - 64, viewport.height - top - 200) : min(viewport.height / 2 - top - 48, contentW - 120)
+  derive orbSize = single ? (homeMode ? 60 : restSize + (52 - restSize) * pull) : max(min(min(hexW - 96, H - below - footTop - 120), 280), 80)
   derive glide = pulling ? "0ms linear" : "420ms cubic-bezier(0.2, 0.8, 0.2, 1)"
   derive agentShown = live and agent.id != ""
   // Above the docked orb and the buttons: the agent line, then the words.
-  derive agentBottom = single ? (columned ? H - dockY + 26 + 10 : bottom + 12 + callSize + 10) : (laptop ? bottom + 88 : columned ? columnFoot : bottom + 12)
+  derive agentBottom = single ? bottom + 12 + callSize + 10 : bottom + 12
   derive wordsBottom = agentBottom + (agentShown ? 44 : 0)
-  derive wordsLeft = book ? "env(viewport-segment-left 1 0)" : `${left}px`
-  derive wordsTop = book ? `${below}px` : laptop ? "env(viewport-segment-top 0 1)" : `${below}px`
+  derive wordsLeft = two ? secondLeft : left
+  derive wordsRight = two ? right : hexRight
   derive readable = talking or live
-  // On a fold at rest, the last call's words stay beside (book) or below (laptop) the home until
-  // Bassim opens a page or puts them away: `away` is the call whose words he put away.
+  // With two columns at rest, the last call's words stay beside the home until Bassim opens a page
+  // or puts them away: `away` is the call whose words he put away.
   state away = ""
   derive wordsShown = talking and away != captions.call
-  derive homeBottom = columned ? bottom : bottom + 12 + callSize + 16
-  derive homeRight = book ? "calc(100% - env(viewport-segment-right 0 0))" : `${right}px`
   action choose(page: string)
     away = captions.call
     select(page)
@@ -222,79 +211,60 @@ component Home
       setReading(false)
 
   view
-    column navigationKey=`${entry.id}` navigationBar="none" position="absolute" inset=0 background-color="-exact-background" testId="home"
+    column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="home"
       // At rest on a phone, a drag anywhere on the screen pulls the words down.
       if single and not reading and readable and not homeMode
-        box position="absolute" top=below bottom=0 left=left right=right touch-action="none" pan=drag panrelease=release testId="pull"
+        box position="absolute" top=below bottom=0 left=left right=hexRight touch-action="none" pan=drag panrelease=release testId="pull"
 
-      box position="absolute" top=below bottom=0 left=left width=20 touch-action="none" pan=edgeDrag panrelease=edgeRelease z-index=1 aria-hidden=true testId="calls-edge"
+      box position="absolute" top=below bottom=footTop left=left width=20 touch-action="none" pan=edgeDrag panrelease=edgeRelease z-index=1 aria-hidden=true testId="calls-edge"
 
-      // Toolbar: down the side column; across the band beside the camera; else a row at the top,
-      // Calls on the leading edge and Tasks and Settings in one capsule on the trailing one.
-      if columned
-        column position="absolute" top=columnTop left=(columnMid - 22) width=44 gap=(tight ? 8 : 12) align-items="center" z-index=2 testId="toolbar"
-          Tools(axis="column", counts=counts, open=open, openTasks=openTasks)
-      else
-        row position="absolute" top=(banded ? max(top / 2 + 7 - 22, 4) : top + 6) left=(banded ? bandSpan.x : 16) width=(banded ? `${bandSpan.width}px` : book ? "calc(env(viewport-segment-width 0 0) - 32px)" : "calc(100% - 32px)") justify-content="space-between" align-items="center" z-index=2 testId="toolbar"
-          Tools(axis="row", counts=counts, open=open, openTasks=openTasks)
+      Chrome(room=room, on="", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=open("/"))
 
-      // The orb: in the middle at rest, docked as the words are read (phone, cover screen); on the
-      // left screen of a book fold; above a laptop fold.
+      // The orb: in the middle at rest, docked as the words are read (one column); at the head of
+      // hex's column (two).
       if single
         box position="absolute" left=(orbX - orbSize / 2) top=(orbY - orbSize / 2) width=orbSize height=orbSize touch-action="none" pan=drag panrelease=release press=orbTap aria-label=(reading ? `${label}. Put the words away` : label) -exact-layout-transition=glide testId="orb-spot"
           hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label -exact-layout-transition=glide testId="orb"
-        column position="absolute" top=(restY + restSize / 2 + 12) left=left right=right align-items="center" gap=10 opacity=(homeMode ? 0 : 1 - pull) pointer-events=(homeMode or pull > 0.5 ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="stage"
+        column position="absolute" top=(restY + restSize / 2 + 12) left=left right=hexRight align-items="center" gap=10 opacity=(homeMode ? 0 : 1 - pull) pointer-events=(homeMode or pull > 0.5 ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="stage"
           CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
           if wrapped
             box padding="8px 32px" width="100%" box-sizing="border-box" display="flex" justify-content="center"
               WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
-        if readable and not (homeMode and columned)
+        if readable and not homeMode
           box position="absolute" left=(dockX - 26) top=(dockY - 26) opacity=(1 - pull) pointer-events=(pull > 0 ? "none" : "auto") testId="transcript-dock"
             button press=setReading(true) appearance="auto" buttonStyle="glass" width=52 height=52 aria-label="Show transcript" testId="show-transcript"
               image "symbol:sf/text.bubble"
       else
-        column position="absolute" top=below bottom=(laptop ? "calc(100% - env(viewport-segment-bottom 0 0))" : `${columned ? columnFoot : bottom + 12 + callSize + 16}px`) left=0 right=(book ? "calc(100% - env(viewport-segment-right 0 0))" : `${right}px`) align-items="center" justify-content="center" gap=10 opacity=(homeMode ? 0 : 1) pointer-events=(homeMode ? "none" : "auto") transition="opacity 300ms" testId="stage"
+        column position="absolute" top=below bottom=footTop left=left right=hexRight align-items="center" justify-content="center" gap=10 opacity=(homeMode ? 0 : 1) pointer-events=(homeMode ? "none" : "auto") transition="opacity 300ms" testId="stage"
           hex-orb state=status silenced=(micOff or hushed ? "true" : "false") persona=persona tint=personaColor palette=palette reaction=reaction still=(viewport.prefersReducedMotion ? "true" : "false") width=orbSize height=orbSize role="img" aria-label=label testId="orb"
           CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
           if wrapped and not talking
             box padding="8px 32px"
               WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
 
-      // The words: under the toolbar as they're read, on the right screen of a book fold, below a
-      // laptop fold.
-      column position="absolute" top=wordsTop bottom=wordsBottom left=wordsLeft right=right opacity=(single ? pull : homeMode ? (wordsShown ? 1 : 0) : readable ? 1 : 0) pointer-events=(single ? (pull < 1 ? "none" : "auto") : homeMode and not wordsShown ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="words"
+      // The words: under the chrome as they're read (one column), in the second column (two).
+      column position="absolute" top=below bottom=wordsBottom left=wordsLeft right=wordsRight opacity=(single ? pull : homeMode ? (wordsShown ? 1 : 0) : readable ? 1 : 0) pointer-events=(single ? (pull < 1 ? "none" : "auto") : homeMode and not wordsShown ? "none" : "auto") transition=(pulling ? "none" : "opacity 300ms") testId="words"
         if live and not talking
           text "Your conversation will appear here." color="-exact-tertiary-label" text-align="center" padding="24px 20px" testId="transcript-empty"
         if single and footerBad
           text footer font="-exact-footnote" color="-exact-system-red" text-align="center" padding="0 20px 6px" testId="words-trouble"
-        CallWords(lines=lines, asks=activity.asks, said=said, width=contentW, live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
+        CallWords(lines=lines, asks=activity.asks, said=said, width=(two ? room.second.width : hexW), live=live, answer=answer, answerMany=answerMany, openTask=openTask, reshare=reshare)
 
-      // hex as the home: on a phone and the cover screen under the orb resting at its top; on a book
-      // fold on the left screen, the page a row opens on the right; on a laptop fold hex and Needs
-      // you above the fold, the rest below it.
-      if laptop
-        column position="absolute" top=below bottom="calc(100% - env(viewport-segment-bottom 0 0))" left=left right=right opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home"
-          HexHome(part="top", face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=false, beside="", select=choose, openTask=openTask, openTasks=openTasks)
-            CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
-            if wrapped
-              box padding="8px 0" display="flex" justify-content="center"
-                WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
-        column position="absolute" top="env(viewport-segment-top 0 1)" bottom=homeBottom left=left right=right opacity=(homeMode and not wordsShown ? 1 : 0) pointer-events=(homeMode and not wordsShown ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home-below"
-          HexHome(part="bottom", face=false, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=false, beside="", select=choose, openTask=openTask, openTasks=openTasks)
-      else
-        column position="absolute" top=below bottom=homeBottom left=left right=homeRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home"
-          HexHome(part="all", face=(not single), persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=book, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks)
-            CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
-            if wrapped
-              box padding="8px 0" display="flex" justify-content="center"
-                WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
-        if book and homeMode and not wordsShown
-          column position="absolute" top=top bottom=0 left="env(viewport-segment-left 1 0)" right=right z-index=1 testId="home-beside"
-            children
+      // hex as the home: in hex's column under the chrome, down to Call; with two columns the page a
+      // row opens beside it.
+      column position="absolute" top=below bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition="opacity 300ms" z-index=1 testId="hex-home"
+        HexHome(part="all", face=(not single), persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=viewport.prefersReducedMotion, now=now, offset=offset, tasks=tasks, asks=asks, said=said, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks)
+          CallLines(status=status, call=call, elapsed=elapsed, liveRecord=liveRecord, footer=footer, footerBad=footerBad)
+          if wrapped
+            box padding="8px 0" display="flex" justify-content="center"
+              WrapUp(call=last, whole=false, more=0, openTasks=openTasks, open=open)
+      if two and homeMode and not wordsShown
+        column position="absolute" top=below bottom=0 left=secondLeft right=right z-index=1 testId="home-beside"
+          children
 
       // The agent line: what hex is doing for this call; tap for the Working tab.
       if agentShown
-        button press=openTasks("working") class=Tap position="absolute" bottom=agentBottom left=(book ? "env(viewport-segment-left 1 0)" : `${left}px`) right=right height=36 margin="0 20px" padding="0 14px" border-radius=18 background-color="-exact-tertiary-fill" display="flex" flex-direction="row" align-items="center" gap=8 aria-live="polite" aria-label=`hex is ${agent.state == "running" ? "working" : agent.state}: ${agentText}${agentWhere != "" ? `, ${agentWhere}` : ""}` testId="agent-line"
+        button press=openTasks("working") class=Tap position="absolute" bottom=agentBottom left=wordsLeft right=wordsRight height=36 margin="0 20px" padding="0 14px" border-radius=18 background-color="-exact-tertiary-fill" display="flex" flex-direction="row" align-items="center" gap=8 aria-live="polite" aria-label=`hex is ${agent.state == "running" ? "working" : agent.state}: ${agentText}${agentWhere != "" ? `, ${agentWhere}` : ""}` testId="agent-line"
           if agent.state == "running"
             progress width=14 height=14 aria-hidden=true
           else
@@ -303,30 +273,19 @@ component Home
           if agentWhere != ""
             text agentWhere font="-exact-caption1" font-variant-numeric="tabular-nums" color=(agent.state == "failed" ? "hex.danger" : agent.state == "done" ? "-exact-label" : "-exact-tertiary-label") white-space="nowrap"
 
-      // The call's buttons: down the side column above its foot; else in a row at the foot of the
-      // orb's side, mute and the photo menu either side of the call button.
-      if columned
-        column position="absolute" bottom=columnFoot left=(columnMid - callSize / 2) width=callSize gap=(tight ? 10 : 14) align-items="center" z-index=2 testId="controls"
-          if here and call.shell
-            AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=muteSize, disabled=false, add=share)
-          if status != "idle"
-            MuteButton(size=muteSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
-          if homeMode and talking
-            WordsButton(size=muteSize, shown=(not single and wordsShown), single=single, show=showTranscript)
-          CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
-      else
-        row position="absolute" bottom=(bottom + 12) left=(book ? "env(viewport-segment-left 0 0)" : "0px") width=(book ? "env(viewport-segment-width 0 0)" : "100%") justify-content="center" align-items="center" gap=28 testId="controls"
-          if status == "idle" and homeMode and talking and not single
-            WordsButton(size=60, shown=wordsShown, single=false, show=showTranscript)
-          else if status == "idle"
-            box width=60 height=60
-          else
-            MuteButton(size=60, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
-          CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
-          if here and call.shell
-            AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=60, disabled=false, add=share)
-          else
-            box width=60 height=60
+      // The call's buttons, at the foot of hex's column: mute and the photo menu either side of Call.
+      row position="absolute" bottom=(bottom + 12) left=left width=hexW justify-content="center" align-items="center" gap=28 z-index=2 testId="controls"
+        if status == "idle" and homeMode and talking and not single
+          WordsButton(size=muteSize, shown=wordsShown, single=false, show=showTranscript)
+        else if status == "idle"
+          box width=muteSize height=muteSize
+        else
+          MuteButton(size=muteSize, mute=mute, micOff=micOff, hushed=hushed, disabled=(not here or not call.shell))
+        CallButton(size=callSize, status=status, busy=busy, retry=(call.error != ""), primary=primary)
+        if here and call.shell
+          AddMedia(menu="call-add", label="Send a photo or video", glass=true, size=muteSize, disabled=false, add=share)
+        else
+          box width=muteSize height=muteSize
 
 // A call hex holds that isn't this phone's (a phone call): shown live, ended from here.
 fn isElsewhere(call: CallState, activity: Activity, liveRecord: CallRecord): bool = call.status == "idle" and activity.call != "" and liveRecord.call.id == activity.call and liveRecord.call.ended == 0
@@ -370,16 +329,15 @@ component CallWords
             row justify-content=(l.who == "you" ? "flex-end" : "flex-start") padding="4px 0"
               text l.text user-select="text" max-width=(l.who == "you" ? "82%" : "100%") font=(l.who == "you" ? "-exact-body" : "-exact-title3") font-weight=(l.who == "you" ? 400 : 500) color=(l.who == "you" ? "-exact-secondary-label" : "-exact-label") padding=(l.who == "you" ? "8px 14px" : "2px 0") border-radius=18 background-color=(l.who == "you" ? "-exact-tertiary-fill" : "transparent") overflow-wrap="break-word" testId=`line-${l.id}`
 
-// The call while Tasks, Calls or Settings cover Home on the Duo: hex's orb small, the call's clock
-// and its buttons, down the side column or across the band beside the camera. A tap on the orb goes
-// back to the call. On a book fold with Tasks open, Words puts the call's words on the left screen,
-// beside the page.
+// The call while a page covers Home: a bar at the foot of the clear rectangle with hex's orb, its
+// clock, Mute and End. A tap on the orb or its name goes back to the call. With two columns and Tasks
+// open, Words puts the call's words in the first column, beside the page.
 component CallDock
   inject
     haptics: bool
   props
     viewport: Viewport
-    pose: Pose
+    room: Room
     call: CallState
     activity: Activity
     liveRecord: CallRecord
@@ -396,81 +354,31 @@ component CallDock
     toggleBeside: action
   derive elsewhere = isElsewhere(call, activity, liveRecord)
   derive status = elsewhere ? (leaving ? "ending" : "live") : call.status
-  derive columned = barOf(viewport, pose) != ""
-  derive mid = columnMidOf(viewport, pose)
-  derive tight = viewport.height < 520
-  derive band = bandOf(viewport, pose)
   derive started = elsewhere ? liveRecord.call.started : call.started
   derive micOff = call.muted or call.interrupted
-  derive book = viewport.horizontalViewportSegments == 2
   action stop
     if elsewhere
       hangUp(activity.call)
     else
       end()
   view
-    if columned
-      column position="absolute" top=columnTopOf(viewport, pose) bottom=columnFootOf(viewport, pose) left=(mid - 28) width=56 align-items="center" justify-content="space-between" z-index=20 testId="call-dock"
-        column align-items="center" gap=8
-          button press=home class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
-            hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=34 height=34
+    row position="absolute" bottom=room.foot left=(room.clear.x + 12) width=(min(room.clear.width - 24, 440)) height=64 padding="0 8px" box-sizing="border-box" gap=10 align-items="center" border-radius=32 backgroundMaterial="glass" box-shadow="0 6px 24px rgba(0,0,0,0.18)" z-index=20 testId="call-dock"
+      button press=home class=Tap flex=1 min-width=0 height=56 display="flex" flex-direction="row" align-items="center" gap=10 aria-label="Back to the call" -exact-press-haptic=(haptics ? "selection" : "none") testId="dock-orb"
+        hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=44 height=44
+        column min-width=0 align-items="flex-start"
+          text "hex" font="-exact-headline" color="-exact-label"
           if status == "live"
-            time datetime=started format="timer" font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
-          if book and tasksOpen
-            button press=toggleBeside appearance="none" width=44 height=44 border-radius=22 backgroundMaterial="glass" background-color=(beside ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(beside ? "Show Tasks beside the page" : "Show the transcript beside Tasks") aria-pressed=beside -exact-press-haptic=(haptics ? "selection" : "none") testId="dock-beside"
-              image "symbol:sf/text.bubble" width=18 height=18 object-fit="contain" color=(beside ? "AccentColor" : "-exact-label")
-        column align-items="center" gap=(tight ? 10 : 14)
-          if not elsewhere
-            MuteButton(size=48, mute=mute, micOff=micOff, hushed=false, disabled=(status != "live" or not call.shell))
-          CallButton(size=(tight ? 48 : 56), status=status, busy=(status != "live"), retry=false, primary=stop)
-    else
-      row position="absolute" top=max(viewport.safeAreaTop / 2 + 7 - 22, 4) right=(viewport.width - band.x - band.width) gap=10 align-items="center" z-index=20 testId="call-dock"
-        button press=home class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Back to the call" testId="dock-orb"
-          hex-orb state=status silenced=(micOff ? "true" : "false") persona=persona tint=personaColor palette=palette reaction="off" still=(viewport.prefersReducedMotion ? "true" : "false") width=34 height=34
-        if status == "live"
-          time datetime=started format="timer" font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-secondary-label" min-width=44
-        if not elsewhere
-          MuteButton(size=44, mute=mute, micOff=micOff, hushed=false, disabled=(status != "live" or not call.shell))
-        CallButton(size=44, status=status, busy=(status != "live"), retry=false, primary=stop)
-
-// The widest stretch of [from, to] clear of every box in `taken`, 12 points off each.
-fn widestClear(from: number, to: number, taken: Rect[]): Span = match sortBy(range(taken.length + 1).map(i => Span(x=(i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from }), width=((i == taken.length ? to : match sortBy(taken, t => t.x).at(i) { case some(t) => t.x - 12, case none => to }) - (i == 0 ? from : match sortBy(taken, t => t.x).at(i - 1) { case some(t) => t.x + t.width + 12, case none => from })))), s => s.width, "desc").at(0) { case some(s) => s, case none => Span(x=from, width=to - from) }
-// The Duo's side column: the side the system bars take ("" when none), how wide, where its tools
-// start below a camera, where its buttons end above one, and its middle, the system's own: its status
-// items' (the camera's ring), else the column's.
-fn barOf(v: Viewport, p: Pose): string = p.bar == "left" and v.safeAreaLeft > 0 ? "left" : p.bar == "right" and v.safeAreaRight > 0 ? "right" : ""
-fn columnWidth(v: Viewport, p: Pose): number = barOf(v, p) == "left" ? v.safeAreaLeft : barOf(v, p) == "right" ? v.safeAreaRight : 0
-fn coversOf(v: Viewport, p: Pose): Rect[] = p.occlusions.filter(o => o.x < (barOf(v, p) == "left" ? 0 : v.width - columnWidth(v, p)) + columnWidth(v, p) and o.x + o.width > (barOf(v, p) == "left" ? 0 : v.width - columnWidth(v, p)))
-fn columnTopOf(v: Viewport, p: Pose): number = max(max(v.safeAreaTop, 16), largest(coversOf(v, p).filter(o => o.y + o.height / 2 < v.height / 2).map(o => o.y + o.height + 8)))
-fn columnFootOf(v: Viewport, p: Pose): number = max(max(v.safeAreaBottom, 12), largest(coversOf(v, p).filter(o => o.y + o.height / 2 >= v.height / 2).map(o => v.height - o.y + 8)))
-fn columnMidOf(v: Viewport, p: Pose): number = match coversOf(v, p).filter(o => o.width < columnWidth(v, p)).at(0) { case some(o) => o.x + o.width / 2, case none => (barOf(v, p) == "left" ? 0 : v.width - columnWidth(v, p)) + columnWidth(v, p) / 2 }
-// The top band of a fold with no side column, clear of its camera.
-fn bandOf(v: Viewport, p: Pose): Span = widestClear(16, v.width - 16, p.occlusions.filter(o => o.y + o.height / 2 < v.safeAreaTop))
-fn largest(xs: number[]): number = match sortBy(xs, x => x, "desc").at(0) { case some(x) => x, case none => 0 }
-
-shape Span
-  x: number
-  width: number
-
-// Calls, Tasks (a dot when something needs Bassim) and Settings, in a row or down the side column.
-component Tools
-  inject
-    haptics: bool
-  props
-    axis: string
-    counts: Counts
-    open: action
-    openTasks: action
-  view
-    button press=open(path("calls")) class=Glass aria-label="Calls" testId="open-calls"
-      image "symbol:sf/clock.arrow.circlepath"
-    box flex-direction=axis display="flex" backgroundMaterial="glass" border-radius=22 width=(axis == "row" ? "auto" : "44px") height=(axis == "row" ? "44px" : "auto") align-items="center" padding=(axis == "row" ? "0 4px" : "4px 0") gap=2 position="relative"
-      button press=openTasks("") class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label=`Tasks, ${counts.yours} need you, ${counts.working} working` -exact-press-haptic=(haptics ? "selection" : "none") testId="open-tasks"
-        image "symbol:list" width=20 height=20 object-fit="contain" color="-exact-label"
-      button press=open(path("settings")) class=Tap width=44 height=44 display="flex" align-items="center" justify-content="center" aria-label="Voice and appearance settings" -exact-press-haptic=(haptics ? "selection" : "none") testId="open-settings"
-        image "symbol:adjust" width=20 height=20 object-fit="contain" color="-exact-label"
-      if counts.yours > 0
-        box position="absolute" top=(axis == "row" ? -2 : 2) left=(axis == "row" ? 34 : 32) width=10 height=10 border-radius=5 background-color="AccentColor" border="2px solid -exact-background" aria-hidden=true testId="needs-dot"
+            row gap=4
+              text (micOff ? "Muted ·" : "On a call ·") font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
+              time datetime=started format="timer" font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
+          else
+            text (status == "ending" ? "Ending…" : status == "reconnecting" ? "Reconnecting…" : "Calling…") font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
+      if room.columns == 2 and tasksOpen
+        button press=toggleBeside class=Tap width=48 height=48 border-radius=24 background-color=(beside ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(beside ? "Show Tasks beside the page" : "Show the transcript beside Tasks") aria-pressed=beside -exact-press-haptic=(haptics ? "selection" : "none") testId="dock-beside"
+          image "symbol:sf/text.bubble" width=18 height=18 object-fit="contain" color=(beside ? "AccentColor" : "-exact-label")
+      if not elsewhere
+        MuteButton(size=48, mute=mute, micOff=micOff, hushed=false, disabled=(status != "live" or not call.shell))
+      CallButton(size=48, status=status, busy=(status != "live"), retry=false, primary=stop)
 
 // Under the orb: the call's clock, its connecting, and how it went.
 component CallLines
@@ -502,7 +410,7 @@ component WordsButton
     single: bool
     show: action
   view
-    button press=show appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial="glass" background-color=(shown ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(single ? "Show transcript" : shown ? "Put the transcript away" : "Show the transcript") aria-pressed=(single ? false : shown) -exact-press-haptic=(haptics ? "selection" : "none") testId="home-words"
+    button press=show class=Tap width=size height=size border-radius=(size / 2) backgroundMaterial="glass" background-color=(shown ? "-exact-tertiary-fill" : "transparent") display="flex" align-items="center" justify-content="center" aria-label=(single ? "Show transcript" : shown ? "Put the transcript away" : "Show the transcript") aria-pressed=(single ? false : shown) -exact-press-haptic=(haptics ? "selection" : "none") testId="home-words"
       image "symbol:sf/text.bubble" width=(size * 0.36) height=(size * 0.36) object-fit="contain" color=(shown ? "AccentColor" : "-exact-label")
 
 component MuteButton
@@ -515,7 +423,7 @@ component MuteButton
     disabled: bool
     mute: action
   view
-    button press=mute disabled=disabled appearance="none" width=size height=size border-radius=(size / 2) backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(micOff ? "Unmute microphone" : hushed ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
+    button press=mute disabled=disabled class=Tap width=size height=size border-radius=(size / 2) backgroundMaterial="glass" display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(micOff ? "Unmute microphone" : hushed ? "hex muted, mute microphone" : "Mute microphone") testId="mute"
       image (micOff ? "symbol:sf/mic.slash.fill" : hushed ? "symbol:sf/speaker.slash.fill" : "symbol:sf/mic.fill") width=(size * 0.37) height=(size * 0.37) object-fit="contain" color=(micOff ? "-exact-system-red" : "-exact-label")
 
 component CallButton

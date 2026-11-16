@@ -67,7 +67,7 @@ component GoalsList
       if watches.length > 0
         Head(label="Watching", n=watches.length, pad="18px 10px 6px", id="goals-head-watching")
         for w in shownWatches key=w.id
-          Row(mark="watch", title=w.title, line=watchLine(w), lines=1, failed=false, stamp=watchStamp(w, now, offset), n=0, pips=0, selected=(beside == `watch:${w.id}`), href="", label=`Watching ${w.title}: ${watchLine(w)}${watchStamp(w, now, offset) != "" ? `, checks again ${nextWords(w.next, now, offset)}` : ""}`, id=`goals-watch-${w.id}`, press=openWatch(w.id))
+          Row(mark="watch", title=w.title, line=watchLine(w), lines=1, failed=false, stamp=watchStamp(w, now, offset), n=0, agents=0, selected=(beside == `watch:${w.id}`), href="", label=`Watching ${w.title}: ${watchLine(w)}${watchStamp(w, now, offset) != "" ? `, checks again ${nextWords(w.next, now, offset)}` : ""}`, id=`goals-watch-${w.id}`, press=openWatch(w.id))
         if watches.length > 2
           ShowMore(n=watches.length - 2, shown=allWatches, pad="6px 10px", id="goals-more-watching", press=toggleWatches)
       if groups.length > 0
@@ -79,7 +79,7 @@ component GoalsList
           if open.includes(p.name)
             for x in groupGoals(goals, p.name) key=x.id
               box padding-left=34
-                Row(mark=markOfGoal(x.state), title=x.title, line=standsOf(x, now, offset), lines=1, failed=false, stamp=(x.state == "unstarted" or x.state == "idle" ? "" : whenOf(x.at, now, offset)), n=0, pips=0, selected=(beside == `goal:${x.id}`), href="", label=`${x.title}: ${standsOf(x, now, offset)}`, id=`goals-goal-${x.id}`, press=openGoal(x.id))
+                Row(mark=markOfGoal(x.state), title=x.title, line=standsOf(x, now, offset), lines=1, failed=false, stamp=(x.state == "unstarted" or x.state == "idle" ? "" : whenOf(x.at, now, offset)), n=0, agents=0, selected=(beside == `goal:${x.id}`), href="", label=`${x.title}: ${standsOf(x, now, offset)}`, id=`goals-goal-${x.id}`, press=openGoal(x.id))
         if groups.length > 5
           ShowMore(n=groups.length - 5, shown=allGroups, pad="6px 10px", id="goals-more-projects", press=toggleGroups)
   action toggleWatches

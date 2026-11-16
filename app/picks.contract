@@ -62,7 +62,7 @@ component Picks
           if picks.length == 0
             Note(kind="empty", text="Nothing left to take", pad="24px 12px", id="picks-empty")
           for a in picks key=a.id
-            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, pips=0, selected=(two and beside == a.id), href="", label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=show(a.id))
+            Row(mark=(choiceOf(picked, a) == "" ? "pending" : choiceOf(picked, a) == pickOf(a) ? "pick" : "done"), title=a.topic, line=(choiceOf(picked, a) == "" ? `Decide later · ${a.question}` : `${choiceOf(picked, a)} · ${a.question}`), lines=2, failed=false, stamp="", n=0, agents=0, selected=(two and beside == a.id), href="", label=`${a.topic}: ${a.question}. ${choiceOf(picked, a) == "" ? "Decide later" : choiceOf(picked, a)}`, id=`pick-${a.id}`, press=show(a.id))
       if picks.length > 0
         button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(room.columns == 2 ? room.first.x + 16 : left + 16 + max(room.clear.width - 32 - 480, 0) / 2) width=(room.columns == 2 ? room.first.width - 32 : min(room.clear.width - 32, 480)) min-height=50 testId="picks-answer"
           text `Answer ${taking.length} ${taking.length == 1 ? "question" : "questions"}` color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600

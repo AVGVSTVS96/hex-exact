@@ -2,13 +2,14 @@
 // then the list of the page under it. Now is the few things that need Bassim, what hex is working
 // on and what it decided for him; Feed, Ideas and Goals join it as tabs at the foot of hex's column.
 // Home shows it whenever no call is on; Tasks has the rest.
-use Tasks, Ask, Asks, TaskRow, Goals from "./shapes.contract"
-use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, dayOf, Tap, springOf from "./parts.contract"
+use Tasks, Ask, Asks, TaskRow, Track, Goals from "./shapes.contract"
+use Mark, StageHead, ShowMore, Row, Ribbon, Note, RowTap, PillTap, PillFace, whenOf, dayOf, Tap, springOf from "./parts.contract"
 use Said from "./said.contract"
 use FeedList, FeedView from "./feed.contract"
 use IdeasList, Ideas, Idea from "./ideas.contract"
 use GoalsList from "./goals.contract"
-use Item, entriesOf, homeOf, problemOf from "./inbox.contract"
+use Item, entriesOf, homeOf, problemOf, picksOf from "./inbox.contract"
+use pickOf from "./rows.contract"
 
 // hex floats at the top of its room: the orb (Home draws it, so a call grows it from there) over a
 // glass pill with its name and one short live line.
@@ -69,6 +70,8 @@ component HexHome
     openTask: action
     openTasks: action
     open: action
+    // Takes hex's pick on each of these questions at once (ids, then the picks).
+    answerAll: action
     feed: FeedView
     openFeed: action
     discuss: action
@@ -115,7 +118,7 @@ component HexHome
         scroll position="absolute" inset=0 padding=`${under}px 6px ${pad}px` box-sizing="border-box" opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
           if p == "now"
             children
-            NowList(wide=(width > height), now=now, offset=offset, tasks=tasks, needs=needs, working=working, decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
+            NowList(wide=(width > height), width=(width - 12), height=(height - under - pad), now=now, offset=offset, tasks=tasks, needs=needs, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll)
           else if p == "feed"
             FeedList(feed=feed, now=now, offset=offset, width=(width - 12), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
           else if p == "ideas"
@@ -135,24 +138,43 @@ component HexHome
                   box width=4 height=4 border-radius=2 background-color="hex.progress" opacity=(i == 0 ? 0.35 : i == 1 ? 0.65 : 1) animation=(still ? "none" : `liveDot 1.2s ease-in-out ${i * 0.2}s infinite`)
               text liveText font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0 flex-shrink=1
 
-// Now: the first three things that need Bassim, then what hex decided for him this week, a bar a
-// day; then the first three hex is working on, each with a pip per agent in it. Each head and "Show
-// N more" opens its whole list. A room wider than tall holds the two side by side.
-fn shownRows(): number = 3
+// Now: as many of what needs Bassim as fit in about 60% of the room, then hex's picks to take at
+// once; as many of what hex is working on as fit in the rest (at least one), each with its agents
+// and its last day; then what hex decided this week, a bar a day. "Show N more" opens each whole
+// list. A room wider than tall holds them in two columns, Working on on the right. Rows are counted
+// to the room so none sits half under Call or the window's edge.
 fn agentsIn(e: Item, tasks: TaskRow[]): number = match tasks.filter(t => t.id == e.id).at(0) { case some(t) => t.agents.filter(a => a.state == "working").length, case none => 0 }
+fn trackOf(e: Item, tasks: TaskRow[]): Track[] = match tasks.filter(t => t.id == e.id).at(0) { case some(t) => t.track, case none => [] }
 // The last seven days, oldest first: how many hex decided on each.
 fn decidedWeek(decided: Ask[], now: number, offset: number): number[] = range(7).map(i => decided.filter(d => dayOf(d.decided, offset) == dayOf(now, offset) - 6 + i).length)
+// A row's height: its padding and title (40), then 20 a line of its 15pt text, which runs about
+// 7.4pt a character in a column `width` wide less the row's insets and mark (64).
+fn linesOf(text: string, width: number, most: number): number = max(1, min(most, ceil(text.length * 7.4 / max(width - 64, 60))))
+fn needH(e: Item, width: number): number = 40 + 20 * linesOf(lineFor(e), width, 2)
+// A working row: its title, one line, and the ribbon under it.
+fn workH(): number = 80
+// How many of rows `heights` fit in `room`, at least `least` (when there are that many).
+fn fitting(heights: number[], room: number, least: number): number = max(min(least, heights.length), range(heights.length).filter(i => sum(heights.slice(0, i + 1)) <= room).length)
+// What the room's parts take: a head (40), "Show N more" (38), the picks row (46), a rule (11),
+// and hex decided (62).
+fn headH(): number = 40
+fn moreH(): number = 38
+fn picksH(): number = 46
 
 component NowList
   inject
     haptics: bool
   props
     wide: bool
+    // The list's own width and the height it shows without scrolling.
+    width: number
+    height: number
     now: number
     offset: number
     tasks: Tasks
     needs: Item[]
     working: Item[]
+    picks: Ask[]
     decided: Ask[]
     known: bool
     failed: bool
@@ -162,11 +184,18 @@ component NowList
     openTask: action
     openTasks: action
     open: action
-  derive shownNeeds = needs.slice(0, shownRows())
-  derive shownWork = working.slice(0, shownRows())
+    answerAll: action
+  // Wide, each column is half the width, and Needs you ends above hex decided.
+  derive colW = wide ? (width - 4) / 2 : width
+  derive needsRoom = (wide ? height - 62 : round(height * 0.62)) - headH() - moreH() - (picks.length > 0 ? picksH() : 0)
+  derive shownNeeds = needs.slice(0, fitting(needs.map(e => needH(e, colW)), needsRoom, 2))
+  derive needsUsed = headH() + sum(shownNeeds.map(e => needH(e, colW))) + (needs.length > shownNeeds.length ? moreH() : 0) + (picks.length > 0 ? picksH() : 0)
+  // `height` ends above Call. In one column hex decided is last, beside Call in its band, so
+  // Working on has the rest down to Call; in two, Working on ends above Call, as `height` does.
+  derive workRoom = (wide ? height : height - needsUsed - 22) - headH() - moreH()
+  derive shownWork = working.slice(0, fitting(working.map(e => workH()), workRoom, 1))
   derive week = decidedWeek(decided, now, offset)
   derive most = match sortBy(week, n => n, "desc").at(0) { case some(n) => max(1, n), case none => 1 }
-  derive thisWeek = sum(week)
   // Questions of one topic open the same page beside; only one of its rows is marked: the one
   // tapped, else the first.
   state tapped = ""
@@ -183,32 +212,60 @@ component NowList
     column testId="home-now"
       if failed and not known
         Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
-      row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch")
+      row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 4 : 0)
         column flex=(wide ? 1 : 0) min-width=0 testId="home-needs"
-          StageHead(state="asks", label="Needs you", n=needs.length, known=known, opens=true, pad="9px 10px", id="home-head-asks", press=openTasks("needs"))
+          StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="9px 10px", id="home-head-asks")
           for e in shownNeeds key=e.id
-            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, pips=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
           if known and needs.length == 0
             Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 42px", id="home-empty-needs")
           if needs.length > shownNeeds.length
             ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=openTasks("needs"))
-          if decided.length > 0
-            button press=open(path("decided")) class=RowTap align-items="center" gap=10 -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${thisWeek} this week` testId="home-decided"
+          if picks.length > 0
+            row gap=10 align-items="center" padding="1px 10px" testId="home-picks"
               Mark(state="decided", size=22)
-              text font="-exact-headline" color="-exact-label" flex=1 min-width=0 text-align="left" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-                text "hex decided"
-                text ` ${thisWeek} this week` font-weight=400 color="-exact-secondary-label"
-              row gap=3 align-items="flex-end" height=22 flex-shrink=0 aria-hidden=true testId="home-decided-week"
-                for n, i in week key=i
-                  box width=5 height=max(2, round(n / most * 22)) border-radius=2 background-color="hex.accent" opacity=(i == 6 ? 1 : 0.55)
-              image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" margin-left=4 aria-hidden=true
+              text `hex has ${picks.length} ${picks.length == 1 ? "pick" : "picks"}` font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+              button press=answerAll(picks.map(a => a.id), picks.map(a => pickOf(a))) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Take hex's pick on ${picks.length} questions` testId="home-take-all"
+                box class=PillFace height=32 box-sizing="border-box" padding="0 12px" background-color="hex.accent.wash"
+                  text "Take all" font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap"
+          if wide
+            Decided(n=sum(week), week=week, most=most, clear=0, open=open(path("decided")))
         if not wide
           box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
-        column flex=(wide ? 1 : 0) min-width=0 border-left=(wide ? "0.5px solid -exact-separator" : "none") testId="home-working"
-          StageHead(state="working", label="Working on", n=working.length, known=known, opens=true, pad="9px 10px", id="home-head-working", press=openTasks("working"))
+        column flex=(wide ? 1 : 0) min-width=0 testId="home-working"
+          StageHead(state="working", label="Working on", n=working.length, known=known, pad="9px 10px", id="home-head-working")
           for e in shownWork key=e.id
-            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, pips=agentsIn(e, tasks.tasks), selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+            Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=agentsIn(e, tasks.tasks), selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+              Ribbon(track=trackOf(e, tasks.tasks), now=now)
           if known and working.length == 0
             Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 42px", id="home-empty-working")
           if working.length > shownWork.length
             ShowMore(n=working.length - shownWork.length, shown=false, pad="8px 10px 10px", id="home-more-working", press=openTasks("working"))
+        if not wide
+          box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
+          Decided(n=sum(week), week=week, most=most, clear=70, open=open(path("decided")))
+
+// What hex decided itself this week, as a row: its count under it, a bar a day trailing (a day with
+// none a faint dot), and a chevron to the list. `clear` keeps it clear of Call when it's last.
+component Decided
+  inject
+    haptics: bool
+  props
+    n: number
+    week: number[]
+    most: number
+    clear: number
+    open: action
+  view
+    button press=open class=RowTap gap=10 align-items="center" margin-right=clear width="auto" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${n} this week` testId="home-decided"
+      Mark(state="decided", size=22)
+      column flex=1 min-width=0 gap=2
+        text "hex decided" font="-exact-headline" color="-exact-label" white-space="nowrap"
+        text `${n} this week` font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap"
+      row gap=3 align-items="flex-end" height=22 flex-shrink=0 aria-hidden=true testId="home-decided-week"
+        for v, i in week key=i
+          if v > 0
+            box width=5 height=max(3, round(v / most * 22)) border-radius=2 background-color="hex.accent"
+          else
+            box width=3 height=3 margin="0 1px" border-radius=1.5 background-color="hex.accent" opacity=0.3
+      image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" margin-left=3 aria-hidden=true

@@ -31,7 +31,7 @@ component ProjectRow
   derive headline = problem != "" ? problem : newest.title
   derive mark = newest.stage == "needs" ? (newest.kind == "task" or newest.kind == "fresh" ? "needs" : newest.mark) : problem != "" ? "failed" : newest.stage == "working" ? "working" : newest.stage == "done" ? "done" : "idle"
   view
-    Row(mark=mark, title=topic.name, line=headline, lines=2, failed=(problem != ""), stamp=whenOf(newest.at, now, offset), n=topic.entries.length, pips=0, selected=selected, href="", label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}`, id=`topic-${topic.name}`, press=select)
+    Row(mark=mark, title=topic.name, line=headline, lines=2, failed=(problem != ""), stamp=whenOf(newest.at, now, offset), n=topic.entries.length, agents=0, selected=selected, href="", label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}`, id=`topic-${topic.name}`, press=select)
 
 // A topic's head over its rows in search: tap to open the topic.
 component TopicHead

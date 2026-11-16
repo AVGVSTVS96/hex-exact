@@ -27,7 +27,8 @@ component PageTitle
     left: number
     id: string
   view
-    text text role="heading" aria-level=1 font="-exact-large-title" font-weight=700 color="-exact-label" line-clamp=2 padding=`0 ${room.columns == 2 ? 20 : max(room.width - room.bar.end, 20)}px 0 ${left}px` testId=id
+    // A column too narrow for a large title on one line (open like a laptop) takes the next size down.
+    text text role="heading" aria-level=1 font=(room.columns == 2 and room.first.width < 320 ? "-exact-title1" : "-exact-large-title") font-weight=700 color="-exact-label" line-clamp=2 padding=`0 ${room.columns == 2 ? 20 : max(room.width - room.bar.end, 20)}px 0 ${left}px` testId=id
 
 component CallsList
   inject

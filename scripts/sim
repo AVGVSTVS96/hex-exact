@@ -56,13 +56,18 @@ echo "$id"
 MAC
 }
 # What the app is built from: a run that changes only flows, scripts or docs reuses the last build.
-tree=$(cd "$here" && { git ls-files -co --exclude-standard app shell; echo app/hex.ts; } | sort -u | xargs sha1sum | sha1sum | cut -c1-40)
+# (The trailing word stands for what this script changes in the Mac's copy below.)
+tree=$(cd "$here" && { git ls-files -co --exclude-standard app shell; echo app/hex.ts; } | sort -u | xargs sha1sum | { cat; echo standin-grant; } | sha1sum | cut -c1-40)
 built=$(ssh "$mac" cat $folder-build/sim/tree 2>/dev/null </dev/null || true)
 if [ -z "${BUILT:-}" ] && [ "$tree" != "$built" ]; then
   # The folder starts as a clone of the first one (Rust's target, which names its own path, left out).
   ssh "$mac" "[ -d $folder ] || { cp -cR Developer/hex-exact $folder && rm -rf $folder/app/target; }" </dev/null
   # The Mac's copy is exactly this tree (--delete), so another builder's files there don't join this build.
   rsync -a --delete --exclude .git --exclude /app/target --exclude /app/.exact --exclude /app/node_modules --exclude /shell/build --exclude /shell/HexExact.xcodeproj --exclude /scripts/uitests/Flows.xcodeproj "$here/" "$mac:$folder/"
+  # The app fetches only https, so its build here may also fetch the stand-in's plain http
+  # (development builds only: a production bake leaves the line out).
+  ssh "$mac" "sed -i '' \"s|^export const grants = 'net.fetch https:|export const grants = 'development net.fetch $standin\\\\\\\\nnet.fetch https:|\" $folder/app/app.ts && grep -q 'development net.fetch $standin' $folder/app/app.ts" </dev/null ||
+    { echo "couldn't let the simulator's build fetch the stand-in (app/app.ts's grants changed?)" >&2; exit 1; }
   echo "building for the simulator on the Mac"
   ssh "$mac" "rm -f $folder-build/sim/tree && SIM=1 EXACT_SIM=$(simulator "hexexact Duo 1") HEX_URL='$standin' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build && echo $tree >$folder-build/sim/tree" </dev/null | tail -1
 fi

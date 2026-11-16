@@ -1,7 +1,7 @@
 // The rows of Tasks (§9.1): a topic's row in the list, and each entry's row in search and on a
 // topic's page. Every row swipes as the stable app's do: from the left to do the obvious thing (take
 // hex's pick, act, mark read), from the right to say "Not needed" or open where it lives.
-use Ask, Place from "./shapes.contract"
+use Ask, Place, TaskRow, Track from "./shapes.contract"
 use Mark, Chip, PlaceTile, Row, PillTap, RowTap, whenOf, appName, appTint, appSymbol, PillFace, plainOf from "./parts.contract"
 use Item, Topic, problemOf, pageOf from "./inbox.contract"
 use Said, unreached, failedWords from "./said.contract"
@@ -14,36 +14,66 @@ fn tileLabel(p: Place): string = p.place != "" ? p.place : appName(p.app)
 // The tile's link to open: its own, or a call's page in the app.
 fn tileHref(p: Place): string = p.call != "" ? `/calls/${encodeURIComponent(p.call)}` : p.link
 
-// A topic in the list: its mark, name, how many, when, and its newest headline.
+fn newestOf(t: Topic): Item = match sortBy(t.entries, e => e.at, "desc").at(0) { case some(e) => e, case none => Item(kind="", id="", topic="", app="", stage="", rank=0, at=0, page="", mark="", title="", line="", meta="", action="", sent=false, words="", tiles=[]) }
+// A topic's mark, from its newest entry: a question, a thread that waits on Bassim, a failure, work
+// going on, done, or quiet.
+fn topicMark(t: Topic): string = newestOf(t).stage == "needs" ? (newestOf(t).kind == "task" or newestOf(t).kind == "fresh" ? "asks" : newestOf(t).mark) : problemOf(newestOf(t).title) != "" ? "failed" : newestOf(t).stage == "working" ? "working" : newestOf(t).stage == "done" ? "done" : "pending"
+// Its last day, hour by hour, oldest first: amber where it waited on Bassim, blue where hex worked in it.
+fn hourInk(track: Track[], now: number, h: number): string = track.filter(x => floor((now - x.at) / 3600000) == 23 - h and x.state == "needs").length > 0 ? "hex.ask" : track.filter(x => floor((now - x.at) / 3600000) == 23 - h and x.state == "working").length > 0 ? "hex.progress" : ""
+fn dayTrack(track: Track[], now: number): string[] = range(24).map(h => hourInk(track, now, h))
+
+// A topic in the list: its mark, name, the questions in it and the agents on it, when, its newest
+// headline on one line, and while hex works in it, its last day hour by hour.
 component ProjectRow
   inject
     haptics: bool
   props
     topic: Topic
+    threads: TaskRow[]
     now: number
     offset: number
-    href: string
-    split: bool
     selected: bool
     select: action
-  derive newest = match sortBy(topic.entries, e => e.at, "desc").at(0) { case some(e) => e, case none => Item(kind="", id="", topic="", app="", stage="", rank=0, at=0, page="", mark="", title="", line="", meta="", action="", sent=false, words="", tiles=[]) }
+  derive newest = newestOf(topic)
   derive problem = problemOf(newest.title)
   derive headline = problem != "" ? problem : newest.title
-  derive mark = newest.stage == "needs" ? (newest.kind == "task" or newest.kind == "fresh" ? "needs" : newest.mark) : problem != "" ? "failed" : newest.stage == "working" ? "working" : newest.stage == "done" ? "done" : "idle"
+  derive mark = topicMark(topic)
+  derive own = threads.filter(t => t.name == topic.name)
+  derive questions = topic.entries.filter(e => e.kind == "ask").length
+  derive working = newest.stage == "working"
+  derive agents = working ? sum(own.map(t => t.agents.filter(a => a.state == "working").length)) : 0
+  derive hours = working ? dayTrack(own.map(t => t.track).flat(), now) : [""].slice(0, 0)
   view
-    Row(mark=mark, title=topic.name, line=headline, lines=2, failed=(problem != ""), stamp=whenOf(newest.at, now, offset), n=topic.entries.length, agents=0, selected=selected, href="", label=`${topic.name}, ${topic.entries.length} ${newest.stage == "needs" ? "waiting" : newest.stage}: ${headline}`, id=`topic-${topic.name}`, press=select)
+    button press=select class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-quaternary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${topic.name}${questions > 0 ? `, ${questions} ${questions == 1 ? "question" : "questions"}` : ""}${agents > 0 ? `, ${agents} ${agents == 1 ? "agent" : "agents"}` : ""}: ${headline}` testId=`topic-${topic.name}`
+      box padding-top=1 flex-shrink=0
+        Mark(state=mark, size=22)
+      column flex=1 min-width=0 gap=2
+        row gap=8 align-items="baseline"
+          text topic.name font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+          if questions > 0 and (mark != "asks" or questions > 1)
+            row gap=2 align-self="center" align-items="center" height=18 padding="0 6px 0 5px" border-radius=9 background-color="hex.ask.wash" flex-shrink=0 aria-hidden=true
+              image "symbol:icon.ask" width=9 height=9 object-fit="contain" color="hex.ask"
+              text `${questions}` font-size=12 line-height="16px" font-weight=600 font-variant-numeric="tabular-nums" color="hex.ask"
+          if agents > 0
+            text `${agents} ${agents == 1 ? "agent" : "agents"}` font="-exact-footnote" color="hex.progress" white-space="nowrap" flex-shrink=0 aria-hidden=true
+          box flex=1
+          text whenOf(newest.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+        if headline != ""
+          text headline font="-exact-subheadline" color=(problem != "" ? "hex.danger" : mark == "asks" ? "-exact-label" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+        if hours.length > 0
+          row gap=1 height=6 margin-top=5 border-radius=2 overflow="hidden" align-self="flex-start" aria-hidden=true
+            for c, i in hours key=i
+              box width=2 height=6 background-color=(c == "" ? "-exact-tertiary-fill" : c)
 
 // A topic's head over its rows in search: tap to open the topic.
 component TopicHead
   props
     topic: Topic
-    href: string
-    split: bool
     select: action
   view
-    link href="" press=select testId=`head-${topic.name}`
-      text topic.name font="-exact-footnote" font-weight=600 color="-exact-secondary-label" text-transform="uppercase" letter-spacing=0.4 flex=1
-      Chip(n=topic.entries.length, state=match topic.entries.at(0) { case some(e) => e.stage, case none => "" }, loading=false)
+    link href="" press=select display="flex" flex-direction="row" align-items="center" gap=8 padding="12px 10px 4px" testId=`head-${topic.name}`
+      text topic.name font="-exact-footnote" font-weight=600 color="-exact-secondary-label" flex=1 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      Chip(n=topic.entries.length, state="", loading=false)
 
 // One entry: an ask, a thread, a stuck run, a fresh result or a finished thing.
 component EntryRow
@@ -85,34 +115,42 @@ component EntryRow
           button id=`${entry.id}-lead` press=leading accent-color="hex.accent.solid" flex-shrink=0 scroll-snap-align="start" -exact-press-haptic=(haptics ? "selection" : "none") testId=`lead-${entry.id}`
             image "symbol:checkmark"
             text lead
-        row id=`${entry.id}-row` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box" gap=12 align-items="flex-start" padding="10px 16px" press=openPage(entry.page != "" ? entry.page : `topic:${entry.topic}`)
+        row id=`${entry.id}-row` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box" gap=10 align-items="flex-start" padding="8px 16px" press=openPage(entry.page != "" ? entry.page : `topic:${entry.topic}`)
           Mark(state=entry.mark, size=22)
-          column flex=1 min-width=0 gap=4
+          column flex=1 min-width=0 gap=3
             row gap=10 align-items="baseline"
-              text entry.title font="-exact-body" line-clamp=2 flex=1 min-width=0
-              if entry.meta != ""
-                text entry.meta font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap"
-              text whenOf(entry.at, now, offset) font="-exact-caption1" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
-              row gap=3
-                for t, i in entry.tiles key=`${t.app}${i}`
-                  PlaceTile(place=t, size=14)
+              text plainOf(entry.title) font="-exact-callout" color="-exact-label" line-clamp=2 flex=1 min-width=0
+              row gap=5 align-items="center" flex-shrink=0
+                if entry.meta != ""
+                  text match entry.meta.split(" ").at(0) { case some(n) => n, case none => "" } font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="hex.progress" aria-label=entry.meta
+                text whenOf(entry.at, now, offset) font="-exact-footnote" color="-exact-tertiary-label" white-space="nowrap" font-variant-numeric="tabular-nums"
+                match entry.tiles.at(0)
+                  case some(t)
+                    image appSymbol(t.app) width=11 height=11 object-fit="contain" color="-exact-tertiary-label" aria-label=tileLabel(t)
+                  case none
+                    box width=0
             if why != ""
-              text plainOf(why) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
-            if (entry.kind == "stuck" or entry.kind == "finished") and entry.line != ""
+              // The words found, in bold and full strength, in the stretch they were found in.
+              text font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
+                for p, i in plainOf(why.replaceAll("**", "¦")).split("¦") key=i
+                  text p font-weight=(i % 2 == 1 ? 600 : 400) color=(i % 2 == 1 ? "-exact-label" : "-exact-secondary-label")
+            if (entry.kind == "stuck" or entry.kind == "finished") and entry.line != "" and why == ""
               text entry.line font="-exact-subheadline" color="-exact-secondary-label" line-clamp=2
             match ask
               case some(a)
                 if inline(a)
-                  row gap=8 flex-wrap="wrap" padding-top=4
+                  row gap=8 flex-wrap="wrap" padding-top=2
                     for o in a.options key=o.label
                       button press=answer(a.id, o.label) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=(o.pick ? `${o.label}, hex’s pick` : o.label) testId=`inline-${a.id}-${o.label}`
-                        box class=PillFace background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill")
-                          text (o.pick ? `✦ ${o.label}` : o.label) font="-exact-subheadline" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
+                        box class=PillFace gap=5 height=32 padding="0 13px" box-sizing="border-box" background-color=(o.pick ? "hex.accent.wash" : "-exact-tertiary-fill")
+                          if o.pick
+                            image "symbol:icon.pick" width=11 height=11 object-fit="contain" color="hex.accent"
+                          text o.label font="-exact-subheadline" font-weight=600 color=(o.pick ? "hex.accent" : "-exact-label")
               case none
                 if entry.action != ""
-                  row padding-top=4
+                  row padding-top=2
                     button press=leading disabled=entry.sent class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") testId=`act-${entry.id}`
-                      box class=PillFace
+                      box class=PillFace height=32 padding="0 13px" box-sizing="border-box"
                         text (entry.kind == "stuck" and entry.sent ? "Sent to hex" : entry.action) font="-exact-subheadline" font-weight=600
                 else if entry.kind == "stuck" and entry.sent
                   text "Sent to hex" font="-exact-footnote" color="-exact-secondary-label"

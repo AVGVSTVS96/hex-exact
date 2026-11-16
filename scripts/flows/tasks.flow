@@ -1,0 +1,11 @@
+# Tasks: the list, narrowed to what needs Bassim and back, everything earlier, then search.
+launch /tasks
+shoot tasks
+tap count-needs
+shoot needs
+tap count-needs
+tap more-earlier
+shoot earlier
+tap tasks-search-open
+type tasks-search fix
+shoot search

@@ -70,7 +70,11 @@ fn matches(e: Item, words: string[]): bool = words.filter(w => not `${e.topic} $
 
 // Why a row matched when a word isn't in what it shows: a stretch around that word, the words in bold.
 fn whyOf(e: Item, words: string[]): string = match words.filter(w => not `${e.topic} ${e.title}`.toLowerCase().includes(w)).at(0) { case some(w) => boldWords(stretch(e.words, w), words), case none => "" }
-fn stretch(text: string, word: string): string = text.toLowerCase().indexOf(word) < 0 ? "" : `${text.toLowerCase().indexOf(word) > 30 ? "…" : ""}${text.slice(max(0, text.toLowerCase().indexOf(word) - 30), text.toLowerCase().indexOf(word) + word.length + 80).trim()}${text.toLowerCase().indexOf(word) + word.length + 80 < text.length ? "…" : ""}`
+// It starts and ends on whole words, about 30 characters before the word and 80 after it.
+fn hitAt(text: string, word: string): number = text.toLowerCase().indexOf(word)
+fn startOn(text: string, at: number): number = at <= 30 ? 0 : min(at, max(0, at - 30) + text.slice(max(0, at - 30)).indexOf(" ") + 1)
+fn endOn(text: string, to: number): number = to >= text.length ? text.length : max(text.slice(0, to).split(" ").slice(0, -1).join(" ").length, to - 20)
+fn stretch(text: string, word: string): string = hitAt(text, word) < 0 ? "" : `${startOn(text, hitAt(text, word)) > 0 ? "…" : ""}${text.slice(startOn(text, hitAt(text, word)), endOn(text, hitAt(text, word) + word.length + 80)).trim()}${endOn(text, hitAt(text, word) + word.length + 80) < text.length ? "…" : ""}`
 fn boldOnce(text: string, word: string): string = text.toLowerCase().indexOf(word) < 0 ? text : `${text.slice(0, text.toLowerCase().indexOf(word))}**${text.slice(text.toLowerCase().indexOf(word), text.toLowerCase().indexOf(word) + word.length)}**${text.slice(text.toLowerCase().indexOf(word) + word.length)}`
 fn boldWords(text: string, words: string[]): string = words.length == 0 ? text : words.length == 1 ? boldOnce(text, nth(words, 0)) : words.length == 2 ? boldOnce(boldOnce(text, nth(words, 0)), nth(words, 1)) : boldOnce(boldOnce(boldOnce(text, nth(words, 0)), nth(words, 1)), nth(words, 2))
 

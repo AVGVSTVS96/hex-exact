@@ -43,6 +43,7 @@ eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 # The simulator's build reaches hex only through the stand-in.
 sed -i "s|^export const HEX_URL = .*|export const HEX_URL = \"$standin\";|" "$here/app/hex.ts"
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer" >&2; exit 1; }
+"$here/scripts/mac-room"
 # Its own simulators, so other apps' checks keep theirs.
 simulator() {
   ssh "$mac" bash -s -- "$(printf %q "$1")" <<'MAC'
@@ -57,7 +58,7 @@ MAC
 }
 # What the app is built from: a run that changes only flows, scripts or docs reuses the last build.
 # (The trailing word stands for what this script changes in the Mac's copy below.)
-tree=$(cd "$here" && { git ls-files -co --exclude-standard app shell; echo app/hex.ts; } | sort -u | xargs sha1sum | { cat; echo standin-grant; } | sha1sum | cut -c1-40)
+tree=$(cd "$here" && { git ls-files -co --exclude-standard app shell; echo app/hex.ts; } | sort -u | xargs sha1sum | { cat; echo standin-grant no-hangar; } | sha1sum | cut -c1-40)
 built=$(ssh "$mac" cat $folder-build/sim/tree 2>/dev/null </dev/null || true)
 if [ -z "${BUILT:-}" ] && [ "$tree" != "$built" ]; then
   # The folder starts as a clone of the first one (Rust's target, which names its own path, left out).
@@ -68,10 +69,14 @@ if [ -z "${BUILT:-}" ] && [ "$tree" != "$built" ]; then
   # (development builds only: a production bake leaves the line out).
   ssh "$mac" "sed -i '' \"s|^export const grants = 'net.fetch https:|export const grants = 'development net.fetch $standin\\\\\\\\nnet.fetch https:|\" $folder/app/app.ts && grep -q 'development net.fetch $standin' $folder/app/app.ts" </dev/null ||
     { echo "couldn't let the simulator's build fetch the stand-in (app/app.ts's grants changed?)" >&2; exit 1; }
+  # Nor does it tell hangar it runs (hangar would take it for his Duo's build).
+  ssh "$mac" "sed -i '' 's|^export const HANGAR_URL = .*|export const HANGAR_URL = \"\";|' $folder/app/hex.ts" </dev/null
   echo "building for the simulator on the Mac"
   ssh "$mac" "rm -f $folder-build/sim/tree && SIM=1 EXACT_SIM=$(simulator "hexexact Duo 1") HEX_URL='$standin' HEX_TOKEN='$HEX_TOKEN' EXACT_CHANNEL='$url/updates' $folder/scripts/build && echo $tree >$folder-build/sim/tree" </dev/null | tail -1
 fi
 # This run's own copy of the app and of the scripts that play it (APFS clones, so instant).
+# The run's folder goes when the run does, however it ends, so runs don't fill the Mac's disk.
+trap 'ssh "$mac" rm -rf "$run" </dev/null' EXIT
 ssh "$mac" "rm -rf $run && mkdir -p $run && cp -cR $folder-build/sim/Build/Products/Release-iphonesimulator/HexExact.app $run/" </dev/null
 rsync -a --exclude Flows.xcodeproj "$here/scripts/" "$mac:$run/scripts/"
 flock -u 9
@@ -87,7 +92,7 @@ done
 sim=$(simulator "hexexact Duo $lane")
 
 # ssh joins its arguments into one command line, so each is quoted for the Mac's shell.
-ssh "$mac" bash -s -- "$(printf "%q " "$run" "$lane" "$sim" "$POSES" "$APPEARANCES" "$HEX_URL" "$HEX_TOKEN" "${#paths[@]}" "${paths[@]}" "${flows[@]}")" <<'MAC'
+ssh "$mac" bash -s -- "$(printf "%q " "$run" "$lane" "$sim" "$POSES" "$APPEARANCES" "$HEX_URL" "$HEX_TOKEN" "${#paths[@]}" "${paths[@]}" "${flows[@]}")" <<'MAC' || status=$?
 set -euo pipefail
 # A run stopped on the server stops here too (its ssh gone, this shell is the launchd's), so it never
 # drives a simulator the next run has taken.
@@ -111,6 +116,8 @@ rm -rf "$out" && mkdir -p "$out"
 # app shows "Can't reach hex" and every picture is of an empty app, so the run stops instead.
 /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity dict' "$app/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true' "$app/Info.plist" 2>/dev/null || true
+# It says it's a build newer than any, so no update toast sits in its pictures.
+/usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 999999' "$app/Info.plist"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsLocalNetworking' "$app/Info.plist")" = true ] ||
   { echo "the simulator's app can't reach the stand-in (no NSAllowsLocalNetworking), so no pictures" >&2; exit 1; }
 # Both simulators' builds reach the one stand-in, kept running between runs and started afresh
@@ -124,7 +131,8 @@ if ! cmp -s "$kept" $run/scripts/standin.mjs || ! lsof -ti tcp:47391 -sTCP:LISTE
   HEX_URL=$hex_url HEX_TOKEN=$hex_token PORT=47391 WRITES=$writes nohup node "$kept" >/dev/null 2>&1 &
   sleep 1
 fi
-curl -sf -m 10 -o /dev/null http://127.0.0.1:47391/asks ||
+# (A stand-in just started takes a moment to listen.)
+for try in 1 2 3 4 5 6; do curl -sf -m 10 -o /dev/null http://127.0.0.1:47391/asks && break; sleep 2; done ||
   { echo "the stand-in doesn't reach hex (http://127.0.0.1:47391/asks on the Mac), so no pictures" >&2; exit 1; }
 trap 'xcrun simctl terminate "$id" com.shahidy.hexexact 2>/dev/null || true' EXIT
 xcrun simctl status_bar "$id" override --time 9:41 --batteryLevel 100 --cellularBars 4 2>/dev/null || true
@@ -161,6 +169,14 @@ place() {
   hubdo orientation "$orientation"; sleep 1; hubdo orientation "$orientation"
 }
 
+# A picture that can't be written (a full disk) is said, and fails the run at its end.
+missed=0
+shoot() {
+  xcrun simctl io "$id" screenshot --display=$display "$1" >/dev/null 2>&1 && [ -s "$1" ] && return
+  echo "couldn't write ${1##*/} (the Mac's disk: $(df -h ~ | awk 'NR == 2 { print $4 }') free)" | tee -a "$out/missed.txt" >&2
+  missed=$((missed + 1))
+}
+
 # Plays one flow: each line XCUITest prints as it goes is acted on here, a shot or a pose, then
 # answered through a file the test waits for.
 play() {
@@ -175,7 +191,7 @@ play() {
         step=$((step + 1)) shot=${line##*flow-s?o?? }
         # Each pose plays the flow, so a step it folded to names the pose it started from too.
         where=$at && [ "$at" = "$pose" ] || where=$at-from-$pose
-        xcrun simctl io "$id" screenshot --display=$display "$dir/$(printf %02d $step)-$shot-$where-$appearance.png" >/dev/null 2>&1
+        shoot "$dir/$(printf %02d $step)-$shot-$where-$appearance.png"
         case $line in *flow-shoot*) touch "$tests/sync/$((answered += 1))" ;; esac
         ;;
       *"flow-pose "*)
@@ -215,7 +231,7 @@ for pose in $poses; do
       xcrun simctl launch --terminate-running-process "$id" com.shahidy.hexexact -HexOpen "$link" >/dev/null
       sleep $((wait + 4))
       name=$(echo "${path#/}" | tr '/:?=&' '_____'); name=${name:-home}
-      xcrun simctl io "$id" screenshot --display=$display "$out/$name-$pose-$appearance.png" >/dev/null 2>&1
+      shoot "$out/$name-$pose-$appearance.png"
       # A path with report=pose leaves the shell's pose beside its shot.
       case $path in *report=pose*) xcrun simctl spawn "$id" defaults read com.shahidy.hexexact HexPose >"$out/pose-$pose.json" 2>/dev/null || true ;; esac
     done
@@ -226,6 +242,9 @@ for pose in $poses; do
     done
   done
 done
+[ "$missed" = 0 ] || { echo "$missed pictures weren't written" >&2; exit 1; }
 MAC
-rsync -a "$mac:$run/shots/" "$shots/" && ssh "$mac" rm -rf "$run" </dev/null
+# What a run that stopped part way got is kept too.
+rsync -a "$mac:$run/shots/" "$shots/" 2>/dev/null || true
 ls "$shots"
+exit "${status:-0}"

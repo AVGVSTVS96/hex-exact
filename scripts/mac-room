@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Runs on the server: whether the Mac's disk has room for a build, a ship, a publish or a simulator
+# run (MAC_ROOM_GB, 15 by default). It is his laptop, shared with every other project: a full disk
+# stopped every build, publish and run on Nov 15, so ours stop first, saying so, and leave what
+# isn't ours alone.
+#   scripts/mac-room || exit 1
+set -euo pipefail
+mac=${HEX_EXACT_MAC:-mac}
+need=${MAC_ROOM_GB:-15}
+free=$(ssh "$mac" "df -g ~ | awk 'NR == 2 { print \$4 }'" </dev/null)
+[ "${free:-0}" -ge "$need" ] && exit 0
+echo "the Mac's disk has ${free:-no} GB free, under the $need GB a build or run needs, so nothing was started: see what fills it with \`ssh $mac du -sh ~/Developer/hex-exact*\` (ours) before anything else" >&2
+exit 1

@@ -23,6 +23,7 @@ shape Viewport
   safeAreaRight: number
   keyboardHeight: number
   prefersReducedMotion: bool
+  prefersColorScheme: string
 
 // What the Duo's frame takes from the screen, in its points (the shell's Screen): the side the system
 // bars sit on in a side column ("left", "right", ""), the fold (0 wide when there's none), and what

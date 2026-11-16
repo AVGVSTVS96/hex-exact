@@ -46,6 +46,8 @@ component HexHome
     top: number
     x: number
     pad: number
+    // The glow is drawn from the orb as each appearance shows it.
+    dark: bool
     still: bool
     // hex's pages that are built, and the one showing.
     pages: string[]
@@ -106,8 +108,8 @@ component HexHome
       openTask(homeOf(liveId, tasks.tasks))
   view
     column flex=1 min-height=0 position="relative" overflow="hidden" testId="home-all"
-      // The orb's colours, glowing behind the top of the page.
-      image "assets/glow.png" position="absolute" left=(x - 440) top=(top - 332) width=880 height=700 pointer-events="none" aria-hidden=true testId="hex-glow"
+      // A hint of the orb's colour behind hex, centred on the orb.
+      image (dark ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(x - 260) top=(top - 173) width=520 height=390 pointer-events="none" aria-hidden=true testId="hex-glow"
       // Each tab keeps its own scroll, mounted while another shows, so it keeps its place.
       for p in pages key=p
         scroll position="absolute" inset=0 padding=`${under}px 6px ${pad}px` box-sizing="border-box" opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`

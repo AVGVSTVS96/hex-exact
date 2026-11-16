@@ -7,7 +7,7 @@ use Room, Chrome from "./room.contract"
 use Said, failedWords from "./said.contract"
 use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
 use EntryRow from "./rows.contract"
-use AskCard, DecidedCard, ReplyComposer from "./ask.contract"
+use AskCard, StuckCard, DecidedCard, ReplyComposer from "./ask.contract"
 
 // A working stretch of a thread's week, as fractions of the lane (log-like: the last hour is a
 // fifth of it, the week before three days ago another).
@@ -220,6 +220,13 @@ component TaskBody
   // first question's.
   derive door = kind == "task" ? match places.filter(t => t.place == row.place and t.link != "").at(0) { case some(t) => Place(app=t.app, place=t.place, task=t.id, call="", link=t.link), case none => Place(app="", place="", task="", call="", link="") } : kind == "done" ? Place(app=finished.app, place="", task="", call="", link=finished.link) : match pageAsks.map(a => a.places).flat().filter(p => p.link != "").at(0) { case some(p) => p, case none => Place(app="", place="", task="", call="", link="") }
   derive width = pane ? room.second.width : room.clear.width
+  // A page beside a list opened like a laptop has the half under the hinge.
+  derive tall = pane and room.across < room.height ? room.height - room.across : room.height
+  // Wider than tall (folded on its side, under a laptop's hinge): a question and its answers side by side.
+  derive wide = width >= 520 and width > tall
+  derive stuckHere = topicEntries.filter(e => e.kind == "stuck")
+  // A page that holds questions (or stuck runs) opens on the first: its own mark and topic head it.
+  derive asking = kind != "done" and (pageAsks.length > 0 or stuckHere.length > 0)
   // A composer docked at the foot: the page scrolls to its top edge and fades over the 24 above it.
   // Beside its own thread (open like a book) the thread's composer is the one.
   derive docked = replyAsk.length == 0 and kind == "task" and chat.sends and entry.name != "thread"
@@ -237,19 +244,22 @@ component TaskBody
     openTask(finished.run)
   view
     column flex=1 min-height=0 height="100%"
-      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked or replyAsk.length > 0 ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
-        // The head scrolls with the page, so a question opens with its answers in view.
-        PageHead(room=room, clearTop=clearTop, pane=pane, end=end, head=head, title=title, line=subtitle, id=(pane ? "pane-head" : "task-head"))
-          if door.link != ""
-            button press=openOut(door.link, door.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(door.app)}` testId=(pane ? "pane-door" : "task-door-bar")
-              box class=PillFace gap=8 padding="5px 12px 5px 6px"
-                PlaceTile(place=door, size=22)
-                text appName(door.app) font="-exact-subheadline" font-weight=600 color="-exact-label"
-          if kind != "done"
-            Discuss(title=title, id=(pane ? "pane-talk" : "task-talk"), press=talk(kind == "task" ? id : "asks"))
-          if missing.includes(door.app)
-            text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding-left=4 width="100%" testId="door-missing"
-        column padding="0 10px" padding-bottom=(docked or replyAsk.length > 0 ? 30 : foot + 24) gap=0
+      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" margin-bottom=(docked ? foot + 8 + 44 + 6 : 0) mask-image=(docked ? "linear-gradient(to top, transparent 0, #000 24px)" : replyAsk.length > 0 ? `linear-gradient(to top, transparent 0, #000 ${foot + 4}px)` : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
+        if asking
+          box flex-shrink=0 min-height=(pane ? head : max(0, clearTop - room.below)) testId=(pane ? "pane-head" : "task-head")
+        else
+          // The head scrolls with the page.
+          PageHead(room=room, clearTop=clearTop, pane=pane, end=end, head=head, title=title, line=subtitle, id=(pane ? "pane-head" : "task-head"))
+            if door.link != ""
+              button press=openOut(door.link, door.app) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open in ${appName(door.app)}` testId=(pane ? "pane-door" : "task-door-bar")
+                box class=PillFace gap=8 padding="5px 12px 5px 6px"
+                  PlaceTile(place=door, size=22)
+                  text appName(door.app) font="-exact-subheadline" font-weight=600 color="-exact-label"
+            if kind != "done"
+              Discuss(title=title, id=(pane ? "pane-talk" : "task-talk"), press=talk(kind == "task" ? id : "asks"))
+            if missing.includes(door.app)
+              text `${appName(door.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" padding-left=4 width="100%" testId="door-missing"
+        column padding="0 10px" padding-bottom=(docked ? 30 : replyAsk.length > 0 ? foot + 8 + 48 + 20 : foot + 24) gap=0
           if kind == "done"
             Happened(mark="done", text=finished.title, stamp="", failed=false)
             if finished.said != "" or finished.links.length > 0
@@ -269,18 +279,24 @@ component TaskBody
             if kind == "task" and failed and not known and row.id == ""
               Note(kind="failed", text="hex didn't answer, so this can't open yet.", pad="24px 10px", id="task-offline")
             for a, i in pageAsks key=a.id
+              if i > 0
+                box height=0.5 background-color="-exact-separator" margin="10px 6px 14px"
               // An open question swipes to Not needed, as a row in the list does.
               if said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0
-                AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(width - 40))
+                AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, openOut=openOut, missing=missing, width=(width - 32), wide=wide)
               else
                 scroll swipeContent=`${a.id}-card` swipeTrailing=`${a.id}-card-away` display="flex" overflow-x="scroll" overflow-y="hidden" scrollbar-width="none" scroll-snap-type="x mandatory" testId=`ask-swipe-${a.id}`
                   box id=`${a.id}-card` width="100%" flex-shrink=0 scroll-snap-align="start" box-sizing="border-box"
-                    AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, width=(width - 40))
+                    AskCard(ask=a, n=(i + 1), of=pageAsks.length, now=now, offset=offset, said=match said.filter(s => s.id == a.id).at(-1) { case some(s) => s, case none => blankSaid() }, draft=askDraft(drafts, a), words=(wordsAsk == a.id ? words : Words(place="", at=0, text="")), wordsOpen=(wordsAsk == a.id), showWords=showWords, answer=answer, answerMany=answerMany, dismiss=dismiss, undo=undo, again=again, reply=reply, open=open, openOut=openOut, missing=missing, width=(width - 32), wide=wide)
                   button id=`${a.id}-card-away` press=dismiss(a.id) destructive=true flex-shrink=0 scroll-snap-align="start" testId=`card-away-${a.id}`
                     image "symbol:sf/hand.raised.slash"
                     text "Not needed"
-            if kind == "topic" and topicEntries.length > 0
-              for e in topicEntries key=e.id
+            for e, i in stuckHere key=e.id
+              if i > 0 or pageAsks.length > 0
+                box height=0.5 background-color="-exact-separator" margin="10px 6px 14px"
+              StuckCard(entry=e, n=(i + 1), of=stuckHere.length, now=now, offset=offset, act=act, openOut=openOut, wide=wide)
+            if kind == "topic" and topicEntries.length > stuckHere.length
+              for e in topicEntries.filter(x => x.kind != "stuck") key=e.id
                 EntryRow(entry=e, asks=asks.asks, said=said, why="", now=now, offset=offset, answer=answer, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, openPage=openTask)
             if kind == "task" and task.needs != "" and pageAsks.length == 0
               Head(label="Needs you", n=-1, pad="18px 10px 4px", id="head-needs")
@@ -338,7 +354,7 @@ component TaskBody
                 ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
       if replyAsk.length > 0
         for a in replyAsk key=a.id
-          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=(viewport.keyboardHeight > 0 ? 0 : foot), answered=(said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0), end=max(16, room.clear.x + room.clear.width - room.footEnd))
+          ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, talk=talk(kind == "task" ? id : "asks"), attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=(viewport.keyboardHeight > 0 ? 0 : foot), answered=(said.filter(s => s.id == a.id and s.verb != "note" and s.status != "failed").length > 0), left=(wide ? width / 2 : 12), end=max(12, room.clear.x + room.clear.width - room.footEnd))
       else if docked
         button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=16 right=max(16, room.clear.x + room.clear.width - room.footEnd) bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
           row class=Composer flex=1 align-items="center" padding="0 16px"

@@ -1,43 +1,51 @@
-// A question from hex (§9.3), flat on the page: no card and no box inside it. Which question it is
-// and when, the question, what it's about in reading text, and "Why", which opens its whole
-// background in one tap: the message it came from and why hex picks what it does. Then every
-// answer as one kind of row, hex's pick marked in mint, and "Not needed" last. One tap answers: the
-// row confirms in place with Undo and the rest stay where they are, so nothing jumps. His own
-// words go in the reply box docked at the page's foot (ReplyComposer).
+// A question from hex (§9.3), flat on the page as one reading: its mark and topic with which of the
+// topic's questions it is and when, the question, what it's about in full, hex's reason beside "Why",
+// and where to look (its links, the thread it lives in, the message it came from). Then every answer
+// as one kind of row, what it gives up under it, hex's pick on a mint wash, and "Not needed" last.
+// One tap answers: the row confirms in place with Undo and the rest stay where they are, so nothing
+// jumps. In a room wider than tall the question is the left column and its answers the right. His
+// own words go in the glass composer floating at the page's foot (ReplyComposer).
 use Ask, Words, Media, Place from "./shapes.contract"
 use Pictures, Thumb, AddMedia, Waiting, shapeOf, rowHeight from "./media.contract"
-use Mark, PlaceTile, whenOf, springOf, PillTap, Tap, PillFace, Composer, ComposerField, Primary, Send, Prose, FieldHint from "./parts.contract"
+use Mark, PlaceTile, whenOf, springOf, PillTap, Tap, PillFace, Primary, Send, Prose, appName, appSymbol from "./parts.contract"
 use Said, unreached, failedWords from "./said.contract"
+use Item from "./inbox.contract"
 
-fn questionWord(n: number, of: number): string = of > 1 ? `Question ${n} of ${of}` : "Question"
+// "1 of 3 · 2:17 AM": which of its topic's questions this is, and when it came.
+fn countOf(n: number, of: number, at: string): string = [of > 1 ? `${n} of ${of}` : "", at].filter(w => w != "").join(" · ")
 
-// One answer to a question, the same row everywhere a question shows: a ring (filled when chosen,
-// mint for hex's pick), its words and what they mean, and "✦ hex’s pick" at its end.
-component AnswerRow
-  inject
-    haptics: bool
+// A small capsule that goes somewhere (a link, the thread in its app) or opens something under it.
+style ChipFace
+  display="flex" flex-direction="row" align-items="center" gap=6 height=30 padding="0 11px" border-radius=15 background-color="-exact-quaternary-fill"
+style ChipTap
+  appearance="none" display="flex" align-items="center" min-height=44 flex-shrink=0
+  :active
+    opacity=0.6
+    -exact-press-scale=0.96
+
+// What a question or a stuck run is, above its answers: the eyebrow, the title, its words in full.
+component AskHead
   props
-    label: string
-    detail: string
-    pick: bool
-    chosen: bool
-    // radio: one answer; check: one of several; "" for a row that only shows.
-    role: string
-    disabled: bool
-    id: string
-    press: action
+    mark: string
+    // The topic's ink: amber while it waits on Bassim, red for a stuck run, grey once settled.
+    tint: string
+    topic: string
+    tag: string
+    count: string
+    title: string
+    words: string
   view
-    button press=press disabled=disabled class=Tap display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") role=(role == "check" ? "checkbox" : role == "radio" ? "radio" : "button") aria-checked=chosen aria-label=(pick ? `${label}, hex’s pick` : label) testId=id
-      box width=22 height=22 border-radius=11 flex-shrink=0 box-sizing="border-box" border=(chosen ? "none" : pick ? "1.5px solid hex.accent" : "1.5px solid -exact-tertiary-label") background-color=(chosen ? "AccentColor" : "transparent") display="flex" align-items="center" justify-content="center" aria-hidden=true
-        if chosen
-          image "symbol:checkmark" width=11 height=11 object-fit="contain" color="ink.on-accent"
-      column flex=1 min-width=0 gap=2
-        text label font="-exact-body" color="-exact-label"
-        if detail != ""
-          text detail font="-exact-subheadline" color="-exact-secondary-label"
-        // Under its answer, so the answer keeps the row's width.
-        if pick
-          text "✦ hex’s pick" font="-exact-footnote" font-weight=500 color="hex.accent"
+    column gap=0
+      row gap=10 align-items="center" min-height=24
+        Mark(state=mark, size=22)
+        row gap=6 align-items="baseline" flex=1 min-width=0
+          text (tag != "" ? `${topic} · ${tag}` : topic) font="-exact-subheadline" font-weight=600 color=tint line-clamp=1 flex-shrink=1
+          if count != ""
+            text count font="-exact-footnote" color="-exact-tertiary-label" font-variant-numeric="tabular-nums" white-space="nowrap"
+      text title font="-exact-title2" font-weight=600 color="-exact-label" margin-top=6 role="heading" aria-level=1 user-select="text"
+      if words != ""
+        column margin-top=8
+          Prose(text=words, font="-exact-callout", color="-exact-label")
 
 component AskCard
   inject
@@ -62,22 +70,28 @@ component AskCard
     again: action
     reply: action
     open: action
+    // A link out to the app the question lives in, and the apps it didn't open in.
+    openOut: action
+    missing: string[]
     width: number
+    // Wider than tall: the question on the left, its answers on the right.
+    wide: bool
   state chosen = [""].slice(0, 0)
   // What Bassim did with it here: answered (one label, several, or Not needed), on its way or sent.
   derive mine = said.id == ask.id and said.verb != "note" and said.verb != "undo"
   derive settled = mine and said.status != "failed"
-  derive gone = settled and said.verb == "dismiss"
   derive picks = mine and said.verb == "answers" ? said.label.split(", ") : mine and said.verb == "answer" ? [said.label] : [""].slice(0, 0)
   // His own words as the answer: no row of the question says them, so they show as a row of their own.
   derive ownWords = mine and said.verb == "answer" and ask.options.filter(o => o.label == said.label).length == 0
   derive noted = said.id == ask.id and said.verb == "note" and said.status == "sent"
   derive shots = ask.options.filter(o => o.shot >= 0)
+  derive half = wide ? (width - 24) / 2 : width
   // The screenshots side by side at their own shapes, 300 tall at most; past 140 they scroll.
-  derive shotsTall = max(140, rowHeight(shots.map(o => Media(id="", kind="photo", aspect=o.aspect)), width, 300))
+  derive shotsTall = max(140, rowHeight(shots.map(o => Media(id="", kind="photo", aspect=o.aspect)), half, 300))
   derive place = match ask.places.at(0) { case some(p) => p, case none => Place(app=ask.app, place=ask.topic, task=ask.task, call="", link="") }
   derive from = place.place != "" ? place.place : ask.topic
-  derive pickLabel = match ask.options.filter(o => o.pick).at(0) { case some(o) => o.label, case none => "" }
+  // The threads it lives in that open, once each.
+  derive doors = ask.places.filter(p => p.link != "").filter((p, i) => ask.places.filter(q => q.link != "").map(q => q.link).indexOf(p.link) == i)
   // Where his answer went, or that it's on its way.
   derive status = said.status == "sending" ? "Sending…" : said.detail != "" ? `Sent to ${said.detail}` : "Sent"
   action choose(label: string)
@@ -89,74 +103,144 @@ component AskCard
     chosen = [""].slice(0, 0)
     undo(ask.id)
   view
-    column gap=10 padding="10px 10px 14px" testId=`ask-card-${ask.id}`
-      row gap=8 align-items="center" min-height=20
-        box width=8 height=8 border-radius=4 background-color=(settled ? "-exact-tertiary-label" : "hex.ask") flex-shrink=0 aria-hidden=true
-        text `${questionWord(n, of)}${ask.at > 0 ? ` · ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label" font-variant-numeric="tabular-nums" line-clamp=1
-        if ask.tag != ""
-          text `· ${ask.tag}` font="-exact-subheadline" font-weight=600 color="hex.ask" white-space="nowrap"
-      text ask.question font="-exact-title2" font-weight=700 role="heading" aria-level=2 user-select="text"
-      if ask.context != ""
-        Prose(text=ask.context, font="-exact-body", color="-exact-label")
-      if ask.pictures.length > 0
-        Pictures(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=width, height=300)
-      button press=showWords(ask.id) class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-expanded=wordsOpen aria-label=(wordsOpen ? "Why: hide the background" : `Why: the message from ${from}${pickLabel != "" and ask.why != "" ? " and why hex picks it" : ""}`) testId=`ask-from-${ask.id}`
-        text "Why" font="-exact-subheadline" font-weight=600 color="-exact-label"
-        text `· from ${from}${ask.at > 0 ? `, ${whenOf(ask.at, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1 flex-shrink=1
-        image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" rotate=(wordsOpen ? "90deg" : "0deg") transition=springOf(still, "rotate")
-      if wordsOpen
-        column gap=10 padding="0 0 4px 12px" border-left="2px solid -exact-separator" testId=`ask-why-${ask.id}`
-          row gap=8 align-items="center"
-            PlaceTile(place=place, size=22)
-            text (words.place != "" ? words.place : from) font="-exact-subheadline" font-weight=600 color="-exact-label" flex=1 line-clamp=1
-            if words.at > 0
-              text whenOf(words.at, now, offset) font="-exact-footnote" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
-          if words.text == ""
-            progress aria-label="Loading the message"
+    column padding="4px 6px 12px" testId=`ask-card-${ask.id}`
+      row gap=24 align-items="flex-start" flex-direction=(wide ? "row" : "column")
+        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%")
+          AskHead(mark=(settled ? "done" : "asks"), tint=(settled ? "-exact-secondary-label" : "hex.ask"), topic=ask.topic, tag=ask.tag, count=countOf(n, of, whenOf(ask.at, now, offset)), title=ask.question, words=ask.context)
+          if ask.pictures.length > 0
+            column margin-top=12
+              Pictures(media=ask.pictures.map(p => Media(id=p.id, kind="photo", aspect=p.aspect)), width=half, height=300)
+          if ask.why != ""
+            row gap=10 align-items="flex-start" margin-top=12 testId=`ask-reason-${ask.id}`
+              row gap=4 align-items="center" flex-shrink=0 min-height=20
+                image "symbol:sf/sparkle" width=12 height=12 object-fit="contain" color="hex.accent" aria-hidden=true
+                text "Why" font="-exact-subheadline" font-weight=600 color="hex.accent"
+              column flex=1 min-width=0
+                Prose(text=ask.why, font="-exact-subheadline", color="-exact-secondary-label")
+          row gap=8 flex-wrap="wrap" margin-top=5 margin-bottom=-7
+            for l in ask.links key=l.url
+              link href=l.url class=ChipTap aria-label=`${l.label}, opens outside` testId=`ask-link-${l.label}`
+                box class=ChipFace
+                  image "symbol:sf/doc.text" width=13 height=13 object-fit="contain" color="-exact-label" aria-hidden=true
+                  text l.label font="-exact-footnote" font-weight=600 color="-exact-label" line-clamp=1
+            for p in doors key=p.link
+              button press=openOut(p.link, p.app) class=ChipTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open ${p.place != "" ? p.place : ask.topic} in ${appName(p.app)}` testId=`ask-door-${ask.id}-${p.app}`
+                box class=ChipFace
+                  image appSymbol(p.app) width=12 height=12 object-fit="contain" color="-exact-label" aria-hidden=true
+                  text `${p.place != "" ? p.place : ask.topic} in ${appName(p.app)}` font="-exact-footnote" font-weight=600 color="-exact-label" line-clamp=1
+            // The message it came from opens under the capsules; its chevron says so.
+            button press=showWords(ask.id) class=ChipTap -exact-press-haptic=(haptics ? "selection" : "none") aria-expanded=wordsOpen aria-label=(wordsOpen ? "Hide the message it came from" : `The message from ${from}`) testId=`ask-from-${ask.id}`
+              box class=ChipFace
+                image "symbol:sf/text.bubble" width=13 height=13 object-fit="contain" color="-exact-label" aria-hidden=true
+                text "The message" font="-exact-footnote" font-weight=600 color="-exact-label"
+                image "symbol:sf/chevron.down" width=10 height=10 object-fit="contain" color="-exact-secondary-label" rotate=(wordsOpen ? "180deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
+          for p in doors.filter(d => missing.includes(d.app)).slice(0, 1) key=p.app
+            text `${appName(p.app)} isn’t on this iPhone` font="-exact-footnote" color="hex.danger" margin-top=8 testId="door-missing"
+          if wordsOpen
+            column gap=8 margin-top=12 padding="2px 0 2px 12px" border-left="2px solid -exact-separator" testId=`ask-why-${ask.id}`
+              row gap=8 align-items="center"
+                PlaceTile(place=place, size=20)
+                text (words.place != "" ? words.place : from) font="-exact-subheadline" font-weight=600 color="-exact-label" flex=1 line-clamp=1
+                if words.at > 0
+                  text whenOf(words.at, now, offset) font="-exact-footnote" color="-exact-tertiary-label" font-variant-numeric="tabular-nums"
+              if words.text == ""
+                progress aria-label="Loading the message"
+              else
+                Prose(text=words.text, font="-exact-subheadline", color="-exact-secondary-label")
+          if shots.length > 0
+            scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none" margin-top=12
+              row gap=10 padding="2px 0"
+                for o in shots key=o.label
+                  column gap=6 align-items="center" width=(shotsTall * shapeOf(o.aspect)) flex-shrink=0
+                    Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=(shotsTall * shapeOf(o.aspect)), square=false)
+                    text o.label font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
+        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%") gap=2 margin-top=(wide ? -4 : 4) role=(ask.multiple ? "group" : "radiogroup") aria-label="Answers"
+          for o in ask.options key=o.label
+            if mine and picks.includes(o.label)
+              Confirmed(label=o.label, detail=o.detail, status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-option-${ask.id}-${o.label}`, undo=takeBack, again=again(ask.id))
+            else
+              AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=chosen.includes(o.label), role=(ask.multiple ? "check" : "radio"), disabled=settled, id=`ask-option-${ask.id}-${o.label}`, press=choose(o.label))
+          if ownWords
+            Confirmed(label=said.label, detail="", status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-own-${ask.id}`, undo=takeBack, again=again(ask.id))
+          // Ticking several, Answer comes right under the answers, Not needed last.
+          if ask.multiple and not settled
+            button press=answerMany(ask.id, chosen) class=Primary margin="8px 0" disabled=(chosen.length == 0) testId=`ask-answer-${ask.id}`
+              text (chosen.length == 0 ? "Check one or more" : `Answer with ${chosen.length}`) color=(chosen.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600
+          if mine and said.verb == "dismiss"
+            Confirmed(label="Not needed", detail="Take it off your list", status=(said.status == "sending" ? "Sending…" : "Off your list"), failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-dismiss-${ask.id}`, undo=takeBack, again=again(ask.id))
           else
-            Prose(text=words.text, font="-exact-subheadline", color="-exact-secondary-label")
-          if ask.why != "" and pickLabel != ""
-            column gap=2
-              text `✦ Why hex picks ${pickLabel}` font="-exact-subheadline" font-weight=600 color="hex.accent"
-              Prose(text=ask.why, font="-exact-subheadline", color="-exact-secondary-label")
-      if ask.links.length > 0
-        row gap=16 flex-wrap="wrap"
-          for l in ask.links key=l.url
-            link href=l.url min-height=44 display="flex" flex-direction="row" align-items="center" gap=4 testId=`ask-link-${l.label}`
-              text l.label font="-exact-subheadline" font-weight=600
-              image "symbol:sf/arrow.up.right" width=11 height=11 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
-      if shots.length > 0
-        scroll overflow-x="auto" overflow-y="hidden" scrollbar-width="none"
-          row gap=10 padding="2px 0"
-            for o in shots key=o.label
-              column gap=6 align-items="center" width=(shotsTall * shapeOf(o.aspect)) flex-shrink=0
-                Thumb(media=Media(id=`/asks/${encodeURIComponent(ask.id)}/shots/${o.shot}`, kind="photo", aspect=o.aspect), width=(shotsTall * shapeOf(o.aspect)), square=false)
-                text o.label font="-exact-footnote" color="-exact-secondary-label" line-clamp=1
-      column border-top="0.5px solid -exact-separator" role=(ask.multiple ? "group" : "radiogroup") aria-label="Answers"
-        for o in ask.options key=o.label
-          if mine and picks.includes(o.label)
-            Confirmed(label=o.label, detail=o.detail, status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-option-${ask.id}-${o.label}`, undo=takeBack, again=again(ask.id))
-          else
-            AnswerRow(label=o.label, detail=o.detail, pick=o.pick, chosen=chosen.includes(o.label), role=(ask.multiple ? "check" : "radio"), disabled=settled, id=`ask-option-${ask.id}-${o.label}`, press=choose(o.label))
-        if ownWords
-          Confirmed(label=said.label, detail="", status=status, failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-own-${ask.id}`, undo=takeBack, again=again(ask.id))
-        // Ticking several, Answer comes right under the answers, Not needed last.
-        if ask.multiple and not settled
-          button press=answerMany(ask.id, chosen) class=Primary margin="10px 0" disabled=(chosen.length == 0) testId=`ask-answer-${ask.id}`
-            text (chosen.length == 0 ? "Check one or more" : `Answer with ${chosen.length}`) color=(chosen.length == 0 ? "-exact-tertiary-label" : "-exact-background") font-weight=600
-        if mine and said.verb == "dismiss"
-          Confirmed(label="Not needed", detail="Take it off your list", status=(said.status == "sending" ? "Sending…" : "Off your list"), failed=(said.status == "failed" ? failedWords(said) : ""), missed=said.missed, id=`ask-dismiss-${ask.id}`, undo=takeBack, again=again(ask.id))
-        else
-          NotNeeded(disabled=settled, id=`ask-dismiss-${ask.id}`, press=dismiss(ask.id))
-      if noted
-        text `Sent to ${said.detail != "" ? said.detail : ask.topic} as a note. The question is still open.` font="-exact-footnote" color="-exact-secondary-label"
-      if said.id == ask.id and said.status == "failed" and (said.verb == "note" or said.verb == "undo")
-        row gap=8 align-items="center" flex-wrap="wrap"
-          text failedWords(said) font="-exact-footnote" color="hex.danger" flex=1 testId=`ask-failed-${ask.id}`
-          if said.verb == "undo"
-            button press=takeBack class=PillTap testId=`ask-retry-${ask.id}`
-              box class=PillFace padding="4px 10px"
-                text "Try again" font="-exact-footnote" font-weight=600
+            NotNeeded(disabled=settled, id=`ask-dismiss-${ask.id}`, press=dismiss(ask.id))
+          if noted
+            text `Sent to ${said.detail != "" ? said.detail : ask.topic} as a note. The question is still open.` font="-exact-footnote" color="-exact-secondary-label" padding-top=6
+          if said.id == ask.id and said.status == "failed" and (said.verb == "note" or said.verb == "undo")
+            row gap=8 align-items="center" flex-wrap="wrap"
+              text failedWords(said) font="-exact-footnote" color="hex.danger" flex=1 testId=`ask-failed-${ask.id}`
+              if said.verb == "undo"
+                button press=takeBack class=PillTap testId=`ask-retry-${ask.id}`
+                  box class=PillFace padding="4px 10px"
+                    text "Try again" font="-exact-footnote" font-weight=600
+
+// A run that stopped and waits on Bassim, drawn as a question is: red mark, what stopped and why in
+// full, where it lives, and its one answer (Resume), which says it went once hex has it.
+component StuckCard
+  inject
+    haptics: bool
+  props
+    entry: Item
+    n: number
+    of: number
+    now: number
+    offset: number
+    act: action
+    openOut: action
+    wide: bool
+  derive doors = entry.tiles.filter(t => t.link != "")
+  view
+    column padding="4px 6px 12px" testId=`stuck-card-${entry.id}`
+      row gap=24 align-items="flex-start" flex-direction=(wide ? "row" : "column")
+        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%")
+          AskHead(mark=entry.mark, tint="hex.danger", topic=entry.topic, tag="", count=countOf(n, of, whenOf(entry.at, now, offset)), title=entry.title, words=entry.line)
+          if doors.length > 0
+            row gap=8 flex-wrap="wrap" margin-top=5 margin-bottom=-7
+              for p, i in doors key=`${p.link}${i}`
+                button press=openOut(p.link, p.app) class=ChipTap -exact-press-haptic=(haptics ? "selection" : "none") testId=`stuck-door-${entry.id}-${i}`
+                  box class=ChipFace
+                    image appSymbol(p.app) width=12 height=12 object-fit="contain" color="-exact-label" aria-hidden=true
+                    text `Open in ${appName(p.app)}` font="-exact-footnote" font-weight=600 color="-exact-label"
+        column flex=(wide ? 1 : 0) min-width=0 width=(wide ? "auto" : "100%") margin-top=(wide ? -4 : 4)
+          AnswerRow(label=entry.action, detail=(entry.sent ? "Sent to hex" : "hex starts it again"), pick=false, chosen=entry.sent, role="", disabled=entry.sent, id=`act-${entry.id}`, press=act(entry.id))
+
+// One answer to a question, the same row everywhere a question shows: a ring (a rounded square when
+// several can be ticked), the answer, what it gives up under it, and hex's pick on a mint wash with
+// "✦ hex's pick" at its end. It reaches 12 past the words' column each side, so its ring lines up
+// with the words above while its wash keeps a margin.
+component AnswerRow
+  inject
+    haptics: bool
+  props
+    label: string
+    detail: string
+    pick: bool
+    chosen: bool
+    // radio: one answer; check: one of several; "" for a row that only shows.
+    role: string
+    disabled: bool
+    id: string
+    press: action
+  view
+    button press=press disabled=disabled class=Tap display="flex" flex-direction="row" gap=12 align-items="flex-start" padding="11px 12px" margin="0 -12px" border-radius=16 background-color=(pick ? "hex.accent.soft" : "transparent") text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") role=(role == "check" ? "checkbox" : role == "radio" ? "radio" : "button") aria-checked=chosen aria-label=(pick ? `${label}, hex’s pick` : label) testId=id
+      box width=22 height=22 border-radius=(role == "check" ? 7 : 11) flex-shrink=0 box-sizing="border-box" border=(chosen ? "none" : pick ? "1.75px solid hex.accent" : "1.75px solid -exact-tertiary-label") background-color=(chosen ? (pick ? "hex.accent" : "-exact-label") : "transparent") display="flex" align-items="center" justify-content="center" aria-hidden=true
+        if chosen
+          image "symbol:checkmark" width=11 height=11 object-fit="contain" color="-exact-background"
+      column flex=1 min-width=0 gap=2
+        row gap=8 align-items="baseline"
+          text label font="-exact-headline" color="-exact-label" flex=1 min-width=0
+          if pick
+            row gap=3 align-items="center" flex-shrink=0
+              image "symbol:sf/sparkle" width=11 height=11 object-fit="contain" color="hex.accent" aria-hidden=true
+              text "hex’s pick" font="-exact-footnote" font-weight=600 color="hex.accent" white-space="nowrap"
+        if detail != ""
+          text detail font="-exact-subheadline" color="-exact-secondary-label"
 
 // An answer Bassim gave here, confirmed on its own row: a filled ring, what he said, where it went,
 // and Undo; a failure says why under it, with Try again.
@@ -174,13 +258,13 @@ component Confirmed
     undo: action
     again: action
   view
-    column border-bottom="0.5px solid -exact-separator" testId=id
-      row gap=12 align-items="center" min-height=44 padding="12px 0"
+    column margin="0 -12px" padding="0 12px" border-radius=16 background-color="-exact-quaternary-fill" testId=id
+      row gap=12 align-items="flex-start" min-height=44 padding="11px 0"
         box width=22 height=22 border-radius=11 flex-shrink=0 background-color=(failed != "" ? "hex.danger" : "-exact-label") display="flex" align-items="center" justify-content="center" aria-hidden=true
           image (failed != "" ? "symbol:sf/exclamationmark" : "symbol:checkmark") width=11 height=11 object-fit="contain" color="-exact-background"
         column flex=1 min-width=0 gap=2
-          row gap=8 align-items="baseline"
-            text label font="-exact-body" font-weight=600 color="-exact-label" flex=1 min-width=0
+          row gap=8 align-items="center"
+            text label font="-exact-headline" color="-exact-label" flex=1 min-width=0
             if failed == ""
               text status font="-exact-footnote" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" max-width="40%" aria-live="polite"
               button press=undo class=PillTap margin="-12px 0" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo ${label}` testId=`${id}-undo`
@@ -210,10 +294,10 @@ component NotNeeded
     id: string
     press: action
   view
-    button press=press disabled=disabled class=Tap display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" min-height=44 border-bottom="0.5px solid -exact-separator" text-align="left" opacity=(disabled ? 0.5 : 1) -exact-press-haptic=(haptics ? "selection" : "none") aria-label="Not needed, take it off your list" testId=id
-      box width=22 height=22 border-radius=11 flex-shrink=0 box-sizing="border-box" border="1.5px dashed -exact-tertiary-label" aria-hidden=true
+    button press=press disabled=disabled class=Tap display="flex" flex-direction="row" gap=12 align-items="flex-start" padding="11px 12px" margin="0 -12px" border-radius=16 text-align="left" opacity=(disabled ? 0.5 : 1) -exact-press-haptic=(haptics ? "selection" : "none") aria-label="Not needed, take it off your list" testId=id
+      box width=22 height=22 border-radius=11 flex-shrink=0 box-sizing="border-box" border="1.75px dashed -exact-tertiary-label" aria-hidden=true
       column flex=1 min-width=0 gap=2
-        text "Not needed" font="-exact-body" color="-exact-secondary-label"
+        text "Not needed" font="-exact-headline" font-weight=400 color="-exact-secondary-label"
         text "Take it off your list" font="-exact-subheadline" color="-exact-tertiary-label"
 
 // A question hex took off Bassim's list to decide itself, on its thread's page: when, the question,
@@ -243,9 +327,12 @@ component DecidedCard
       if failed != ""
         text failed font="-exact-footnote" color="hex.danger"
 
-// Bassim's own words to a question, docked at the page's foot: + adds a photo, and the words go as
-// his answer. The keyboard stays up after a send, and a draft is kept if he leaves.
+// Bassim's own words to a question, as glass floating at the page's foot over what scrolls under
+// it: + adds a photo or video, the mic talks it over with hex (the call, about this), and the words
+// go as his answer. The keyboard stays up after a send, and a draft is kept if he leaves.
 component ReplyComposer
+  inject
+    haptics: bool
   props
     ask: Ask
     draft: string
@@ -253,6 +340,7 @@ component ReplyComposer
     dismissed: action
     note: action
     answer: action
+    talk: action
     attached: Media[]
     addError: string
     attach: action
@@ -261,7 +349,9 @@ component ReplyComposer
     foot: number
     // Answered already: his words go to its thread as a note.
     answered: bool
-    // How far its trailing edge stands in, clear of a camera in the window's corner (room.footEnd).
+    // Where it starts in the page, and how far its trailing edge stands in from the page's end,
+    // clear of a camera in the window's corner (room.footEnd).
+    left: number
     end: number
   state text = ""
   state started = false
@@ -282,13 +372,17 @@ component ReplyComposer
     started = true
     keep(`ask:${ask.id}`, "")
   view
-    column gap=4 padding=`6px ${end}px ${foot + 8}px 16px` testId="reply"
+    column position="absolute" left=left right=end bottom=(foot + 8) gap=6 z-index=5 testId="reply"
       Waiting(media=attached, error=addError, remove=detach)
-      row gap=8 align-items="flex-end"
-        AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=44, disabled=(attached.length >= 4), add=add)
-        row class=Composer flex=1 min-width=0
+      row backgroundMaterial="glass" border-radius=24 min-height=48 padding="0 6px 0 6px" gap=8 align-items="flex-end"
+        box padding="6px 0" flex-shrink=0
+          AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=36, disabled=(attached.length >= 4), add=add)
+        box position="relative" flex=1 min-width=0 display="flex"
           if words == ""
-            FieldHint(text=(answered ? "Add a note to it" : "Reply in your own words"))
-          textarea id="reply-field" class=ComposerField value=words input=edit rows=1 field-sizing="content" max-height=130 aria-label=`Your answer to ${ask.question}` testId="reply-field"
-          button press=send disabled=empty class=Send retainFocus=true aria-label=(answered ? "Send this note" : "Answer with these words") testId="reply-answer"
-            image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")
+            text (answered ? "Add a note to it" : "Write your own") position="absolute" left=0 top=13 right=0 font="-exact-body" color="-exact-placeholder" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" pointer-events="none" aria-hidden=true
+          textarea id="reply-field" border="none" background-color="transparent" padding="13px 0" flex=1 min-width=0 font="-exact-body" color="-exact-label" value=words input=edit rows=1 field-sizing="content" max-height=130 aria-label=`Your answer to ${ask.question}` testId="reply-field"
+        box padding="6px 0" flex-shrink=0
+          button press=talk class=Tap width=36 height=36 border-radius=18 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label="Talk it over with hex" testId="reply-talk"
+            image "symbol:sf/mic.fill" width=16 height=16 object-fit="contain" color="-exact-label"
+        button press=send disabled=empty class=Send margin="6px 0" retainFocus=true aria-label=(answered ? "Send this note" : "Answer with these words") testId="reply-answer"
+          image "symbol:send" width=16 height=16 object-fit="contain" color=(empty ? "-exact-tertiary-label" : "-exact-background")

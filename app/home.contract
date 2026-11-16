@@ -159,8 +159,9 @@ component HexHome
               IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
             else if p == "goals"
               GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
+      // Its foot fades out over the list, so a row passing under it never shows cut in half.
       if page != "now"
-        box position="absolute" top=0 left=0 right=0 background-color="-exact-background" opacity=(past.includes(page) ? 1 : 0) pointer-events=(past.includes(page) ? "auto" : "none") aria-hidden=(not past.includes(page)) transition=springOf(still, "opacity") testId="hex-bar"
+        box position="absolute" top=0 left=0 right=0 height=(row.height + 20) background-color="-exact-background" mask-image="linear-gradient(to top, transparent 0, #000 20px)" opacity=(past.includes(page) ? 1 : 0) pointer-events=(past.includes(page) ? "auto" : "none") aria-hidden=(not past.includes(page)) transition=springOf(still, "opacity") testId="hex-bar"
           box padding-right=headRight
             HexFace(f=row, face=true, persona=persona, personaColor=personaColor, palette=palette, reaction=reaction, still=still, known=known, liveId=liveId, liveTopic=liveTopic, lineText=lineText, goLive=goLive)
 

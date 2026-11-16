@@ -1,11 +1,12 @@
 // hex's colours, each with one job: mint is hex's own choice (its pick, what it decided), amber a
 // question or what waits on Bassim, blue work going on, red a failure or ending the call, each with
 // its wash behind a mark or count. Everything else is the platform's greys at full strength or less,
-// so the accent (native controls, filled buttons, a spinner) is ink, as Muse's controls are.
+// so the accent (native controls, filled buttons, a spinner) is ink, as Muse's controls are. In dark
+// it is a mid grey, not near-white: UIKit keeps a filled button's label white on any tint.
 tamber hex
 
 theme
-  AccentColor = light-dark(#111113, #F2F2F4)
+  AccentColor = light-dark(#111113, #636366)
   hex.accent = light-dark(#1F8A6D, #C4F3E5)
   hex.accent.wash = light-dark(#D7F2EA, #1B3534)
   hex.accent.solid = #1F8A6D  scheme=fixed
@@ -23,7 +24,7 @@ theme
   tile.server = #3A3A3C  scheme=fixed
   tile.link = #8E8E93  scheme=fixed
   ink.on-tile = #FFFFFF  scheme=fixed
-  ink.on-accent = light-dark(#FFFFFF, #111113)
+  ink.on-accent = #FFFFFF  scheme=fixed
 
 // Icons hex draws itself: SF Symbols on Apple, the same outline from icons/ elsewhere. The four
 // tabs of hex's column, and the glyphs inside a state's mark.

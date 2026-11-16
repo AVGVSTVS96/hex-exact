@@ -270,7 +270,7 @@ shape HexTab
 fn hexTabs(): HexTab[] = [HexTab(id="now", label="Now", icon="symbol:icon.now"), HexTab(id="feed", label="Feed", icon="symbol:icon.feed"), HexTab(id="ideas", label="Ideas", icon="symbol:icon.ideas"), HexTab(id="goals", label="Goals", icon="symbol:icon.goals")]
 
 style TabTap
-  appearance="none" display="flex" flex-direction="column" align-items="center" justify-content="center" gap=2 width=54 height=48 border-radius=999 position="relative"
+  appearance="none" display="flex" flex-direction="column" align-items="center" justify-content="center" gap=2 width="3.375rem" height="3rem" border-radius=999 position="relative"
   :active
     -exact-press-scale=0.92
 

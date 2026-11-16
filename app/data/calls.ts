@@ -4,7 +4,7 @@ import { enc, read, watch, write } from './hex.ts';
 import { at, bool, list, num, obj, str, strings, type Json } from './parse.ts';
 
 const call = (c: Json, live: string): Result<'watchCalls'>['calls'][number] => ({
-  id: str(c.id), started: at(c.started), ended: at(c.ended), ending: str(c.end), source: str(c.from), voice: str(c.voice),
+  id: str(c.id), started: at(c.started), ended: at(c.ended), ending: str(c.end), reason: str(c.reason), source: str(c.from), voice: str(c.voice),
   title: str(c.title), why: str(c.why), summary: str(c.summary), waiting: strings(c.waiting),
   // A call's own record can come without its length; its start and end say it.
   seconds: num(c.seconds) || (c.ended !== undefined && at(c.ended) > at(c.started) ? (at(c.ended) - at(c.started)) / 1000 : 0), tasks: typeof c.tasks === 'number' ? c.tasks : Array.isArray(c.tasks) ? c.tasks.length : 0,
@@ -14,8 +14,8 @@ const call = (c: Json, live: string): Result<'watchCalls'>['calls'][number] => (
 const record = (b: Json): Result<'loadCall'> => ({
   call: call(b, b.ended === undefined ? str(b.id) : ''),
   turns: list(b.turns, (t) => ({ who: str(t.who), at: num(t.at), text: str(t.text) })),
-  tasks: list(b.tasks, (t) => ({ id: str(t.id), state: str(t.state), at: num(t.at), text: str(t.text) })),
-  moments: list(b.moments, (m) => ({ at: num(m.at), kind: str(m.kind), text: str(m.text), media: typeof m.media === 'string' ? m.media : str(obj(m.media).id) })),
+  tasks: list(b.tasks, (t) => ({ id: str(t.id), state: str(t.state), at: num(t.at), text: str(t.text), to: str(t.to) })),
+  moments: list(b.moments, (m) => ({ at: num(m.at), kind: str(m.kind), text: str(m.text), media: typeof m.media === 'string' ? m.media : str(obj(m.media).id), checked: str(m.checked), topic: str(obj(m.sent).topic) })),
 });
 
 export const calls: Partial<Sources> = {

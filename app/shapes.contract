@@ -366,6 +366,8 @@ shape CallRow
   started: number
   ended: number
   ending: string
+  // Why it ended, in hex's words or as a code (connection_lost).
+  reason: string
   source: string
   voice: string
   title: string
@@ -388,18 +390,23 @@ shape Turn
   at: number
   text: string
 
+// to: the topic it went to.
 shape CallTask
   id: string
   state: string
   at: number
   text: string
+  to: string
 
-// kind: paused | resumed | warned | muted | unmuted | stopped | photo | video | ask | answered …
+// kind: paused | resumed | warned | muted | unmuted | stopped | photo | video | ask | answered | say …
+// checked: what hex looked at for what it said (say). topic: where an answer went (answered).
 shape Moment
   at: number
   kind: string
   text: string
   media: string
+  checked: string
+  topic: string
 
 shape CallRecord
   call: CallRow

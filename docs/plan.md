@@ -32,6 +32,11 @@ Home          built to the Muse design; reads well
               open like a book: one list stretched across the whole width
 past Home     no screen has been seen on iOS: a launch link leaves the app on Home in the
               simulator, and nothing can tap the Duo simulator yet
+on the web    "hex decided" on Home opens Tasks at its top, not what hex decided
+render        a decided row opens its topic's first open question, not itself
+              Tasks during a call: the call's timer and End button draw over the list
+              open like a book: threads, Steps, Calls and a past call are one page across
+              the fold; the page beside Tasks runs over the search field
 layout        each screen decides for itself, from the fold or a fixed number
               (`horizontalViewportSegments == 2` in 10 places; 520, 700, 900 in others)
 Exact         pinned at 7722882 (Nov 12); upstream has moved a long way since

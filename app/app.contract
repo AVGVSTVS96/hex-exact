@@ -363,6 +363,24 @@ component App
     beside = page
     if haptics
       haptic("selection")
+  // Folding and unfolding keep the page he's on. A goal, watch or idea over Home goes beside it
+  // once there are two columns (however it opened: a tap, a link, the Duo unfolding), and the one
+  // beside Home comes over it when the Duo folds.
+  derive under = match stack(nav).at(-2) { case some(e) => e.name, case none => "" }
+  derive besideKind = match beside.split(":").at(0) { case some(k) => k, case none => "" }
+  task besideOnUnfold key=`${room.columns}|${top(nav).id}`
+    after(1, pageBeside)
+  task overOnFold key=`${room.columns}`
+    after(1, pageOver)
+  action pageBeside
+    if room.columns == 2 and (under == "home" or under == "") and ["goal", "watch", "idea"].includes(top(nav).name)
+      beside = `${top(nav).name}:${top(nav).params.id}`
+      nav = under == "" ? go(nav, "/") : back(nav)
+  action pageOver
+    if room.columns == 1 and top(nav).name == "home" and ["goal", "watch", "idea"].includes(besideKind)
+      let id = beside.slice(besideKind.length + 1)
+      nav = push(nav, besideKind == "goal" ? path("goal", id) : besideKind == "watch" ? path("watch", id) : path("idea", id))
+      beside = ""
   action pickTab(t: string)
     tab = t
     if haptics

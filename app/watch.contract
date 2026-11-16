@@ -6,7 +6,7 @@ use Mark, Note, Tap, whenOf, springOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Confirmed from "./ask.contract"
 use GoalAnswer, changeOf, partOf from "./goal.contract"
-use nextWords, plainOf, sentenceOf from "./goals.contract"
+use nextWords, plainOf from "./goals.contract"
 
 fn watchOf(goals: Goals, id: string): Watch = match goals.watching.filter(w => w.id == id).at(0) { case some(w) => w, case none => Watch(id="", stopped=false, title="", topic="", run="", every="", next=0, asked=[], does="", runs=[]) }
 fn foundOf(w: Watch): WatchRun[] = w.runs.filter(r => r.said != "")
@@ -65,17 +65,13 @@ component WatchBody
         Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading" : "hex isn't watching this any more."), pad="24px 0", id="watch-missing")
       else
         column gap=4 padding="0 0 16px"
-          text w.title font="-exact-title1" font-weight=700 padding-right=end role="heading" aria-level=1 user-select="text"
+          text w.title font="-exact-title1" font-weight=700 padding-right=end line-clamp=2 role="heading" aria-level=1 user-select="text"
           text `Watching · ${w.topic}${w.every != "" ? ` · ${w.every}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
         if w.asked.length > 0
           column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="watch-asked"
             text "You asked" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
             for a, i in w.asked key=i
               text a font="-exact-body" color="-exact-label" user-select="text"
-        else if w.does != ""
-          column gap=6 margin-bottom=22 testId="watch-does"
-            text "What hex checks" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
-            text `${sentenceOf(w.does)}.` font="-exact-body" color="-exact-label" line-clamp=3 user-select="text"
         column gap=10 margin-bottom=22 testId="watch-next"
           text "Next" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
           row gap=14 align-items="center"
@@ -90,13 +86,13 @@ component WatchBody
                   button press=toggleEarlier class=Tap display="flex" flex-direction="row" gap=6 align-items="center" min-height=44 aria-expanded=earlier -exact-press-haptic=(haptics ? "selection" : "none") testId="watch-earlier"
                     text (found.length == 2 ? "1 earlier check" : `${found.length - 1} earlier checks`) font="-exact-subheadline" color="-exact-secondary-label"
                     image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" rotate=(earlier ? "90deg" : "0deg") transition=springOf(still, "rotate")
-              text plainOf(r.said) font="-exact-body" color="-exact-label" user-select="text"
+              text plainOf(r.said) font="-exact-body" color="-exact-label" line-clamp=6 user-select="text"
               if earlier
                 column gap=14 padding="8px 0 0 14px" border-left="3px solid -exact-separator" testId="watch-earlier-list"
                   for e in found.slice(1) key=e.at
                     column gap=2
                       text foundWhen(e.at, now, offset) font="-exact-footnote" font-weight=600 color="-exact-secondary-label"
-                      text plainOf(e.said) font="-exact-subheadline" color="-exact-label" line-clamp=6 user-select="text"
+                      text plainOf(e.said) font="-exact-subheadline" color="-exact-label" line-clamp=3 user-select="text"
           case none
             Note(kind="empty", text="Nothing found yet: it hasn't run since you asked.", pad="0", id="watch-not-yet")
         if w.run != ""

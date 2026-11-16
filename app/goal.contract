@@ -86,7 +86,7 @@ component GoalBody
           Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading this goal" : "This goal is no longer on your list."), pad="24px 0", id="goal-missing")
         else
           column gap=4 padding="0 0 16px"
-            text g.title font="-exact-title1" font-weight=700 padding-right=end role="heading" aria-level=1 user-select="text"
+            text g.title font="-exact-title1" font-weight=700 padding-right=end line-clamp=2 role="heading" aria-level=1 user-select="text"
             text `Goal · ${g.group}${g.asked > 0 ? ` · asked ${whenOf(g.asked, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
           if g.words.length > 0
             column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="goal-asked"
@@ -98,7 +98,7 @@ component GoalBody
               text "Done when" font="-exact-subheadline" font-weight=600 color="-exact-secondary-label"
               text g.doneWhen font="-exact-body" color="-exact-label" user-select="text"
           column gap=10 testId="goal-stands"
-            text (done ? `Reached ${dayAndTime(g.at, now, offset)}` : "Where it stands") font="-exact-subheadline" font-weight=600 color=(done ? "-exact-secondary-label" : "hex.progress")
+            text (done ? `Reached ${dayAndTime(g.at, now, offset)}` : "Where it stands") font="-exact-subheadline" font-weight=600 color=(g.state == "working" ? "hex.progress" : "-exact-secondary-label")
             if g.state == "needs" and g.run != ""
               button press=openTask(g.run) class=Tap display="flex" flex-direction="row" gap=14 align-items="flex-start" text-align="left" min-height=44 aria-label=`hex asks: ${g.line}` -exact-press-haptic=(haptics ? "selection" : "none") testId="goal-question"
                 Mark(state="asks", size=26)
@@ -148,11 +148,11 @@ component GoalAnswer
     id: string
     press: action
   view
-    button press=press class=Tap display="flex" flex-direction="row" gap=14 align-items="center" padding="12px 0" min-height=44 border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${label}: ${detail}` testId=id
-      box width=26 height=26 border-radius=13 flex-shrink=0 box-sizing="border-box" border=(dashed ? "1.5px dashed -exact-tertiary-label" : "1.5px solid -exact-tertiary-label") aria-hidden=true
+    button press=press class=Tap display="flex" flex-direction="row" gap=12 align-items="center" padding="12px 0" min-height=44 border-bottom="0.5px solid -exact-separator" text-align="left" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${label}: ${detail}` testId=id
+      box width=22 height=22 border-radius=11 flex-shrink=0 box-sizing="border-box" border=(dashed ? "1.5px dashed -exact-tertiary-label" : "1.5px solid -exact-tertiary-label") aria-hidden=true
       column flex=1 min-width=0 gap=2
         text label font="-exact-body" color=(dashed ? "-exact-secondary-label" : "-exact-label")
-        text detail font="-exact-subheadline" color=(dashed ? "-exact-tertiary-label" : "-exact-secondary-label")
+        text detail font="-exact-subheadline" color="-exact-secondary-label"
 
 // "Add to this goal": Bassim's words to the goal's topic, with photos. The keyboard stays up after
 // a send, and a draft is kept if he leaves.

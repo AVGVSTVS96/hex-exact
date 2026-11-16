@@ -20,9 +20,12 @@ fn lastRunAt(w: Watch): number = match w.runs.filter(r => r.said != "").at(0) { 
 fn plainOf(text: string): string = text.replaceAll("**", "").replaceAll("`", "")
 fn sentenceOf(text: string): string = match plainOf(text).split(". ").at(0) { case some(s) => s.endsWith(".") ? s.slice(0, -1) : s, case none => "" }
 // When it runs next, as Bassim would say it: "today at 9 AM", "tomorrow", "on Monday", "on Dec 6".
-fn nextWords(next: number, now: number, offset: number): string = next == 0 ? "" : dayOf(next, offset) == dayOf(now, offset) ? `today at ${formatTime(next, offset, "short")}` : dayOf(next, offset) == dayOf(now, offset) + 1 ? "tomorrow" : dayOf(next, offset) < dayOf(now, offset) + 7 ? `on ${match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(dayOf(next, offset) % 7) { case some(d) => d, case none => "" }}` : `on ${match formatDate(next, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }}`
-// When it checks next comes first, so a long report can't push it out of the row's two lines.
-fn watchLine(w: Watch, now: number, offset: number): string = w.stopped ? "Stopped" : `${w.next == 0 ? "Not set to run again" : `Checks again ${nextWords(w.next, now, offset)}`}${lastRun(w) != "" ? ` · ${sentenceOf(lastRun(w))}` : ""}`
+fn nextWords(next: number, now: number, offset: number): string = next == 0 ? "" : dayOf(next, offset) == dayOf(now, offset) ? `today at ${formatTime(next, offset, "short")}` : dayOf(next, offset) == dayOf(now, offset) + 1 ? "tomorrow" : dayOf(next, offset) < dayOf(now, offset) + 7 ? `on ${match ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"].at(dayOf(next, offset) % 7) { case some(d) => d, case none => "" }}` : `on ${next - now > 300 * 86400000 ? formatDate(next, offset, "medium") : match formatDate(next, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" }}`
+// What it last found, in its first sentence; when it checks next goes in the row's stamp.
+fn watchLine(w: Watch): string = w.stopped ? "Stopped" : lastRun(w) != "" ? sentenceOf(lastRun(w)) : "Nothing found yet"
+fn watchStamp(w: Watch, now: number, offset: number): string = w.stopped or w.next == 0 ? "" : capitalOf(shortNext(nextWords(w.next, now, offset)))
+fn shortNext(s: string): string = s.startsWith("on ") ? s.slice(3) : s.startsWith("today at ") ? s.slice(9) : s
+fn capitalOf(s: string): string = s == "" ? "" : `${s.slice(0, 1).toUpperCase()}${s.slice(1)}`
 
 component GoalsList
   inject
@@ -64,7 +67,7 @@ component GoalsList
       if watches.length > 0
         Head(label="Watching", n=watches.length, pad="18px 10px 6px", id="goals-head-watching")
         for w in shownWatches key=w.id
-          Row(mark="watch", title=w.title, line=watchLine(w, now, offset), lines=2, failed=false, stamp="", n=0, selected=(beside == `watch:${w.id}`), href="", label=`Watching ${w.title}: ${watchLine(w, now, offset)}`, id=`goals-watch-${w.id}`, press=openWatch(w.id))
+          Row(mark="watch", title=w.title, line=watchLine(w), lines=1, failed=false, stamp=watchStamp(w, now, offset), n=0, selected=(beside == `watch:${w.id}`), href="", label=`Watching ${w.title}: ${watchLine(w)}${watchStamp(w, now, offset) != "" ? `, checks again ${nextWords(w.next, now, offset)}` : ""}`, id=`goals-watch-${w.id}`, press=openWatch(w.id))
         if watches.length > 2
           ShowMore(n=watches.length - 2, shown=allWatches, pad="6px 10px", id="goals-more-watching", press=toggleWatches)
       if groups.length > 0

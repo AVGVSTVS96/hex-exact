@@ -20,7 +20,7 @@ use UpdateToast from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
 use Room, roomOf, belowIn from "./room.contract"
-use DecidedPage from "./decided.contract"
+use DecidedPage, decidedPath from "./decided.contract"
 use Feed, FeedEntry, FeedView from "./feed.contract"
 use Said, Sending, saidLine, saidOf, sendingLine, sendingOf, field, saidFor, withSaid, settledLines from "./said.contract"
 
@@ -111,7 +111,7 @@ component App
   // Where everything sits: the window's size and what covers it, worked out once (room.contract).
   derive room = roomOf(viewport, pose)
   // hex's own pages that are built: Now until Feed, Ideas and Goals join it. With one, no tabs show.
-  derive hexPages = ["now"]
+  derive hexPages = ["now", "feed"]
 
   // Feed (feed.contract): the last Feed hex gave shows until it answers; older stretches load as
   // the list reaches its end. feedSeen is the newest entry Bassim has had Feed open for; feedMark,
@@ -345,7 +345,7 @@ component App
     else if e.kind == "done"
       openTask(`done:${e.opens}`)
     else if e.kind == "decided"
-      open(`${path("decided")}?open=${e.opens}`)
+      open(decidedPath(e.opens))
   // Discuss: a call that opens on this entry, or the entry brought into the call that's on.
   action discussFeed(id: string)
     if call.status == "live"
@@ -593,7 +593,7 @@ component App
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id
         if e.name == "home"
-          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
+          Home(entry=e, viewport=viewport, now=now, call=call, captions=captions, activity=activity, counts=counts, calls=callsShown, liveRecord=liveRecord, persona=persona, personaColor=(personaColor == "" ? "#FFFFFF" : personaColor), palette=(opalPalette == "original" ? "" : opalPalette), reaction=reaction, haptics=haptics, start=startCall(""), mute=toggleMute, end=endCall, hangUp=hangUpElsewhere, leaving=pending(commanded), share=share, reshare=reshare, open=open, openTasks=openTasks, openTask=openTask, answer=answer, answerMany=answerMany, said=saids, finished=agentDone, room=room, pages=hexPages, page=hexPage, pickPage=pickPage, feedFresh=feedFresh, feed=feed, openFeed=openFeed, discuss=discussFeed, undo=undo, moreFeed=moreFeed, retryFeed=retryFeed, reading=reading, setReading=setReading, trouble=trouble, offset=clock.utcOffset, tasks=tasks, asks=asks, listsLoading=(not current(liveTasks) or not current(liveAsks)), listsFailed=(failed(liveTasks) or failed(liveAsks)), beside=besideId, select=besidePage)
             if besideId != ""
               TaskBody(id=besideId, pane=true, room=room, clearTop=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=e, viewport=viewport, now=now, offset=clock.utcOffset, task=task, chat=chat, asks=asks, tasks=tasks, said=saids, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=(not current(task)), failed=failed(task), inCall=(call.status == "live"), open=open, openTask=openTask, answer=answer, answerMany=answerMany, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
         if e.name == "decided"

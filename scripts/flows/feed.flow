@@ -1,0 +1,23 @@
+# Feed: the tab, its days, scrolling to the last entry above the tabs and Call, the oldest entry
+# (loaded as the list reaches its end) clear of the tabs, an entry opened and Back. The stand-in
+# answers /feed with made-up days.
+launch /
+shoot now
+tap hex-tab-feed
+shoot feed
+mark hex-tabs
+scroll home-list-feed
+shoot scrolled
+scroll home-list-feed
+scroll home-list-feed
+scroll home-list-feed
+shoot end
+still hex-tabs
+apart feed-done:t-7 hex-tabs
+tap hex-tab-now
+tap hex-tab-feed
+shoot again
+tap feed-done:t-1-open
+shoot opened
+tap chrome-back
+shoot back

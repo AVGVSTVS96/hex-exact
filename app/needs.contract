@@ -70,7 +70,7 @@ component NeedsPage
   derive colH = across ? room.across : room.height
   derive wide = colW >= 520 and colW > colH
   derive right = two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)
-  // Go through them floats at the list's foot, except where the room is short (wide), or a call is
+  // Go through them floats at the list's foot, which ends above it so no row sits under it at rest, except where the room is short (wide), or a call is
   // docked there.
   derive floating = not wide and not callOn and needs.length > 1
   derive lit = two ? match sortBy(needs.filter(e => needPage(e, tasks) == beside), e => (e.id == tapped ? 0 : 1)).at(0) { case some(e) => e.id, case none => "" } : ""
@@ -97,8 +97,8 @@ component NeedsPage
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="needs"
       Chrome(room=room, on="needs", needsYou=counts, working=working, open=open, openTasks=openTasks, back=back)
-      scroll id="needs-list" position="absolute" top=room.below bottom=(across ? room.height - room.across : callOn ? room.foot + 64 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(callOn ? "linear-gradient(to top, transparent 0, #000 26px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)") testId="needs-list"
-        column padding=`0 ${right + 6}px ${floating ? room.foot + 8 + 50 + 20 : callOn ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
+      scroll id="needs-list" position="absolute" top=room.below bottom=(across ? room.height - room.across : callOn ? room.foot + 64 + 6 : floating ? room.foot + 8 + 50 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(callOn or floating ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)") testId="needs-list"
+        column padding=`0 ${right + 6}px ${floating or callOn ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
           if failed and not known
             Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="needs-offline")
           if loading and not known and not failed
@@ -272,9 +272,9 @@ component NeedRow
           if stuck
             text whenOf(entry.at, now, offset) font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
           if picks.length > 0
-            row gap=4 align-items="center" min-width=0 margin-top=2
+            row gap=4 align-items="flex-start" min-width=0 margin-top=2
               image "symbol:icon.pick" width=11 height=11 object-fit="contain" color="hex.accent" aria-hidden=true
-              text match picks.at(0) { case some(p) => p, case none => "" } font="-exact-footnote" font-weight=600 color="hex.accent" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0 flex-shrink=1
+              text match picks.at(0) { case some(p) => p, case none => "" } font="-exact-footnote" font-weight=600 color="hex.accent" line-clamp=2 min-width=0 flex-shrink=1
               if picks.length > 1
                 text ` +${picks.length - 1}` font="-exact-footnote" color="hex.accent" white-space="nowrap"
       if stuck and entry.action != ""

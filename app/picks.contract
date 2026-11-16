@@ -67,8 +67,9 @@ component Picks
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="picks"
       Chrome(room=room, on="picks", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
-      scroll id="picks" position="absolute" top=room.below bottom=(across ? room.height - room.across : 0) left=colX width=colW box-sizing="border-box" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
-        column padding=`0 ${right + 6}px ${floating ? room.foot + 8 + 50 + 20 : room.foot + 24}px 6px` box-sizing="border-box"
+      // Take all floats at the list's foot, which ends above it so no row sits under it at rest.
+      scroll id="picks" position="absolute" top=room.below bottom=(across ? room.height - room.across : floating ? room.foot + 8 + 50 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(floating ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
+        column padding=`0 ${right + 6}px ${floating ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
           column min-height=(two ? 0 : max(0, room.headBottom - room.below))
             row gap=10 align-items="baseline" padding="0 10px 4px" testId="picks-title"
               text "hex’s picks" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"
@@ -90,8 +91,8 @@ component Picks
                 text "for later" font="-exact-footnote" color="-exact-secondary-label"
             if wide and picks.length > 0
               box flex=1
-              button press=takeAll class=Primary disabled=(taking.length == 0) min-height=34 padding="0 14px" testId="picks-answer"
-                text `Take all ${taking.length}` font="-exact-subheadline" font-weight=600 color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background")
+              button press=takeAll class=Primary disabled=(taking.length == 0) min-height=34 padding="0 14px" background-color=(taking.length == 0 ? "-exact-tertiary-fill" : "hex.accent") testId="picks-answer"
+                text `Take all ${taking.length}` font="-exact-subheadline" font-weight=600 color=(taking.length == 0 ? "-exact-tertiary-label" : "ink.on-accent")
           if picks.length == 0
             Note(kind="empty", text="Nothing left to take", pad="24px 12px", id="picks-empty")
           // Two columns read across, in rank order, so the first rows of both are the top of the list.
@@ -103,8 +104,8 @@ component Picks
                     box height=0.5 margin="5px 0 5px 42px" background-color="-exact-separator"
                   PickRow(ask=a, choice=choiceOf(picked, a), now=now, offset=offset, selected=(two and beside == a.id), press=show(a.id))
       if floating
-        button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(colX + (colW - takeW) / 2) width=takeW min-height=50 box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" testId="picks-answer"
-          text `Take all ${taking.length}` font="-exact-headline" color=(taking.length == 0 ? "-exact-tertiary-label" : "-exact-background")
+        button press=takeAll class=Primary disabled=(taking.length == 0) position="absolute" bottom=(room.foot + 8) left=(colX + (colW - takeW) / 2) width=takeW min-height=50 background-color=(taking.length == 0 ? "-exact-tertiary-fill" : "hex.accent") box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" testId="picks-answer"
+          text `Take all ${taking.length}` font="-exact-headline" color=(taking.length == 0 ? "-exact-tertiary-label" : "ink.on-accent")
       if two
         scroll position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width padding=`8px 20px ${room.foot + 24}px` box-sizing="border-box" testId="picks-beside"
           for a in picks.filter(x => x.id == beside) key=a.id
@@ -145,7 +146,7 @@ component PickRow
           row gap=4 align-items="center" flex-shrink=1 min-width=0
             if choice != ""
               image (hexs ? "symbol:icon.pick" : "symbol:icon.done") width=12 height=12 object-fit="contain" color=(hexs ? "hex.accent" : "-exact-label") aria-hidden=true
-            text (choice == "" ? "Decide later" : choice) font="-exact-subheadline" font-weight=600 color=(choice == "" ? "-exact-tertiary-label" : hexs ? "hex.accent" : "-exact-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
+            text (choice == "" ? "Decide later" : choice) font="-exact-subheadline" font-weight=600 color=(choice == "" ? "-exact-tertiary-label" : hexs ? "hex.accent" : "-exact-label") line-clamp=2 min-width=0
           row gap=4 flex-shrink=0 aria-hidden=true
             for o in a.options key=o.label
               box width=7 height=7 border-radius=3.5 box-sizing="border-box" background-color=(o.label == choice ? (hexs ? "hex.accent" : "-exact-label") : "transparent") border=(o.label == choice ? "none" : "1.25px solid -exact-tertiary-label")

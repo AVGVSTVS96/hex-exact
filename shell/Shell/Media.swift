@@ -56,6 +56,7 @@ enum MediaPicker {
       let delegate = PhotosDelegate { results in done.resume(returning: results) }
       picker.delegate = delegate
       objc_setAssociatedObject(picker, &PhotosDelegate.key, delegate, .OBJC_ASSOCIATION_RETAIN)
+      fill(picker)
       top.present(picker, animated: true)
     }
     var picked: [Picked] = []
@@ -84,6 +85,13 @@ enum MediaPicker {
     let alert = UIAlertController(title: "Videos up to a minute", message: "Pick a shorter video, or trim it in Photos.", preferredStyle: .alert)
     alert.addAction(UIAlertAction(title: "OK", style: .default))
     top.present(alert, animated: true)
+  }
+
+  /// A sheet as wide as the window. On a regular-width window (the Duo open, an iPad) iOS otherwise
+  /// draws a sheet at a page's width, an iPhone-sized card in the middle.
+  private static func fill(_ sheet: UIViewController) {
+    sheet.modalPresentationStyle = .pageSheet
+    sheet.sheetPresentationController?.prefersPageSizing = false
   }
 
   /// The picker's file is gone once its callback returns, so it's copied out first.
@@ -140,12 +148,7 @@ enum MediaPicker {
       let host = DismissWatcher(rootView: sheet) { finish([]) }
       host.overrideUserInterfaceStyle = .dark
       host.view.backgroundColor = .black
-      if let presentation = host.sheetPresentationController {
-        presentation.detents = [.medium(), .large()]
-        presentation.selectedDetentIdentifier = .large
-        presentation.prefersGrabberVisible = true
-        presentation.preferredCornerRadius = 32
-      }
+      host.modalPresentationStyle = .fullScreen
       top.present(host, animated: true)
     }
   }
@@ -175,8 +178,9 @@ private final class DismissWatcher<Content: View>: UIHostingController<Content> 
   }
 }
 
-/// The camera, as the stable app's sheet: tap the shutter for a photo, hold it for a video (up to a
+/// The camera, over the whole window: tap the shutter for a photo, hold it for a video (up to a
 /// minute, a red ring filling as it runs), flip between cameras, then look it over and Send or Add.
+/// Its controls keep to the safe area, clear of the Duo's side column and cameras; × closes it.
 private struct CameraSheet: View {
   let sends: Bool
   let done: ([Picked]) -> Void
@@ -204,6 +208,20 @@ private struct CameraSheet: View {
         review(picked)
       }
     }
+    .overlay(alignment: .topLeading) {
+      Button { done([]) } label: {
+        Image(systemName: "xmark")
+          .font(.system(size: 17, weight: .semibold))
+          .frame(width: 44, height: 44)
+      }
+      .buttonStyle(.glass)
+      .buttonBorderShape(.circle)
+      .disabled(camera.stage == .recording)
+      .opacity(camera.stage == .recording ? 0 : 1)
+      .accessibilityLabel("Close")
+      .padding(.leading, 24)
+      .padding(.top, 32)
+    }
     .preferredColorScheme(.dark)
     .task { await camera.start(muted: Call.shared.status != .idle) }
     .onDisappear { camera.stop() }
@@ -211,7 +229,7 @@ private struct CameraSheet: View {
 
   private var live: some View {
     VStack(spacing: 0) {
-      CameraPreview(session: camera.session)
+      CameraPreview(camera: camera)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 1))
         .overlay(alignment: .top) {
@@ -347,53 +365,97 @@ private final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptu
   private let photos = AVCapturePhotoOutput()
   private let movies = AVCaptureMovieFileOutput()
   private var position = AVCaptureDevice.Position.back
-  private var input: AVCaptureDeviceInput?
+  /// Touched only on `queue`, where the session is configured, so the screen (and the orb over a
+  /// live call) never waits on it.
+  nonisolated(unsafe) private var input: AVCaptureDeviceInput?
   private var clock: Timer?
   private let queue = DispatchQueue(label: "hex.camera")
+  private weak var preview: AVCaptureVideoPreviewLayer?
+  /// Keeps the picture upright as the Duo turns and folds: the preview and what's captured.
+  private var rotation: AVCaptureDevice.RotationCoordinator?
+  private var upright: NSKeyValueObservation?
 
-  /// While a call holds the mic, a clip is recorded without sound, as the stable app does.
+  /// While a call holds the mic, a clip is recorded without sound, as the stable app does, and the
+  /// camera leaves the call's audio session alone.
   func start(muted: Bool) async {
     guard await AVCaptureDevice.requestAccess(for: .video) else { return stage = .denied }
-    session.beginConfiguration()
-    session.sessionPreset = .high
-    attach(position)
-    if !muted, await AVCaptureDevice.requestAccess(for: .audio), let mic = AVCaptureDevice.default(for: .audio),
-      let audio = try? AVCaptureDeviceInput(device: mic), session.canAddInput(audio)
-    {
-      session.addInput(audio)
+    let mic = muted ? nil : await AVCaptureDevice.requestAccess(for: .audio) ? AVCaptureDevice.default(for: .audio) : nil
+    let (session, photos, movies, position, longest) = (session, photos, movies, position, MediaPicker.clipSeconds)
+    let device = await withCheckedContinuation { done in
+      queue.async {
+        session.beginConfiguration()
+        session.automaticallyConfiguresApplicationAudioSession = !muted
+        session.sessionPreset = .high
+        let device = self.attach(position)
+        if let mic, let audio = try? AVCaptureDeviceInput(device: mic), session.canAddInput(audio) { session.addInput(audio) }
+        if session.canAddOutput(photos) { session.addOutput(photos) }
+        if session.canAddOutput(movies) { session.addOutput(movies) }
+        movies.maxRecordedDuration = CMTime(seconds: longest, preferredTimescale: 600)
+        session.commitConfiguration()
+        session.startRunning()
+        done.resume(returning: device)
+      }
     }
-    if session.canAddOutput(photos) { session.addOutput(photos) }
-    if session.canAddOutput(movies) { session.addOutput(movies) }
-    movies.maxRecordedDuration = CMTime(seconds: MediaPicker.clipSeconds, preferredTimescale: 600)
-    session.commitConfiguration()
-    let session = session
-    queue.async { session.startRunning() }
+    follow(device)
   }
 
   func stop() {
     clock?.invalidate()
+    upright = nil
     let session = session
     queue.async { session.stopRunning() }
   }
 
-  private func attach(_ position: AVCaptureDevice.Position) {
+  nonisolated private func attach(_ position: AVCaptureDevice.Position) -> AVCaptureDevice? {
     if let input { session.removeInput(input) }
     guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
       let next = try? AVCaptureDeviceInput(device: device), session.canAddInput(next)
-    else { return }
+    else { return nil }
     session.addInput(next)
     input = next
+    return device
   }
 
   func flip() {
     position = position == .back ? .front : .back
-    session.beginConfiguration()
-    attach(position)
-    session.commitConfiguration()
+    let (session, position) = (session, position)
+    queue.async {
+      session.beginConfiguration()
+      let device = self.attach(position)
+      session.commitConfiguration()
+      Task { @MainActor in self.follow(device) }
+    }
+  }
+
+  func show(in layer: AVCaptureVideoPreviewLayer) {
+    preview = layer
+    follow(input?.device)
+  }
+
+  private func follow(_ device: AVCaptureDevice?) {
+    guard let device, let preview else { return }
+    let rotation = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: preview)
+    self.rotation = rotation
+    upright = rotation.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { [weak preview] rotation, _ in
+      let angle = rotation.videoRotationAngleForHorizonLevelPreview
+      Task { @MainActor in
+        guard let connection = preview?.connection, connection.isVideoRotationAngleSupported(angle) else { return }
+        connection.videoRotationAngle = angle
+      }
+    }
+  }
+
+  /// What's captured comes out the way the Duo is held.
+  private func level(_ output: AVCaptureOutput) {
+    guard let angle = rotation?.videoRotationAngleForHorizonLevelCapture, let connection = output.connection(with: .video),
+      connection.isVideoRotationAngleSupported(angle)
+    else { return }
+    connection.videoRotationAngle = angle
   }
 
   func photo() {
     guard stage == .live, session.isRunning else { return }
+    level(photos)
     photos.capturePhoto(with: AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg]), delegate: self)
   }
 
@@ -401,6 +463,7 @@ private final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptu
     guard stage == .live, session.isRunning else { return }
     stage = .recording
     recorded = 0
+    level(movies)
     movies.startRecording(to: MediaPicker.scratch("mov"), recordingDelegate: self)
     let began = Date()
     clock = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -436,16 +499,17 @@ private final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptu
 }
 
 private struct CameraPreview: UIViewRepresentable {
-  let session: AVCaptureSession
+  let camera: CameraModel
   final class Preview: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     var preview: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
   }
   func makeUIView(context: Context) -> Preview {
     let view = Preview()
-    view.preview.session = session
+    view.preview.session = camera.session
     view.preview.videoGravity = .resizeAspectFill
     view.backgroundColor = .black
+    camera.show(in: view.preview)
     return view
   }
   func updateUIView(_ view: Preview, context: Context) {}

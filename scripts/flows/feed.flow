@@ -4,9 +4,9 @@
 # entry opening hex decided at that row.
 launch /
 shoot now
-tap hex-tab-feed
+tap tab-feed
 shoot feed
-mark hex-tabs
+mark tab-now
 scroll home-list-feed
 shoot scrolled
 scroll home-list-feed
@@ -15,9 +15,9 @@ scroll home-list-feed
 scroll home-list-feed
 scroll home-list-feed
 shoot further
-still hex-tabs
-tap hex-tab-now
-tap hex-tab-feed
+still tab-now
+tap tab-now
+tap tab-feed
 shoot again
 scroll-back home-list-feed
 scroll-back home-list-feed
@@ -31,9 +31,9 @@ tap feed-done:*
 shoot opened
 tap story-more-*
 shoot another
-tap chrome-back
+tap bar-back
 shoot back
 tap feed-decided:*
 shoot decided
-tap chrome-back
+tap bar-back
 shoot back-decided

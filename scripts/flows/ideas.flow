@@ -2,7 +2,7 @@
 # looking, a word added to it (nothing moves when it's sent), Back where there is one, then the list
 # shown in full and scrolled to its end. The stand-in keeps every write from reaching hex.
 launch /
-tap hex-tab-ideas
+tap tab-ideas
 shoot ideas
 tap idea-row-*
 shoot idea
@@ -24,7 +24,7 @@ still idea-field
 shoot sent
 swipe-down idea-scroll
 no-keyboard
-tap chrome-back
+tap bar-back
 shoot back
 reveal ideas-more-*
 tap ideas-more-*

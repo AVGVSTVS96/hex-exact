@@ -3,9 +3,9 @@
 # at the top a finished entry's story beside Feed, marked, its goal from there, and a decided entry opening what hex decided beside Feed, marked, with Undo.
 launch /
 shoot now
-tap hex-tab-feed
+tap tab-feed
 shoot feed
-mark hex-tabs
+mark tab-now
 scroll home-list-feed
 shoot scrolled
 scroll home-list-feed
@@ -14,9 +14,9 @@ scroll home-list-feed
 scroll home-list-feed
 scroll home-list-feed
 shoot further
-still hex-tabs
-tap hex-tab-now
-tap hex-tab-feed
+still tab-now
+tap tab-now
+tap tab-feed
 shoot again
 scroll-back home-list-feed
 scroll-back home-list-feed

@@ -2,9 +2,9 @@
 launch call:/
 wait 10
 shoot talking
-tap open-tasks
+tap bar-tasks
 shoot tasks-in-call
-tap chrome-back
+tap bar-back
 shoot back-in-call
 tap mute
 shoot muted

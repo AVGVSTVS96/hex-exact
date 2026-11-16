@@ -3,8 +3,9 @@ import UIKit
 /// The frame around the Exact screen: hex's pages (Now, Feed, Ideas, Goals) as the system's tabs,
 /// and Calls, Tasks and Settings, with Back on a page opened over Home, as its bar buttons. iOS
 /// puts them where a phone's bars go: on the iPhone Duo folded, in the vertical bar down the
-/// screen's edge under the status icons, and the page stops at that column (its safe area);
-/// open, the bar along the top and the tab bar at the foot.
+/// screen's edge under the status icons, and the page stops at that column (its safe area), as
+/// it does open like a book; open like a laptop, the bar along the top and the tab bar at the foot.
+/// A page opened over Home (Back shows) hides the tabs, as a pushed page does.
 ///
 /// The screen asks for them (`op: bars` through Bridge: the pages, the one showing, whether Back
 /// shows, whether anything needs Bassim) and until it does the frame draws nothing, so a screen
@@ -68,7 +69,7 @@ final class Frame: UITabBarController, UITabBarControllerDelegate {
       self.needs = needs
       stacks.values.forEach(dress)
     }
-    let tabs = shown && pages.count > 1
+    let tabs = shown && pages.count > 1 && !back
     if isTabBarHidden == tabs { setTabBarHidden(!tabs, animated: false) }
     hold()
     say(tap: screen.bars["tap"] as? String ?? "", counted: false)
@@ -97,7 +98,7 @@ final class Frame: UITabBarController, UITabBarControllerDelegate {
   private func dress(_ stack: UINavigationController) {
     guard let holder = stack.viewControllers.first else { return }
     let item = { (symbol: String, label: String, tap: String) -> UIBarButtonItem in
-      let made = UIBarButtonItem(image: UIImage(systemName: symbol), primaryAction: UIAction { [weak self] _ in
+      let made = UIBarButtonItem(title: label, image: UIImage(systemName: symbol), primaryAction: UIAction(title: label) { [weak self] _ in
         self?.say(tap: tap, counted: true)
       })
       made.accessibilityLabel = label
@@ -113,9 +114,11 @@ final class Frame: UITabBarController, UITabBarControllerDelegate {
         : UIColor(red: 0xA3 / 255, green: 0x5F / 255, blue: 0, alpha: 1) }
       tasks.badge = dot
     }
+    // Folded on its side, the Duo's column has room for one button and tucks the rest under More,
+    // keeping the last of these: Tasks, so its dot stays in sight.
     holder.navigationItem.rightBarButtonItems = [
-      item("slider.horizontal.3", "Voice and appearance settings", "open:settings"), tasks,
-      item("clock.arrow.circlepath", "Calls", "open:calls"),
+      item("slider.horizontal.3", "Settings", "open:settings"),
+      item("clock.arrow.circlepath", "Calls", "open:calls"), tasks,
     ]
     holder.navigationItem.leftBarButtonItem = back ? item("chevron.backward", "Back", "back") : nil
     stack.setNavigationBarHidden(!shown, animated: false)

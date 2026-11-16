@@ -5,8 +5,8 @@
 // The Duo gives its status icons either a column down one side (folded upright, open like a book)
 // or a band along the top (on its side), and the icons in it come as occlusions. Where the shell
 // draws the bars (shell/Shell/Frame.swift: hex's pages as the system's tabs, Calls, Tasks,
-// Settings and Back as its bar buttons), iOS puts them in that column folded and along the top and
-// foot open, and reports what they take as safe area, so the page stops at them and there's no
+// Settings and Back as its bar buttons), iOS puts them in that column folded and open like a book,
+// and along the top and foot open like a laptop, and reports what they take as safe area, so the page stops at them and there's no
 // chrome row of the app's own. Without them (a binary from before) the app draws its chrome row
 // beside the icons, never under them: inside the band when the band has room clear of the icons,
 // else just under it, its trailing end at the column's edge.
@@ -92,7 +92,8 @@ fn barTop(v: Viewport): number = v.safeAreaTop + 8
 fn rowCovers(v: Viewport, p: Pose): Rect[] = topCovers(v, p).filter(o => o.y < barTop(v) + barHeight() and o.y + o.height > barTop(v))
 fn barEnd(v: Viewport, p: Pose): number = min(v.width - v.safeAreaRight - (v.safeAreaRight > 0 ? 8 : 16), match sortBy(rowCovers(v, p).filter(o => o.x + o.width / 2 > v.width / 2), o => o.x).at(0) { case some(o) => o.x - 10, case none => v.width })
 fn barStart(v: Viewport, p: Pose): number = max(v.safeAreaLeft + 16, match sortBy(rowCovers(v, p).filter(o => o.x + o.width / 2 <= v.width / 2), o => o.x + o.width, "desc").at(0) { case some(o) => o.x + o.width + 10, case none => 0 })
-fn barOf(v: Viewport, p: Pose): Bar = Bar(top=barTop(v), start=barStart(v, p), end=barEnd(v, p))
+// With the shell's bars there is no capsule to stop short of: a page's own column bounds it.
+fn barOf(v: Viewport, p: Pose): Bar = Bar(top=barTop(v), start=barStart(v, p), end=(p.frame ? v.width : barEnd(v, p)))
 // Under the row; and for a column that has the icons above it, under them too, as a page's own
 // header has buttons at its trailing end.
 fn belowOf(v: Viewport, p: Pose): number = p.bars ? max(v.safeAreaTop, 16) + 8 : barTop(v) + barHeight() + 10
@@ -124,7 +125,7 @@ fn besideHigh(v: Viewport, p: Pose): bool = not p.bars and twoOf(v) and barEnd(v
 fn framedOf(v: Viewport, p: Pose): Viewport = p.bars ? Viewport(width=v.width, height=v.height, devicePosture=v.devicePosture, horizontalViewportSegments=v.horizontalViewportSegments, verticalViewportSegments=v.verticalViewportSegments, segments=v.segments, safeAreaTop=max(v.safeAreaTop, p.inset.top), safeAreaBottom=max(v.safeAreaBottom, p.inset.bottom), safeAreaLeft=max(v.safeAreaLeft, p.inset.left), safeAreaRight=max(v.safeAreaRight, p.inset.right), keyboardHeight=v.keyboardHeight, prefersReducedMotion=v.prefersReducedMotion, prefersColorScheme=v.prefersColorScheme) : v
 fn roomOf(v: Viewport, p: Pose): Room = roomIn(framedOf(v, p), p)
 fn belowIn(v: Viewport, p: Pose, column: Span): number = belowAt(framedOf(v, p), p, column)
-fn roomIn(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v, p), secondBelow=belowAt(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), firstTop=(p.bars ? belowOf(v, p) : ((twoOf(v) and barEnd(v, p) - capsuleWidth() >= firstOf(v, p).x + firstOf(v, p).width) or sideOf(v) ? barTop(v) : belowOf(v, p))), secondTop=(besideHigh(v, p) ? barTop(v) : belowAt(v, p, secondOf(v, p))), secondHeadEnd=(besideHigh(v, p) ? barEnd(v, p) - capsuleWidth() - 12 : clearOf(v).x + clearOf(v).width), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p), native=p.bars, covers=topCovers(v, p), across=acrossOf(v, p))
+fn roomIn(v: Viewport, p: Pose): Room = Room(width=v.width, height=v.height, clear=clearOf(v), columns=(twoOf(v) ? 2 : 1), first=firstOf(v, p), second=secondOf(v, p), bar=barOf(v, p), below=belowOf(v, p), secondBelow=belowAt(v, p, secondOf(v, p)), foot=max(v.safeAreaBottom, 12), tabs=Foot(x=firstOf(v, p).x, width=firstOf(v, p).width, top=v.height - max(v.safeAreaBottom, 12) - 8 - callSize()), firstTop=(p.bars ? belowOf(v, p) : ((twoOf(v) and barEnd(v, p) - capsuleWidth() >= firstOf(v, p).x + firstOf(v, p).width) or sideOf(v) ? barTop(v) : belowOf(v, p))), secondTop=(besideHigh(v, p) ? barTop(v) : belowAt(v, p, secondOf(v, p))), secondHeadEnd=(besideHigh(v, p) ? barEnd(v, p) - capsuleWidth() - 12 : clearOf(v).x + clearOf(v).width), headEnd=headEndOf(v, p), headBottom=headBottomOf(v, p), footEnd=footEndOf(v, p), native=p.frame, covers=topCovers(v, p), across=acrossOf(v, p))
 
 // Where the capsule starts, and so where Back and the free space on its leading side end.
 fn capsuleX(room: Room): number = room.bar.end - capsuleWidth()

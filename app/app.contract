@@ -244,7 +244,7 @@ component App
   derive ideasFirst = match firstIdea(ideas) { case some(i) => `idea:${i.id}`, case none => "" }
   derive needsOpen = split and top(nav).name == "needs"
   derive besideId = split and names.includes("tasks") ? (beside != "" ? beside : firstPage) : needsOpen ? (needsBeside == "check" ? "" : needsBeside != "" ? needsBeside : firstNeed(tasks, asks, saids, now)) : homeBeside
-  derive taskId = match stack(nav).filter(e => e.name == "task").at(-1) { case some(e) => e.params.id, case none => besideId }
+  derive taskId = match stack(nav).filter(e => e.name == "task" or e.name == "thread" or e.name == "steps").at(-1) { case some(e) => e.params.id, case none => besideId }
   derive chatOpen = names.includes("thread") or names.includes("task") or besideId != ""
   resource record = loadCall(pastId, pastLive) when pastId != "" as shape CallRecord else empty()
   // A topic (`topic:<name>`) or a finished item (`done:<id>`) opens a page made from the lists.

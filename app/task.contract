@@ -497,7 +497,7 @@ component TaskBody
                 box width=30 height=30 border-radius=15 background-color="-exact-quaternary-fill" display="flex" align-items="center" justify-content="center"
                   image "symbol:waveform" width=14 height=14 object-fit="contain" color="-exact-label" aria-hidden=true
           if kind == "task" and row.id != ""
-            Standing(state=row.state, parent=parent, since=row.since, at=row.at, agents=busyAgents.length, now=now, offset=offset)
+            Standing(state=(openAsks.length > 0 and row.state != "working" and row.state != "failed" ? "needs" : row.state), parent=parent, since=row.since, at=row.at, agents=busyAgents.length, now=now, offset=offset)
           else if kind == "topic"
             text `${openAsks.length > 0 ? `${openAsks.length} need you` : `${topicEntries.length} here`}` font="-exact-footnote" color="-exact-secondary-label" padding="0 16px"
           else if kind == "done"
@@ -551,7 +551,7 @@ component TaskBody
               box height=0.5 background-color="-exact-separator" margin="10px 6px 4px"
               Further(icon="symbol:list", label=title, n=-1, selected=false, id="task-page-link", press=toPage)
           else
-            if kind == "task" and loading and not known and row.id == ""
+            if kind == "task" and loading and not known
               Note(kind="loading", text="Loading", pad="24px 10px", id="task-loading")
             if kind == "task" and failed and not known and row.id == ""
               Note(kind="failed", text="hex didn't answer, so this can't open yet.", pad="24px 10px", id="task-offline")

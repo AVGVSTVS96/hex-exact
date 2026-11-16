@@ -1,72 +1,179 @@
 // hex as the home (the Muse review's first change): hex's face and one live line of what it's doing,
-// then the few things that need Bassim, then what it's working on, then what it decided for him.
-// Home shows it whenever no call is on; Tasks has the rest. Laptop-folded, its top half is hex and
-// Needs you and its bottom half the rest.
+// then the list of the page under it. Now is the few things that need Bassim, what hex is working
+// on and what it decided for him; Feed, Ideas and Goals join it as tabs at the foot of hex's column.
+// Home shows it whenever no call is on; Tasks has the rest.
 use Tasks, Asks, TaskRow from "./shapes.contract"
 use Mark, StageHead, ShowMore, Row, Note, RowTap, whenOf, Tap from "./parts.contract"
 use Said from "./said.contract"
 use Item, entriesOf, homeOf, problemOf from "./inbox.contract"
 
+// hex's face in its column: stacked (the orb over its name and live line) when the window is
+// taller than wide, else one row (the orb beside them). `x`, `y` are the orb's centre from the
+// column's top left, so the call's orb (call.contract) rests exactly where the face is drawn and
+// grows out of it.
+shape Face
+  compact: bool
+  height: number
+  x: number
+  y: number
+  size: number
+
+fn faceOf(width: number, compact: bool): Face = compact ? Face(compact=true, height=88, x=44, y=44, size=56) : Face(compact=false, height=140, x=width / 2, y=44, size=60)
+
 // What Bassim put away here leaves at once, as in Tasks.
 fn awayOf(said: Said[]): string[] = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
-// What needs Bassim, as Tasks lists it. A question hex has a pick for still waits on him; what hex
-// decided itself has left the list already (asks.decided).
-fn needsOf(tasks: Tasks, asks: Asks, said: Said[], now: number): Item[] = entriesOf(tasks, asks, now).filter(e => e.stage == "needs" and not awayOf(said).includes(e.id))
+// What waits for Bassim's answer, as Tasks lists it: questions (a pick of hex's still waits on
+// him), threads that wait on him and stuck runs. A result he hasn't seen is new in Feed, not here;
+// what hex decided itself has left already (asks.decided).
+fn needsOf(tasks: Tasks, asks: Asks, said: Said[], now: number): Item[] = entriesOf(tasks, asks, now).filter(e => e.stage == "needs" and e.kind != "fresh" and not awayOf(said).includes(e.id))
 // The page a row opens: its thread's main page, "" for what has none (a stuck run).
 fn pageFor(e: Item, tasks: Tasks): string = e.page == "" ? "" : homeOf(e.page, tasks.tasks)
-// The page beside Home on a book fold until Bassim picks one: the first thing that needs him.
+// The page beside Home with two columns until Bassim picks one: the first thing that needs him.
 fn firstNeed(tasks: Tasks, asks: Asks, said: Said[], now: number): string = match needsOf(tasks, asks, said, now).filter(e => e.page != "").at(0) { case some(e) => homeOf(e.page, tasks.tasks), case none => "" }
 // What hex is doing right now: the thread that moved last of those running.
 fn liveOf(tasks: Tasks): option<TaskRow> = sortBy(tasks.tasks.filter(t => t.state == "working" and t.running), t => t.at, "desc").at(0)
 fn lineOf(t: TaskRow): string = t.line != "" ? t.line : match t.agents.filter(a => a.state == "working" and a.line != "").at(0) { case some(a) => a.line, case none => "" }
 // A row's mark, as Tasks draws its topic's.
-fn markOf(e: Item): string = e.stage == "needs" ? (e.kind == "task" or e.kind == "fresh" ? "needs" : e.mark) : problemOf(e.title) != "" ? "failed" : e.mark
+fn markOf(e: Item): string = e.stage == "needs" ? (e.kind == "task" ? "needs" : e.mark) : problemOf(e.title) != "" ? "failed" : e.mark
+fn lineFor(e: Item): string = problemOf(e.title) != "" ? problemOf(e.title) : e.title
+
+// How many rows of Now fit in `height` without scrolling, once its heads, a "Show N more", what hex
+// decided and the fade above the tabs have their room: a row is two lines, about 58pt.
+fn rowsFit(height: number): number = height > 2 * 44 + 2 * 34 + 20 + 116 ? floor((height - 2 * 44 - 2 * 34 - 20) / 58) : 2
 
 keyframes liveDot
   50% opacity=0.25
 
 component HexHome
-  inject
-    haptics: bool
   props
-    // all | top (hex and Needs you) | bottom (Working on and what hex decided)
-    part: string
-    // Whether to draw hex's face here; on a phone and the cover screen Home's own orb rests in its place.
+    // The column's size; the window's shape picks the face (faceOf).
+    width: number
+    height: number
+    compact: bool
+    // Whether to draw hex's orb here; where the call's own orb rests in its place, only its room.
     face: bool
     persona: string
     personaColor: string
     palette: string
     reaction: string
     still: bool
+    // hex's pages that are built, and the one under the face.
+    pages: string[]
+    page: string
     now: number
     offset: number
     tasks: Tasks
     asks: Asks
     said: Said[]
+    // hex's counts of what needs Bassim and what's working.
+    needing: number
+    workingOn: number
     loading: bool
     failed: bool
-    // On a book fold, rows open beside; the page that's there, "" when the call's words are.
+    // With two columns rows open beside; the page that's there, "" when the call's words are.
     split: bool
     beside: string
     select: action
     openTask: action
     openTasks: action
-  // What the call just left (how it ended, its wrap-up), under the live line.
+    open: action
+  // What the call just left (how it ended, its wrap-up), at the top of Now.
   slot
   derive known = tasks.version > 0 or asks.version > 0
-  derive needs = needsOf(tasks, asks, said, now)
+  derive f = faceOf(width, compact)
   derive live = liveOf(tasks)
   derive liveId = match live { case some(t) => t.id, case none => "" }
-  derive liveLine = match live { case some(t) => lineOf(t), case none => "" }
+  derive liveLine = match live { case some(t) => (lineOf(t) != "" ? lineOf(t) : `Working on ${t.name}`), case none => "" }
   derive liveTopic = match live { case some(t) => t.name, case none => "" }
-  // What's working, newest first; the one on the live line isn't listed twice.
+  derive lineText = not known ? " " : liveId == "" ? "Nothing running" : liveLine
+  // Each tab's list starts under the face and ends at the column's foot, above the tabs and Call;
+  // what scrolls there fades over its last 26pt.
+  derive listHeight = max(height - f.height, 1)
+  // Now's lists, worked out here, once, rather than inside the per-tab loop.
+  derive needs = needsOf(tasks, asks, said, now)
   derive working = sortBy(entriesOf(tasks, asks, now).filter(e => e.stage == "working"), e => e.at, "desc")
+  derive fade = max(100 - 26 * 100 / listHeight, 0)
+  action goLive
+    if split
+      select(homeOf(liveId, tasks.tasks))
+    else
+      openTask(homeOf(liveId, tasks.tasks))
+  view
+    column flex=1 min-height=0 position="relative" testId="home-all"
+      if compact
+        row gap=14 align-items="center" padding="12px 16px" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
+          box width=f.size height=f.size flex-shrink=0
+            if face
+              hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
+          column flex=1 min-width=0 gap=2
+            text "hex" font="-exact-headline" color="-exact-label"
+            LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=false, press=goLive)
+      else
+        column align-items="center" padding="14px 16px 0" height=f.height box-sizing="border-box" flex-shrink=0 testId="hex"
+          box width=f.size height=f.size flex-shrink=0
+            if face
+              hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=f.size height=f.size role="img" aria-label="hex"
+          text "hex" font="-exact-headline" color="-exact-label" margin-top=8
+          LiveLine(known=known, id=liveId, topic=liveTopic, line=lineText, still=still, center=true, press=goLive)
+      // hex pages: each tab keeps its own scroll, mounted while another shows, so it keeps its place.
+      box position="relative" flex=1 min-height=0
+        for p in pages key=p
+          scroll position="absolute" inset=0 padding="0 6px 34px" box-sizing="border-box" opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) mask-image=`linear-gradient(to bottom, #000 0, #000 ${fade}%, transparent 100%)` testId=`home-list-${p}`
+            if p == "now"
+              children
+              NowList(height=listHeight, now=now, offset=offset, tasks=tasks, needs=needs, working=working, needing=needing, workingOn=workingOn, decided=asks.decided.length, known=known, failed=failed, liveId=liveId, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open)
+
+// hex's live line: what it's doing, two lines at most, ending in an ellipsis; a tap opens that work.
+component LiveLine
+  props
+    known: bool
+    id: string
+    topic: string
+    line: string
+    still: bool
+    center: bool
+    press: action
+  view
+    button press=press disabled=(id == "") class=Tap display="flex" flex-direction="row" align-items="flex-start" justify-content=(center ? "center" : "flex-start") gap=7 max-width="100%" min-width=44 min-height=44 margin-top=(center ? -2 : -10) padding=(center ? "2px 0 0" : "0") box-sizing="border-box" aria-live="polite" aria-label=(id == "" ? "Nothing running" : `hex is working on ${topic}: ${line}`) testId="live-line"
+      if id != ""
+        row gap=3 flex-shrink=0 padding-top=8 aria-hidden=true
+          for i in [0, 1, 2] key=i
+            box width=4 height=4 border-radius=2 background-color="hex.progress" animation=(still ? "none" : `liveDot 1.2s ease-in-out ${i * 0.2}s infinite`)
+      text line font="-exact-subheadline" color=(id == "" ? "-exact-tertiary-label" : "-exact-secondary-label") text-align=(center ? "center" : "left") line-clamp=2 min-width=0 flex-shrink=1
+
+// Now: the few things that need Bassim (as many as fit without scrolling, then "Show N more"), what
+// hex is working on, then "hex decided N".
+component NowList
+  inject
+    haptics: bool
+  props
+    height: number
+    now: number
+    offset: number
+    tasks: Tasks
+    needs: Item[]
+    working: Item[]
+    // hex's own counts of the two (Counts), for how many rows each takes.
+    needing: number
+    workingOn: number
+    decided: number
+    known: bool
+    failed: bool
+    liveId: string
+    split: bool
+    beside: string
+    select: action
+    openTask: action
+    openTasks: action
+    open: action
+  // What's working, newest first; the one on the live line isn't listed twice.
   derive listed = working.filter(e => e.id != liveId)
-  derive decided = asks.decided.length
-  derive shownNeeds = needs.slice(0, 3)
-  derive shownWork = listed.slice(0, 2)
-  derive top = part != "bottom"
-  derive bottom = part != "top"
+  derive fit = rowsFit(height)
+  // Needs you takes the rows that fit but one, which Working on keeps; Working on takes what Needs
+  // you leaves. Each counts the other from hex's summary (`needing`, `workingOn`), so neither list
+  // walks the other's.
+  derive shownNeeds = needs.slice(0, max(1, fit - (workingOn > 0 ? 1 : 0)))
+  derive shownWork = listed.slice(0, max(1, fit - min(needing, max(1, fit - 1))))
   action go(e: Item)
     if pageFor(e, tasks) == ""
       openTasks(e.stage)
@@ -74,49 +181,27 @@ component HexHome
       select(pageFor(e, tasks))
     else
       openTask(pageFor(e, tasks))
-  action goLive
-    if split
-      select(homeOf(liveId, tasks.tasks))
-    else
-      openTask(homeOf(liveId, tasks.tasks))
   view
-    column flex=1 min-height=0 testId=`home-${part}`
-      if top
-        column align-items="center" padding="14px 16px 0" flex-shrink=0 testId="hex"
-          if face
-            hex-orb state="idle" silenced="false" persona=persona tint=personaColor palette=palette reaction=reaction still=(still ? "true" : "false") width=60 height=60 role="img" aria-label="hex"
-          else
-            box width=60 height=60
-          text "hex" font="-exact-headline" margin-top=8
-          button press=goLive disabled=(liveId == "") class=Tap display="flex" flex-direction="row" align-items="center" justify-content="center" gap=7 max-width="100%" min-width=44 min-height=22 margin-top=2 aria-live="polite" aria-label=(liveId == "" ? "Nothing running" : `hex is working on ${liveTopic}: ${liveLine}`) testId="live-line"
-            if liveId != ""
-              row gap=3 flex-shrink=0 aria-hidden=true
-                for i in [0, 1, 2] key=i
-                  box width=4 height=4 border-radius=2 background-color="hex.progress" animation=(still ? "none" : `liveDot 1.2s ease-in-out ${i * 0.2}s infinite`)
-            text (not known ? " " : liveId == "" ? "Nothing running" : liveLine) font="-exact-subheadline" color=(liveId == "" ? "-exact-tertiary-label" : "-exact-secondary-label") white-space="nowrap" overflow="hidden" text-overflow="ellipsis" min-width=0
-      scroll flex=1 min-height=0 padding="0 6px 16px" mask-image="linear-gradient(to bottom, #000 0, #000 96%, transparent 100%)" testId=`home-list-${part}`
-        if top
-          children
-          if failed and not known
-            Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
-          StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="20px 10px 4px", id="home-head-asks")
-          for e in shownNeeds key=e.id
-            Row(mark=markOf(e), title=e.topic, line=(problemOf(e.title) != "" ? problemOf(e.title) : e.title), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${problemOf(e.title) != "" ? problemOf(e.title) : e.title}`, id=`home-row-${e.id}`, press=go(e))
-          if known and needs.length == 0
-            Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 44px", id="home-empty-needs")
-          if needs.length > shownNeeds.length
-            ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="6px 10px", id="home-more-needs", press=openTasks("needs"))
-        if bottom
-          StageHead(state="working", label="Working on", n=working.length, known=known, pad="20px 10px 4px", id="home-head-working")
-          for e in shownWork key=e.id
-            Row(mark=markOf(e), title=e.topic, line=(problemOf(e.title) != "" ? problemOf(e.title) : e.title), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${problemOf(e.title) != "" ? problemOf(e.title) : e.title}`, id=`home-row-${e.id}`, press=go(e))
-          if known and working.length == 0
-            Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 44px", id="home-empty-working")
-          if listed.length > shownWork.length
-            ShowMore(n=listed.length - shownWork.length, shown=false, pad="6px 10px", id="home-more-working", press=openTasks("working"))
-          if decided > 0
-            box height=0 margin="14px 10px 4px" border-top="0.5px solid -exact-separator"
-            button press=openTasks("needs") class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided}` testId="home-decided"
-              Mark(state="decided", size=22)
-              text `hex decided ${decided}` font="-exact-headline" flex=1 text-align="left"
-              image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+    column testId="home-now"
+      if failed and not known
+        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
+      StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="20px 10px 4px", id="home-head-asks")
+      for e in shownNeeds key=e.id
+        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+      if known and needs.length == 0
+        Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 44px", id="home-empty-needs")
+      if needs.length > shownNeeds.length
+        ShowMore(n=needs.length - shownNeeds.length, shown=false, pad="6px 10px", id="home-more-needs", press=openTasks("needs"))
+      StageHead(state="working", label="Working on", n=working.length, known=known, pad="20px 10px 4px", id="home-head-working")
+      for e in shownWork key=e.id
+        Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, selected=(split and beside != "" and beside == pageFor(e, tasks)), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+      if known and working.length == 0
+        Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 44px", id="home-empty-working")
+      if listed.length > shownWork.length
+        ShowMore(n=listed.length - shownWork.length, shown=false, pad="6px 10px", id="home-more-working", press=openTasks("working"))
+      if decided > 0
+        box height=0 margin="14px 10px 4px" border-top="0.5px solid -exact-separator"
+        button press=open(path("decided")) class=RowTap align-items="center" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${decided} this week` testId="home-decided"
+          Mark(state="decided", size=22)
+          text `hex decided ${decided} this week` font="-exact-headline" flex=1 text-align="left"
+          image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true

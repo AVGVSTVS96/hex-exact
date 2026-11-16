@@ -177,6 +177,6 @@ component Voices
         for a in accents() key=a
           row gap=10 align-items="center" min-height=40
             text a font="-exact-footnote" color="-exact-secondary-label" width=118 flex-shrink=0
-            row gap=6
+            row gap=6 flex=1 min-width=0 flex-wrap="wrap" padding="3px 0"
               for v in voices().filter(x => x.detail == a) key=v.id
                 VoiceChip(v=v, on=(v.id == voice), locked=locked, press=choose(v.id))

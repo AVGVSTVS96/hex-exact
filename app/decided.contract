@@ -86,6 +86,42 @@ component DecidedList
             text a.question font="-exact-title2" font-weight=700 role="heading" aria-level=2 user-select="text"
             DecidedBody(ask=a, openTopic=openTask(homeOf(a.task, tasks.tasks)))
 
+// One thing hex decided, opened from Feed with two columns: beside Feed, as an idea or a goal is.
+component DecidedPane
+  inject
+    haptics: bool
+  props
+    id: string
+    asks: Asks
+    tasks: Tasks
+    loading: bool
+    failed: bool
+    // How far the heading stays off the column's trailing edge, and its least height (as IdeaBody).
+    inset: number
+    head: number
+    foot: number
+    undo: action
+    openTask: action
+  derive known = asks.version > 0
+  view
+    scroll flex=1 min-height=0 padding=`4px 16px ${foot + 24}px` box-sizing="border-box" testId="decided-pane"
+      if not known and failed
+        Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 0", id="decided-pane-offline")
+      if not known and not failed
+        Note(kind="loading", text="Loading what hex decided", pad="24px 0", id="decided-pane-loading")
+      if known and asks.decided.filter(a => a.id == id).length == 0
+        Note(kind="empty", text="Put back to you. It's in Needs you.", pad="24px 0", id="decided-pane-gone")
+      for a in asks.decided.filter(x => x.id == id) key=a.id
+        column gap=14
+          column gap=4 padding-right=inset min-height=head box-sizing="border-box"
+            text a.question font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 color="-exact-label" line-clamp=(head > 0 ? 3 : 4) overflow-wrap="break-word" role="heading" aria-level=2 user-select="text" testId="decided-pane-title"
+            text `hex decided · ${a.topic}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
+          row
+            button press=undo(a.id) class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put “${a.question}” back in Needs you` testId=`decided-pane-undo-${a.id}`
+              box class=PillFace
+                text "Undo" font="-exact-subheadline" font-weight=600
+          DecidedBody(ask=a, openTopic=openTask(homeOf(a.task, tasks.tasks)))
+
 // One thing hex decided: its topic and question, Undo, and a chevron that says it opens in place;
 // open, the whole story under it.
 component DecidedStory

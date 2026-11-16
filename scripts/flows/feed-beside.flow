@@ -1,6 +1,6 @@
 # Feed beside its pages (any two-column pose) with his real entries (the stand-in passes /feed through to his hex): the tab, its days,
 # scrolling down the list with the tabs and Call held still, Feed keeping its place across tabs, back
-# at the top a finished entry opening its goal beside Feed, marked, and a decided entry opening hex decided at that row, and Back.
+# at the top a finished entry opening its goal beside Feed, marked, and a decided entry opening what hex decided beside Feed, marked, with Undo.
 launch /
 shoot now
 tap hex-tab-feed
@@ -30,5 +30,4 @@ tap feed-done:*
 shoot opened
 tap feed-decided:*
 shoot decided
-tap chrome-back
-shoot back-decided
+mark decided-pane-title

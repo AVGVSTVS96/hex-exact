@@ -20,7 +20,7 @@ use UpdateToast, noticeOf from "./toast.contract"
 use stageTopics, entriesOf, homeOf, pageOf from "./inbox.contract"
 use firstNeed from "./home.contract"
 use Room, roomOf, belowIn from "./room.contract"
-use DecidedPage, decidedPath from "./decided.contract"
+use DecidedPage, decidedPath, DecidedPane from "./decided.contract"
 use Feed, FeedEntry, FeedView from "./feed.contract"
 use Ideas, IdeaOne, IdeaDone from "./ideas.contract"
 use IdeaScreen, IdeaPane, IdeaAct, ideaActOf, ideaActLine, undoOf, weekdayNumber from "./idea.contract"
@@ -382,9 +382,9 @@ component App
       beside = `${top(nav).name}:${top(nav).params.id}`
       nav = under == "" ? go(nav, "/") : back(nav)
   action pageOver
-    if room.columns == 1 and top(nav).name == "home" and ["goal", "watch", "idea"].includes(besideKind)
+    if room.columns == 1 and top(nav).name == "home" and ["goal", "watch", "idea", "decided"].includes(besideKind)
       let id = beside.slice(besideKind.length + 1)
-      nav = push(nav, besideKind == "goal" ? path("goal", id) : besideKind == "watch" ? path("watch", id) : path("idea", id))
+      nav = push(nav, besideKind == "goal" ? path("goal", id) : besideKind == "watch" ? path("watch", id) : besideKind == "decided" ? decidedPath(id) : path("idea", id))
       beside = ""
   action pickTab(t: string)
     tab = t
@@ -455,6 +455,8 @@ component App
       openGoal(e.opens)
     else if e.kind == "found"
       openIdea(e.opens)
+    else if e.kind == "decided" and room.columns == 2
+      besidePage(`decided:${e.opens}`)
     else if e.kind == "decided"
       open(decidedPath(e.opens))
   // Discuss: a call that opens on this entry, or the entry brought into the call that's on.
@@ -759,6 +761,8 @@ component App
               IdeaPane(idea=idea.idea, loading=(not current(idea)), failed=failed(idea), now=now, offset=clock.utcOffset, act=ideaAct, inset=max(0, room.clear.x + room.clear.width - 20 - room.secondHeadEnd), head=(room.secondBelow - room.secondTop), end=(room.clear.x + room.clear.width - room.footEnd), draft=match drafts.filter(l => field(l, 0) == `idea:${ideaId}`).at(0) { case some(l) => field(l, 1), case none => "" }, sent=(field(ideaSent, 0) == ideaId ? field(ideaSent, 1) : ""), error=field(ideaSent, 2), bottom=(viewport.keyboardHeight > 0 ? 8 : room.foot + 8), do=doIdea, redo=redoIdea, undo=undoIdea, keep=keepDraft, add=addIdea)
             else if besideId.startsWith("goal:")
               GoalBody(foot=room.foot, end=max(0, room.clear.x + room.clear.width - 16 - room.secondHeadEnd), head=(room.secondBelow - room.secondTop), footRight=max(12, room.clear.x + room.clear.width - room.footEnd), id=besideId.slice(5), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=changeGoal, undo=undoGoal, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+            else if besideId.startsWith("decided:")
+              DecidedPane(id=besideId.slice(8), asks=asks, tasks=tasks, loading=(not current(liveAsks)), failed=failed(liveAsks), inset=max(0, room.clear.x + room.clear.width - 20 - room.secondHeadEnd), head=(room.secondBelow - room.secondTop), foot=room.foot, undo=undo, openTask=openTask)
             else if besideId.startsWith("watch:")
               WatchBody(foot=room.foot, end=max(0, room.clear.x + room.clear.width - 16 - room.secondHeadEnd), head=(room.secondBelow - room.secondTop), id=besideId.slice(6), goals=goalsShown, now=now, offset=clock.utcOffset, loading=goalsLoading, changes=goalChanges, change=changeGoal, undo=undoGoal, openTask=openTask)
             else if besideId != ""

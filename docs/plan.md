@@ -1,8 +1,8 @@
 # hex Exact, finished
 
 hex Exact is finished when every tap, swipe and fold on the iPhone Duo does what you expect, at
-once, on every screen, and the whole app has the care of Muse: hex in the middle, flat pages, dark
-reading text, nothing on screen that hasn't earned its place.
+once, on every screen, and the whole app has the care of Muse: hex in the middle, flat pages,
+reading text at full strength, nothing on screen that hasn't earned its place.
 
 The reference is Muse, not the stable hex voice app. `docs/parity.md` lists what that app does,
 as an inventory to draw on.
@@ -59,9 +59,9 @@ until Hands photographs that pose.
 |---|---|---|
 | Home | ![](plan/home-cover-side-dark.png) | ![](plan/home-open-side-dark.png) |
 
-| An update waiting | Light |
-|---|---|
-| ![](plan/update-cover-up-dark.png) | ![](plan/home-cover-up-light.png) |
+| An update waiting | Tasks during a call | Light |
+|---|---|---|
+| ![](plan/update-cover-up-dark.png) | ![](plan/call-tasks-cover-up-dark.png) | ![](plan/home-cover-up-light.png) |
 
 | A thread | Steps | hex decided |
 |---|---|---|
@@ -71,7 +71,8 @@ until Hands photographs that pose.
 |---|---|---|
 | ![](plan/calls-cover-up-dark.png) | ![](plan/settings-cover-up-dark.png) | ![](plan/call-cover-up-light.png) |
 
-Light versions of the question and Tasks are in `docs/plan/`.
+The question and Tasks in light, and Home and the question open like a book in light, are in
+`docs/plan/`.
 
 ## The pieces
 
@@ -141,10 +142,11 @@ On the Duo, in all four poses:
 - Calls, Tasks, Settings, and Back on inner pages, sit beside the status icons. No page has a
   Back in its header.
 - The update notice sits in Home's free toolbar space: never over hex, a control or the hinge.
+  Where Home has a page beside it, the notice keeps to Home's side.
 - Calls, Tasks and Settings keep one place on every page. Back appears beside them without
   moving them.
-- Call keeps a clear spot at the foot of hex's column, or the bottom corner when that column is
-  full. No row sits under it.
+- Call keeps a clear spot in hex's column: at its foot, or beside hex's face when the column is
+  short. No row sits under it.
 - The same window size gives the same layout, folded or not. Two columns appear only when both
   read well. No control or fixed part sits on the hinge; a list may scroll across it.
 - Fold, unfold, rotate: you stay on the page you were on, nothing jumps, the scroll holds.
@@ -161,8 +163,8 @@ On the Duo:
   blue is work going on, red is a failure or ending the call.
 - Home's rows and Tasks' rows are the same part. So are section heads, answer rows, composers,
   and the empty, loading and failed states. No screen draws its own.
-- What you read is dark; grey is for side details. A live call's words are easy to read in dark
-  and light.
+- What you read is full strength; grey is for side details. A live call's words are easy to
+  read in dark and light.
 - Light mode is as finished as dark: a card is visible on its background.
 - Every control shows a press at once. Things that move share one spring, and stay still with
   Reduce Motion on.
@@ -186,7 +188,7 @@ On the Duo:
 ### 5 Home and the call
 
 On the Duo:
-- Open the app: hex's face, its name, and one live line of two lines at most. A longer line
+- Open the app: hex's face, its name, and its live line, two lines at most. A longer line
   ends in an ellipsis. A tap on the line opens that work.
 - Needs you shows the few that fit without scrolling, then "Show N more". A tap opens that
   question: over Home when folded, beside it when there's room for two columns.
@@ -202,7 +204,7 @@ On the Duo:
 ### 6 Questions
 
 On the Duo:
-- A question opens on the question, in dark reading text, flat on the page.
+- A question opens on the question, in full-strength reading text, flat on the page.
 - Every answer is the same kind of row; hex's pick is marked. One tap answers: the row
   confirms in place with Undo, and the list moves on without a jump.
 - "Why" opens the whole background in one tap. Nothing opens in a second hidden step, and
@@ -220,7 +222,8 @@ On the Duo:
 
 On the Duo:
 - Tasks opens at once with the last list it knew, then updates in place.
-- Needs you, Working and Done read as sections; search finds across them; rows swipe.
+- Needs you, Working and Done read as sections, with one row that opens what hex decided;
+  search finds across them; rows swipe.
 - With room for two columns: the list on one side, the open row marked, its page beside it.
 - A task's page says what it is, where it stands and what came last. "Open in Telegram" opens
   it, or says the app isn't on this phone.

@@ -111,6 +111,8 @@ All from the server, in this folder:
 cd app && EXACT=~/Developer/exact-src/exact bun exact.mjs contract build app.contract --json --errors-only
 scripts/sim / /tasks /settings                 # simulator build on the Mac, shots in every pose
 BUILT=1 POSES=open-up APPEARANCES="dark light" scripts/sim /calls   # reuse the last build
+scripts/sim scripts/flows/answer.flow          # a flow: taps, types, swipes, folds, a shot per step
+scripts/phone                                  # a picture of the real Duo's screen
 scripts/ship                                   # new install link on the Duo
 scripts/publish                                # screens only, over the air
 cd app && bun exact.mjs test web               # app.test.contract, about 3 minutes
@@ -122,8 +124,12 @@ Exact's web build prints "built" and then never exits (the app's data keeps a ti
 build-time realm), so `exact test web` waits forever: run it with an `EXACT` whose
 `host/web-js/build.mjs` ends in `process.exit(0);` until Exact exits there itself.
 
-`scripts/sim` shoots into `~/hex/scratch/hex-exact/shots/<commit>/`, poses `cover-up` (folded),
-`open-up` (book fold), `open-side` (laptop fold), `cover-side`. Check `memory_pressure` on the Mac
+`scripts/sim` shoots into `~/hex/scratch/hex-exact/shots/<commit>/`, in poses `cover-up` (folded),
+`cover-side`, `open-up` (book fold) and `open-side` (laptop fold). A flow (`scripts/flows/*.flow`,
+its commands at the top of `scripts/uitests/Flows.swift`) is played by XCUITest, finding controls
+by `testId`; each `shoot` lands in `<flow>/`, with what failed in `notes.txt` and the testIds on
+screen in `tree-*.txt`. The simulator's app talks to hex through `scripts/standin.mjs` on the Mac:
+reads reach hex, writes never do, and each run lists what it would have sent. Check `memory_pressure` on the Mac
 before a build; builds share it with other work. Commit to main, signed, small.
 
 ## Where Exact can't (yet)

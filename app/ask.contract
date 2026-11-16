@@ -127,7 +127,7 @@ component AskCard
               button press=openOut(p.link, p.app) class=ChipTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Open ${p.place != "" ? p.place : ask.topic} in ${appName(p.app)}` testId=`ask-door-${ask.id}-${p.app}`
                 box class=ChipFace
                   image appSymbol(p.app) width=12 height=12 object-fit="contain" color="-exact-label" aria-hidden=true
-                  text `${p.place != "" ? p.place : ask.topic} in ${appName(p.app)}` font="-exact-footnote" font-weight=600 color="-exact-label" line-clamp=1
+                  text (p.place == "" or p.place == ask.topic ? appName(p.app) : `${p.place} in ${appName(p.app)}`) font="-exact-footnote" font-weight=600 color="-exact-label" line-clamp=1
             // The message it came from opens under the capsules; its chevron says so.
             button press=showWords(ask.id) class=ChipTap -exact-press-haptic=(haptics ? "selection" : "none") aria-expanded=wordsOpen aria-label=(wordsOpen ? "Hide the message it came from" : `The message from ${from}`) testId=`ask-from-${ask.id}`
               box class=ChipFace
@@ -420,7 +420,7 @@ component ReplyComposer
   view
     column position="absolute" left=left right=end bottom=(foot + 8) gap=6 z-index=5 testId="reply"
       Waiting(media=attached, error=addError, remove=detach)
-      row backgroundMaterial="glass" border-radius=24 min-height=48 padding="0 6px 0 6px" gap=8 align-items="flex-end"
+      row backgroundMaterial="glass" border-radius=24 min-height=48 padding="0 6px 0 6px" gap=8 align-items="flex-end" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
         box padding="6px 0" flex-shrink=0
           AddMedia(menu="reply-add", label="Add a photo or video", glass=false, size=36, disabled=(attached.length >= 4), add=add)
         box position="relative" flex=1 min-width=0 display="flex"

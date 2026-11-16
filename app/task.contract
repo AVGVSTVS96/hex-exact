@@ -480,7 +480,7 @@ component TaskBody
     answerAll(picksOpen.map(a => a.id), picksOpen.map(a => askPick(a)))
   view
     column flex=1 min-height=0 height="100%" position="relative"
-      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" mask-image=(replyAsk.length > 0 ? `linear-gradient(to top, transparent 0, #000 ${foot + 4}px)` : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
+      scroll id=(pane ? "task-pane" : "task-page") testId=(pane ? "task-pane" : "task-page") flex=1 min-height=0 overflow-y="auto" mask-image="linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)"
         if asking
           box flex-shrink=0 min-height=(pane ? head : max(0, clearTop - room.below)) testId=(pane ? "pane-head" : "task-head")
         else
@@ -624,12 +624,13 @@ component TaskBody
                       image "symbol:sf/chevron.right" width=12 height=12 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
                   if siblings.length > 4
                     ShowMore(n=(siblings.length - 4), shown=allPlaces, pad="2px 10px", id="more-places", press=morePlaces)
+      if replyAsk.length > 0 or docked
+        // What scrolls under the composer fades out behind it.
+        box position="absolute" left=0 right=0 bottom=0 height=(foot + 8 + 48 + 24) background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 24px)" pointer-events="none" aria-hidden=true
       if replyAsk.length > 0
         for a in replyAsk key=a.id
           ReplyComposer(ask=a, draft=askDraft(drafts, a), keep=keepDraft, dismissed=closeReply, note=note, answer=answer, attached=(attachedTo == `ask:${a.id}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `ask:${a.id}` ? addError : ""), attach=attach, detach=detach, foot=(viewport.keyboardHeight > 0 ? 0 : foot), answered=settled.includes(a.id), left=(wide ? width / 2 : 12), end=rightEnd)
       else if docked
-        // What scrolls under the composer fades out behind it.
-        box position="absolute" left=0 right=0 bottom=0 height=(foot + 8 + 48 + 24) background-color="-exact-background" mask-image="linear-gradient(to bottom, transparent 0, #000 24px)" pointer-events="none" aria-hidden=true
         button press=open(`${path("thread", id)}#compose`) class=Tap position="absolute" left=12 right=rightEnd bottom=(foot + 8) display="flex" aria-label=`Message ${title}` testId="task-compose"
           row backgroundMaterial="glass" border-radius=24 height=48 flex=1 padding="0 6px" gap=8 align-items="center" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))"
             box width=36 height=36 border-radius=18 background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center" flex-shrink=0 aria-hidden=true

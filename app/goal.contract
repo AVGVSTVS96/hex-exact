@@ -56,7 +56,8 @@ component GoalBody
     // Room under the page's foot: the bar and, during a call, the docked call.
     foot: number
     // Room kept at the heading's end, clear of the status icons beside the chrome row, and the
-    // heading's least height, so what follows it starts below them.
+    // heading's least height, so what follows it starts below them: with one, the heading
+    // shares the chrome row, in the smaller title drawn for it.
     end: number
     head: number
     // Room kept at the composer's end, clear of a camera at the foot (folded on its side).
@@ -90,7 +91,7 @@ component GoalBody
           Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading this goal" : "This goal is no longer on your list."), pad="24px 0", id="goal-missing")
         else
           column gap=4 padding="0 0 16px" padding-right=end min-height=head box-sizing="border-box"
-            text g.title font="-exact-title1" font-weight=700 line-clamp=2 role="heading" aria-level=1 user-select="text"
+            text g.title font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 line-clamp=(head > 0 ? 3 : 2) role="heading" aria-level=1 user-select="text"
             text `Goal · ${g.group}${g.asked > 0 ? ` · asked ${whenOf(g.asked, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
           if g.words.length > 0
             column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="goal-asked"

@@ -44,7 +44,8 @@ component WatchBody
   props
     foot: number
     // Room kept at the heading's end, clear of the status icons beside the chrome row, and the
-    // heading's least height, so what follows it starts below them.
+    // heading's least height, so what follows it starts below them: with one, the heading
+    // shares the chrome row, in the smaller title drawn for it.
     end: number
     head: number
     id: string
@@ -67,7 +68,7 @@ component WatchBody
         Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading" : "hex isn't watching this any more."), pad="24px 0", id="watch-missing")
       else
         column gap=4 padding="0 0 16px" padding-right=end min-height=head box-sizing="border-box"
-          text w.title font="-exact-title1" font-weight=700 line-clamp=2 role="heading" aria-level=1 user-select="text"
+          text w.title font=(head > 0 ? "-exact-title2" : "-exact-title1") font-weight=700 line-clamp=(head > 0 ? 3 : 2) role="heading" aria-level=1 user-select="text"
           text `Watching · ${w.topic}${w.every != "" ? ` · ${w.every}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
         if w.asked.length > 0
           column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="watch-asked"

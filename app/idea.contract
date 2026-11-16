@@ -85,8 +85,10 @@ component IdeaBody
     offset: number
     // The last thing done with this idea here.
     act: IdeaAct
-    // How far the title stays off the column's trailing edge, clear of the status icons beside it.
+    // How far the title stays off the column's trailing edge, clear of the status icons beside it,
+    // and the heading's least height, so what follows it starts below them.
     inset: number
+    head: number
     // do(id, verb), redo(id), undo(id, verb).
     do: action
     redo: action
@@ -112,7 +114,7 @@ component IdeaBody
         else
           Note(kind="loading", text="Opening the idea", pad="24px 0", id="idea-loading")
       else
-        column gap=4 padding-right=inset
+        column gap=4 padding-right=inset min-height=head box-sizing="border-box"
           text idea.title font="-exact-title1" font-weight=700 color="-exact-label" line-clamp=2 testId="idea-title"
           text `Idea${idea.topic != "" ? ` · ${idea.topic}` : ""} · floated ${dayWord(idea.at, now, offset)}` font="-exact-subheadline" color="-exact-secondary-label" line-clamp=1
         if idea.said != ""
@@ -199,6 +201,7 @@ component IdeaPane
     offset: number
     act: IdeaAct
     inset: number
+    head: number
     // How far the composer stands off the column's trailing edge, clear of a camera in that corner.
     end: number
     draft: string
@@ -213,7 +216,7 @@ component IdeaPane
   view
     column flex=1 min-height=0 padding-bottom=bottom testId="idea-pane"
       scroll flex=1 min-height=0 padding="4px 16px 24px" box-sizing="border-box" testId="idea-scroll"
-        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=inset, do=do, redo=redo, undo=undo)
+        IdeaBody(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=inset, head=head, do=do, redo=redo, undo=undo)
       if idea.id != ""
         column margin-top=-24 padding="24px 16px 0" padding-right=max(16, end) background-image="linear-gradient(to bottom, transparent 0, -exact-background 24px)" flex-shrink=0 position="relative" testId="idea-foot"
           AddToIdea(idea=idea, draft=draft, sent=sent, error=error, keep=keep, add=add)
@@ -249,4 +252,4 @@ component IdeaScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="idea-screen"
       Chrome(room=room, on="idea", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.first.x width=room.first.width testId="idea-column"
-        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), end=(room.clear.x + room.clear.width - room.footEnd), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)
+        IdeaPane(idea=idea, loading=loading, failed=failed, now=now, offset=offset, act=act, inset=max(0, room.clear.x + room.clear.width - room.bar.end - 20), head=0, end=(room.clear.x + room.clear.width - room.footEnd), draft=draft, sent=sent, error=error, bottom=(viewport.keyboardHeight > 0 ? 8 : (callOn ? room.foot + 64 + 12 : room.foot) + 8), do=do, redo=redo, undo=undo, keep=keep, add=add)

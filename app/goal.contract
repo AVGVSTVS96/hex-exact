@@ -47,7 +47,7 @@ component GoalPage
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="goal"
       Chrome(room=room, on="goal", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        GoalBody(foot=room.foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), footRight=max(12, room.clear.x + room.clear.width - room.footEnd), id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+        GoalBody(foot=room.foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), head=0, footRight=max(12, room.clear.x + room.clear.width - room.footEnd), id=id, goals=goals, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
 
 component GoalBody
   inject
@@ -55,8 +55,10 @@ component GoalBody
   props
     // Room under the page's foot: the bar and, during a call, the docked call.
     foot: number
-    // Room kept at the heading's end, clear of the status icons beside the chrome row.
+    // Room kept at the heading's end, clear of the status icons beside the chrome row, and the
+    // heading's least height, so what follows it starts below them.
     end: number
+    head: number
     // Room kept at the composer's end, clear of a camera at the foot (folded on its side).
     footRight: number
     id: string
@@ -87,8 +89,8 @@ component GoalBody
         if g.id == ""
           Note(kind=(loading ? "loading" : "empty"), text=(loading ? "Loading this goal" : "This goal is no longer on your list."), pad="24px 0", id="goal-missing")
         else
-          column gap=4 padding="0 0 16px"
-            text g.title font="-exact-title1" font-weight=700 padding-right=end line-clamp=2 role="heading" aria-level=1 user-select="text"
+          column gap=4 padding="0 0 16px" padding-right=end min-height=head box-sizing="border-box"
+            text g.title font="-exact-title1" font-weight=700 line-clamp=2 role="heading" aria-level=1 user-select="text"
             text `Goal · ${g.group}${g.asked > 0 ? ` · asked ${whenOf(g.asked, now, offset)}` : ""}` font="-exact-subheadline" color="-exact-secondary-label"
           if g.words.length > 0
             column gap=6 padding="2px 0 2px 14px" border-left="3px solid -exact-separator" margin-bottom=22 testId="goal-asked"

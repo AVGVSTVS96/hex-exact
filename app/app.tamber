@@ -1,11 +1,11 @@
-// hex's colours, the stable app's (hex-voice src/ui/tokens.ts): mint for what's Bassim's, amber for
-// a question, blue for work going on, red for a failure, each with its wash behind a mark or count.
-// The accent fills buttons, so its dark side stays deep enough for their white label; mint text is
-// hex.accent.
+// hex's colours, each with one job: mint is hex's own choice (its pick, what it decided), amber a
+// question or what waits on Bassim, blue work going on, red a failure or ending the call, each with
+// its wash behind a mark or count. Everything else is the platform's greys at full strength or less,
+// so the accent (native controls, filled buttons, a spinner) is ink, as Muse's controls are.
 tamber hex
 
 theme
-  AccentColor = light-dark(#1F8A6D, #23A27F)
+  AccentColor = light-dark(#111113, #F2F2F4)
   hex.accent = light-dark(#1F8A6D, #C4F3E5)
   hex.accent.wash = light-dark(#D7F2EA, #1B3534)
   hex.accent.solid = #1F8A6D  scheme=fixed
@@ -23,4 +23,21 @@ theme
   tile.server = #3A3A3C  scheme=fixed
   tile.link = #8E8E93  scheme=fixed
   ink.on-tile = #FFFFFF  scheme=fixed
-  ink.on-accent = light-dark(#FFFFFF, #0A2A21)
+  ink.on-accent = light-dark(#FFFFFF, #111113)
+
+// Icons hex draws itself: SF Symbols on Apple, the same outline from icons/ elsewhere. The four
+// tabs of hex's column, and the glyphs inside a state's mark.
+icons
+  icon.now = icon(sf "smallcircle.filled.circle", svg "icons/now.svg")
+  icon.feed = icon(sf "newspaper", svg "icons/feed.svg")
+  icon.ideas = icon(sf "lightbulb", svg "icons/ideas.svg")
+  icon.goals = icon(sf "flag", svg "icons/goals.svg")
+  icon.ask = icon(sf "questionmark", svg "icons/question.svg")
+  icon.pick = icon(sf "sparkle", svg "icons/sparkle.svg")
+  icon.done = icon(sf "checkmark", svg "icons/check.svg")
+  icon.failed = icon(sf "exclamationmark", svg "icons/exclaim.svg")
+  icon.paused = icon(sf "pause.fill", svg "icons/pause.svg")
+  icon.offline = icon(sf "wifi.exclamationmark", svg "icons/wifi-off.svg")
+  icon.found = icon(sf "magnifyingglass", svg "icons/lens.svg")
+  icon.watch = icon(sf "clock", svg "icons/clock.svg")
+  icon.open = icon(sf "chevron.down", svg "icons/chevron-down.svg")

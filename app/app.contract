@@ -93,6 +93,8 @@ component App
   state tick = 0
 
   resource viewport = exactViewport() as shape Viewport
+  // Reduce Motion: every part that moves holds still (parts.contract).
+  derive still = viewport.prefersReducedMotion
   resource pose = devicePose() as shape Pose else empty()
   resource clock = exactTime() as shape Time
 
@@ -503,9 +505,10 @@ component App
   action giveVoice
     send saved = saveSetting("voice", voice)
 
-  // The Haptics switch, for every screen's taps.
+  // The Haptics switch, for every screen's taps, and Reduce Motion, for everything that moves.
   provide
     haptics
+    still
   view
     main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow key=pressed width="100%" height="100%" testId="app"
       for e in stack(nav) key=e.id

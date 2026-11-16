@@ -14,20 +14,51 @@ style Glass
 style Pill
   padding="7px 14px" border-radius=999 background-color="-exact-tertiary-fill"
 
-// The colour a state is drawn in, everywhere: mint for what's Bassim's, amber for a question, blue
-// for work going on, red for a failure, grey for the settled (app.tamber).
-fn tintOf(state: string): string = state == "needs" or state == "pick" or state == "decided" ? "hex.accent" : state == "asks" ? "hex.ask" : state == "working" or state == "running" ? "hex.progress" : state == "failed" ? "hex.danger" : "-exact-secondary-label"
-fn washOf(state: string): string = state == "needs" or state == "pick" or state == "decided" ? "hex.accent.wash" : state == "asks" ? "hex.ask.wash" : state == "working" or state == "running" ? "hex.progress.wash" : state == "failed" ? "hex.danger.wash" : "-exact-tertiary-fill"
+// Every control of ours shows a press the moment it's touched. A row's whole width greys under the
+// finger; a capsule button (Undo, Send again, an inline answer, Discuss) dims and gives a little.
+// Every target is at least 44pt each way: a capsule is drawn smaller (PillFace) inside its 44pt
+// button (PillTap).
+style RowTap
+  appearance="none" display="flex" flex-direction="row" gap=12 align-items="flex-start" width="100%" box-sizing="border-box" text-align="left" padding="9px 10px" border-radius=12
+  :active
+    background-color="-exact-tertiary-fill"
+style PillTap
+  appearance="none" display="flex" align-items="center" justify-content="center" min-width=44 min-height=44 flex-shrink=0
+  :active
+    opacity=0.6
+    -exact-press-scale=0.96
+style PillFace
+  display="flex" flex-direction="row" align-items="center" justify-content="center" padding="6px 12px" border-radius=999 background-color="-exact-tertiary-fill"
+// A plain tap target with no box of its own (an icon, a line of text): it dims under the finger.
+style Tap
+  appearance="none"
+  :active
+    opacity=0.5
 
-fn symbolOf(state: string): string = state == "asks" ? "symbol:sf/questionmark" : state == "pick" ? "symbol:sf/sparkle" : state == "done" ? "symbol:sf/checkmark" : state == "failed" ? "symbol:sf/exclamationmark" : state == "paused" ? "symbol:sf/pause.fill" : ""
+// The one motion everything that moves shares, and none with Reduce Motion on. Anything dragged
+// (a swiped row, the call's words pulled up, a sheet) is a native scroll with snap points, as
+// rows.contract's swipes are: UIKit moves it with nothing re-rendered, a release carries on at the
+// finger's speed, turning back before lifting springs it home, and state follows the snap.
+fn springOf(still: bool, property: string): string = still ? "none" : `${property} -exact-spring(380, 34, 1)`
+
+// The colour a state is drawn in, everywhere, each with one job: mint is hex's own choice (its pick,
+// what it decided), amber a question or anything that waits on Bassim, blue work going on, red a
+// failure or ending the call, grey the settled (app.tamber).
+fn tintOf(state: string): string = state == "pick" or state == "decided" ? "hex.accent" : state == "needs" or state == "asks" ? "hex.ask" : state == "working" or state == "running" ? "hex.progress" : state == "failed" ? "hex.danger" : "-exact-secondary-label"
+fn washOf(state: string): string = state == "pick" or state == "decided" ? "hex.accent.wash" : state == "needs" or state == "asks" ? "hex.ask.wash" : state == "working" or state == "running" ? "hex.progress.wash" : state == "failed" ? "hex.danger.wash" : "-exact-tertiary-fill"
+
+fn symbolOf(state: string): string = state == "asks" ? "symbol:icon.ask" : state == "pick" ? "symbol:icon.pick" : state == "done" ? "symbol:icon.done" : state == "failed" ? "symbol:icon.failed" : state == "paused" ? "symbol:icon.paused" : ""
 
 // Where a thread lives, as its tile: Telegram, T3 Code, Buzz, Discord, the server, a call, a link.
 fn appName(app: string): string = app == "telegram" ? "Telegram" : app == "t3" ? "T3 Code" : app == "buzz" ? "Buzz" : app == "discord" ? "Discord" : app == "server" ? "Server" : app == "voice" or app == "call" ? "Call" : app == "link" ? "Link" : app
 fn appSymbol(app: string): string = app == "telegram" ? "symbol:sf/paperplane.fill" : app == "t3" ? "symbol:sf/chevron.left.forwardslash.chevron.right" : app == "buzz" ? "symbol:sf/bolt.fill" : app == "discord" ? "symbol:sf/bubble.left.and.bubble.right.fill" : app == "server" ? "symbol:sf/terminal.fill" : app == "voice" or app == "call" ? "symbol:waveform" : "symbol:sf/arrow.up.right"
 fn appTint(app: string): string = app == "telegram" ? "tile.telegram" : app == "t3" ? "tile.t3" : app == "buzz" ? "tile.buzz" : app == "discord" ? "tile.discord" : app == "server" ? "tile.server" : app == "voice" or app == "call" ? "hex.accent.solid" : "tile.link"
 
-// When something happened: the time today, else the date.
-fn whenOf(at: number, now: number, offset: number): string = at == 0 ? "" : formatDate(at, offset, "iso") == formatDate(now, offset, "iso") ? formatTime(at, offset, "short") : formatDate(at, offset, "medium")
+// When something happened, as the phone's own lists say it: the time today, "Yesterday", the
+// weekday this week, the day this year ("Nov 14"), else the date with its year.
+fn dayOf(at: number, offset: number): number = floor((at + offset * 60000) / 86400000)
+fn weekdayOf(at: number, offset: number): string = match ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"].at(dayOf(at, offset) % 7) { case some(d) => d, case none => "" }
+fn whenOf(at: number, now: number, offset: number): string = at == 0 ? "" : dayOf(at, offset) == dayOf(now, offset) ? formatTime(at, offset, "short") : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : dayOf(at, offset) > dayOf(now, offset) - 7 and dayOf(at, offset) < dayOf(now, offset) ? weekdayOf(at, offset) : formatDate(at, offset, "iso").slice(0, 4) == formatDate(now, offset, "iso").slice(0, 4) ? match formatDate(at, offset, "medium").split(", ").at(0) { case some(d) => d, case none => "" } : formatDate(at, offset, "medium")
 
 // A call's length: "45 s", "3 min", "1 h 12 min".
 fn lengthOf(seconds: number): string = seconds < 60 ? `${round(seconds)} s` : seconds < 3600 ? `${round(seconds / 60)} min` : `${floor(seconds / 3600)} h ${round((seconds % 3600) / 60)} min`
@@ -39,11 +70,15 @@ fn badEnding(kind: string): bool = kind == "dropped" or kind == "no-connect" or 
 keyframes markSpin
   to rotate="360deg"
 
-// A state's mark, the stable app's (§9.10), in a square of `size`: needs a mint dot on its wash; a
+// A state's mark, the stable app's (§9.10), in a square of `size`. Feed, Ideas and Goals add theirs:
+// something hex found (a lens, in Feed and Ideas alike), something it watches (a clock), an idea (a
+// bulb) and a goal not started (a dashed box). Otherwise: needs a mint dot on its wash; a
 // question amber with ?; hex's pick mint with ✦, and what hex decided a mint ✦ on its wash; working
 // a turning blue arc; done a checked square; read a dot; failed red with !; paused, stopped,
 // pending (dashed) and idle (a ring) in grey.
 component Mark
+  inject
+    still: bool
   props
     state: string
     size: number
@@ -53,15 +88,15 @@ component Mark
   view
     box width=size height=size flex-shrink=0 display="flex" align-items="center" justify-content="center" aria-hidden=true
       if state == "working" or state == "running"
-        svg width=disc height=disc viewBox="0 0 20 20" animation="markSpin 1.1s linear infinite"
+        svg width=disc height=disc viewBox="0 0 20 20" animation=(still ? "none" : "markSpin 1.1s linear infinite")
           circle cx=10 cy=10 r=8 fill="none" stroke="hex.progress.wash" stroke-width=2.25
           circle cx=10 cy=10 r=8 fill="none" stroke="hex.progress" stroke-width=2.25 stroke-linecap="round" stroke-dasharray="14 40"
       else if state == "needs"
-        box width=disc height=disc border-radius=(disc / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
-          box width=dot height=dot border-radius=(dot / 2) background-color="hex.accent"
+        box width=disc height=disc border-radius=(disc / 2) background-color="hex.ask.wash" display="flex" align-items="center" justify-content="center"
+          box width=dot height=dot border-radius=(dot / 2) background-color="hex.ask"
       else if state == "decided"
         box width=disc height=disc border-radius=(disc / 2) background-color="hex.accent.wash" display="flex" align-items="center" justify-content="center"
-          image "symbol:sf/sparkle" width=glyph height=glyph object-fit="contain" color="hex.accent"
+          image "symbol:icon.pick" width=glyph height=glyph object-fit="contain" color="hex.accent"
       else if state == "asks" or state == "pick"
         box width=disc height=disc border-radius=(disc / 2) background-color=tintOf(state) display="flex" align-items="center" justify-content="center"
           image symbolOf(state) width=glyph height=glyph object-fit="contain" color="-exact-background"
@@ -70,13 +105,18 @@ component Mark
           image symbolOf(state) width=glyph height=glyph object-fit="contain" color=(state == "failed" ? "hex.danger" : "-exact-secondary-label")
       else if state == "done"
         box width=disc height=disc border-radius=round(disc * 0.3) border="1.5px solid -exact-tertiary-label" display="flex" align-items="center" justify-content="center"
-          image "symbol:sf/checkmark" width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
+          image "symbol:icon.done" width=glyph height=glyph object-fit="contain" color="-exact-secondary-label"
+      else if state == "found" or state == "watch" or state == "idea"
+        box width=disc height=disc border-radius=(disc / 2) background-color="-exact-tertiary-fill" display="flex" align-items="center" justify-content="center"
+          image (state == "found" ? "symbol:icon.found" : state == "watch" ? "symbol:icon.watch" : "symbol:icon.ideas") width=glyph height=glyph object-fit="contain" color="-exact-label"
       else if state == "read"
         box width=dot height=dot border-radius=(dot / 2) background-color="-exact-tertiary-label"
       else if state == "stopped"
         box width=dot height=dot border-radius=2 background-color="-exact-tertiary-label"
       else if state == "pending"
         box width=(disc - 4) height=(disc - 4) border-radius=(disc / 2) border="1.5px dashed -exact-tertiary-label"
+      else if state == "unstarted"
+        box width=disc height=disc border-radius=round(disc * 0.3) border="1.5px dashed -exact-tertiary-label"
       else
         box width=dot height=dot border-radius=(dot / 2) border="1.5px solid -exact-tertiary-label"
 
@@ -108,10 +148,78 @@ component ShowMore
     id: string
     press: action
   view
-    button press=press appearance="none" display="flex" flex-direction="row" gap=12 align-items="center" justify-content="flex-start" width="100%" box-sizing="border-box" text-align="left" padding=pad aria-expanded=shown -exact-press-haptic=(haptics ? "selection" : "none") testId=id
+    button press=press class=RowTap align-items="center" padding=pad aria-expanded=shown -exact-press-haptic=(haptics ? "selection" : "none") testId=id
       box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
         image "symbol:ellipsis" width=14 height=14 object-fit="contain" color="-exact-tertiary-label"
       text (shown ? "Show fewer" : `Show ${n} more`) font="-exact-subheadline" color="-exact-secondary-label" flex=1
+
+// The one row every list draws (Home, Tasks, what hex decided): its mark, a title in full-strength
+// type, a count when there's more than one, when, and a grey line under it (red when it's a
+// failure). It opens with `href` (a pushed page, a native list's row and its press) or, with no
+// href, `press` (a page beside, a sheet).
+// selected marks the row whose page is open beside the list.
+component Row
+  inject
+    haptics: bool
+  props
+    mark: string
+    title: string
+    line: string
+    lines: number
+    failed: bool
+    stamp: string
+    n: number
+    selected: bool
+    href: string
+    label: string
+    id: string
+    press: action
+  view
+    if href != ""
+      link href=href aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
+        row gap=12 align-items="flex-start" flex=1 min-width=0 padding="2px 0"
+          RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)
+    else
+      button press=press class=RowTap background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=label testId=id
+        RowLines(mark=mark, title=title, line=line, lines=lines, failed=failed, stamp=stamp, n=n)
+
+component RowLines
+  props
+    mark: string
+    title: string
+    line: string
+    lines: number
+    failed: bool
+    stamp: string
+    n: number
+  view
+    box padding-top=1 flex-shrink=0
+      Mark(state=mark, size=22)
+    column flex=1 min-width=0 gap=2
+      row gap=8 align-items="baseline"
+        text title font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis" flex-shrink=1 min-width=0
+        if n > 1
+          Chip(n=n, state=mark, loading=false)
+        box flex=1
+        text stamp font="-exact-caption1" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap"
+      if line != "" and line != title
+        text line font="-exact-subheadline" color=(failed ? "hex.danger" : "-exact-secondary-label") line-clamp=lines
+
+// What a list says when it has nothing to show: empty, still loading, or can't reach hex. Every
+// screen says it the same way, in the rows' column.
+component Note
+  props
+    kind: string
+    text: string
+    pad: string
+    id: string
+  view
+    row gap=10 align-items="center" justify-content=(kind == "empty" ? "flex-start" : "center") padding=pad aria-live="polite" testId=id
+      if kind == "loading"
+        progress aria-label=text
+      else if kind == "failed"
+        image "symbol:icon.offline" width=15 height=15 object-fit="contain" color="-exact-secondary-label" aria-hidden=true
+      text text font="-exact-subheadline" color="-exact-secondary-label"
 
 // A count in its state's ink on its wash ("–" while loading).
 component Chip
@@ -140,3 +248,155 @@ shape Option
 // hex's faces. Opal has palettes of its own; Mana keeps its own colour; the rest take the colour picked.
 fn personas(): Option[] = [Option(id="obsidian", label="Obsidian", detail="Shifting silver"), Option(id="mana", label="Mana", detail="Soft blue light"), Option(id="opal", label="Opal", detail="Flowing color"), Option(id="halo", label="Halo", detail="A ring of light"), Option(id="glint", label="Glint", detail="A pair of stars"), Option(id="command", label="Command", detail="A simple slash")]
 fn paletteColor(id: string): string = id == "2" ? "#E5484D" : id == "3" ? "#F07B3F" : id == "4" ? "#E8C547" : id == "5" ? "#46B96C" : id == "6" ? "#2FB5AD" : id == "7" ? "#4562DA" : id == "8" ? "#9B4DD6" : id == "9" ? "#DE4FA6" : ""
+
+// hex's own pages, switched at the foot of its column as Muse's are: Now, Feed, Ideas, Goals, each
+// an icon over its name in one glass capsule, the current one on a pill of its own, Feed with a
+// dot when something is new. What sits beside it (Call) comes in as its children, in the same
+// glass group so the two read as one bar. Room places it and says which is current.
+shape HexTab
+  id: string
+  label: string
+  icon: string
+
+fn hexTabs(): HexTab[] = [HexTab(id="now", label="Now", icon="symbol:icon.now"), HexTab(id="feed", label="Feed", icon="symbol:icon.feed"), HexTab(id="ideas", label="Ideas", icon="symbol:icon.ideas"), HexTab(id="goals", label="Goals", icon="symbol:icon.goals")]
+
+style TabTap
+  appearance="none" display="flex" flex-direction="column" align-items="center" justify-content="center" gap=2 width=54 height=48 border-radius=999 position="relative"
+  :active
+    -exact-press-scale=0.92
+
+component HexTabs
+  inject
+    haptics: bool
+    still: bool
+  props
+    current: string
+    fresh: bool
+    pick: action
+  slot
+  view
+    row glassGroup=12 gap=10 align-items="center" justify-content="center" testId="hex-tabs"
+      row backgroundMaterial="glass" border-radius=999 padding=4 gap=0 role="tablist" aria-label="hex" flex-shrink=0
+        for t in hexTabs() key=t.id
+          button press=pick(t.id) class=TabTap background-color=(current == t.id ? "-exact-tertiary-fill" : "transparent") transition=springOf(still, "background-color") role="tab" aria-selected=(current == t.id) aria-label=(t.id == "feed" and fresh ? "Feed, new" : t.label) -exact-press-haptic=(haptics ? "selection" : "none") testId=`hex-tab-${t.id}`
+            image t.icon width=22 height=22 object-fit="contain" color=(current == t.id ? "-exact-label" : "-exact-secondary-label") aria-hidden=true
+            text t.label font="-exact-caption2" font-weight=(current == t.id ? 600 : 500) color=(current == t.id ? "-exact-label" : "-exact-secondary-label") white-space="nowrap"
+            if t.id == "feed" and fresh
+              box position="absolute" top=6 right=13 width=7 height=7 border-radius=4 background-color="-exact-label" aria-hidden=true
+      children
+
+// Under which day something happened, as Feed sorts it: This morning, This afternoon, This
+// evening, Yesterday, then the weekday this week, then the date.
+fn dayWordOf(at: number, now: number, offset: number): string = dayOf(at, offset) == dayOf(now, offset) ? (((at + offset * 60000) % 86400000) < 43200000 ? "This morning" : ((at + offset * 60000) % 86400000) < 64800000 ? "This afternoon" : "This evening") : dayOf(at, offset) == dayOf(now, offset) - 1 ? "Yesterday" : whenOf(at, now, offset)
+
+// The small grey head over a list on Feed, Ideas and Goals (a day, "hex found something",
+// "Watching"), with how many on the right where that's worth saying (n < 0: none).
+component Head
+  props
+    label: string
+    n: number
+    pad: string
+    id: string
+  view
+    row gap=12 align-items="baseline" padding=pad role="heading" aria-level=2 aria-label=(n < 0 ? label : `${label}, ${n}`) testId=id
+      text label font="-exact-subheadline" font-weight=600 color="-exact-secondary-label" flex=1
+      if n >= 0
+        text `${n}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label"
+
+// The thin line between what came since Bassim last looked and what he's seen.
+component Earlier
+  props
+    pad: string
+  view
+    row gap=12 align-items="center" padding=pad role="separator" aria-label="Earlier" testId="earlier"
+      box flex=1 height=0 border-top="0.5px solid -exact-separator"
+      text "Earlier" font="-exact-footnote" color="-exact-tertiary-label"
+      box flex=1 height=0 border-top="0.5px solid -exact-separator"
+
+// One story (a Feed entry, an idea): its mark, the news in bold (two lines at most), then said in
+// full in reading text, or in grey quotes when they're Bassim's own words. Its pictures come in as
+// children. Under it the topic and time in grey, and on the right what it offers: "Discuss" (a
+// call that opens on it), "Undo" (what hex decided), or nothing. A tap anywhere else opens it.
+component Story
+  inject
+    haptics: bool
+  props
+    mark: string
+    title: string
+    body: string
+    quoted: bool
+    meta: string
+    // discuss | undo | ""
+    offer: string
+    selected: bool
+    id: string
+    open: action
+    act: action
+  slot
+  view
+    column gap=0 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") testId=id
+      button press=open class=RowTap padding="10px 10px 4px" aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${title}. ${body}` testId=`${id}-open`
+        box padding-top=1 flex-shrink=0
+          Mark(state=mark, size=22)
+        column flex=1 min-width=0 gap=4
+          text title font="-exact-headline" color="-exact-label" line-clamp=2
+          if body != ""
+            text (quoted ? `“${body}”` : body) font="-exact-body" color=(quoted ? "-exact-secondary-label" : "-exact-label")
+      column padding="4px 10px 0 44px" gap=8
+        children
+      row gap=12 align-items="center" padding="2px 10px 8px 44px" min-height=36
+        text meta font="-exact-footnote" color="-exact-secondary-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+        if offer == "discuss"
+          Discuss(title=title, id=`${id}-discuss`, press=act)
+        else if offer == "undo"
+          button press=act class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Undo, put ${title} back on your list` testId=`${id}-undo`
+            box class=PillFace
+              text "Undo" font="-exact-subheadline" font-weight=600
+
+// "Discuss": a call that opens on this. A pill of its own, a thumb's target apart from the row.
+component Discuss
+  inject
+    haptics: bool
+  props
+    title: string
+    id: string
+    press: action
+  view
+    button press=press class=PillTap -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Discuss ${title} with hex` testId=id
+      box class=PillFace padding="0 14px" gap=6
+        image "symbol:waveform" width=15 height=15 object-fit="contain" color="-exact-label" aria-hidden=true
+        text "Discuss" font="-exact-subheadline" font-weight=600 color="-exact-label"
+
+// A project's goals as one bar, a segment each, coloured by where each stands (reached full
+// strength, working blue, waiting on Bassim amber, not started grey), then "1 of 4" reached. Every
+// project's bar is the same width, split evenly among its goals, so bars line up down the list.
+fn segmentInk(state: string): string = state == "done" ? "-exact-label" : state == "working" or state == "running" ? "hex.progress" : state == "needs" or state == "asks" ? "hex.ask" : state == "failed" ? "hex.danger" : "-exact-tertiary-fill"
+
+component GoalsBar
+  props
+    states: string[]
+  derive reached = states.filter(s => s == "done").length
+  view
+    row gap=8 align-items="center" flex-shrink=0 aria-label=`${reached} of ${states.length} reached`
+      row gap=3 width="4.25rem" aria-hidden=true
+        for s, i in states key=i
+          box flex=1 min-width=2 height=5 border-radius=3 background-color=segmentInk(s)
+      text `${reached} of ${states.length}` font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-secondary-label" white-space="nowrap"
+
+// A project over its goals: a chevron that turns as it opens in place, its name, and its bar.
+component GoalProject
+  inject
+    haptics: bool
+    still: bool
+  props
+    name: string
+    states: string[]
+    open: bool
+    id: string
+    toggle: action
+  view
+    button press=toggle class=RowTap align-items="center" aria-expanded=open aria-label=`${name}, ${open ? "open" : "shut"}` -exact-press-haptic=(haptics ? "selection" : "none") testId=id
+      box width=22 display="flex" justify-content="center" flex-shrink=0 aria-hidden=true
+        image "symbol:icon.open" width=14 height=14 object-fit="contain" color="-exact-secondary-label" rotate=(open ? "0deg" : "-90deg") transition=springOf(still, "rotate")
+      text name font="-exact-headline" color="-exact-label" flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
+      GoalsBar(states=states)

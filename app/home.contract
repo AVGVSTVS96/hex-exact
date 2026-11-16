@@ -136,7 +136,7 @@ component HexHome
           else if p == "ideas"
             IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, wide=(width > height), selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
           else if p == "goals"
-            GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals)
+            GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), needsN=needs.length, workingN=working.length, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals, open=open, openTasks=openTasks)
       row position="absolute" top=(top + hexOrb() - 9) left=(x - half) width=(2 * half) justify-content="center" testId="hex"
         button press=goLive disabled=(liveId == "") class=Tap display="flex" flex-direction="row" align-items="center" gap=7 max-width=min(330, 2 * half - 24) min-width=0 padding="13px 14px 6px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(liveId == "" ? "hex" : `hex is working on ${liveTopic}`) testId="live-line"
           text "hex" font="-exact-footnote" font-weight=600 color="-exact-label" flex-shrink=0

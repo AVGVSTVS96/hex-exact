@@ -39,6 +39,9 @@ component GoalsList
     wide: bool
     // hex's queue of questions, so what needs him runs in the order Now has it.
     queue: string[]
+    // The app's own counts of what needs him and what hex is working on, as Now shows them.
+    needsN: number
+    workingN: number
     // Which projects are open, once Bassim has opened or shut one (`chosen`).
     opened: string[]
     chosen: bool
@@ -48,8 +51,8 @@ component GoalsList
     openGoal: action
     openWatch: action
     retry: action
-  state allNeeds = false
-  state allWork = false
+    open: action
+    openTasks: action
   state allWatches = false
   state allGroups = false
   state showReached = false
@@ -61,7 +64,7 @@ component GoalsList
   derive reached = sortBy(goals.goals.filter(g => g.state == "done" and dayOf(g.at, offset) > dayOf(now, offset) - 7), g => g.at, "desc")
   derive groups = sortBy(goals.groups, p => p.states.length, "desc")
   derive biggest = match groups.at(0) { case some(p) => max(1, p.states.length), case none => 1 }
-  derive open = chosen ? opened : [""].slice(0, 0)
+  derive openNames = chosen ? opened : [""].slice(0, 0)
   derive colW = wide ? (width - 4) / 2 : width
   derive firstRows = wide ? 2 : 3
   view
@@ -81,8 +84,8 @@ component GoalsList
               GoalsSummary(counts=counts, total=goals.goals.length, width=(colW - 20))
               box height=10
             if not wide
-              NeedsSection(needs=(allNeeds ? needs : needs.slice(0, firstRows)), n=needs.length, all=allNeeds, wide=wide, beside=beside, openGoal=openGoal, more=toggleNeeds)
-              WorkSection(working=(allWork ? working : working.slice(0, firstRows)), n=working.length, all=allWork, lines=2, wide=wide, reached=reached, open=showReached, now=now, offset=offset, beside=beside, openGoal=openGoal, more=toggleWork, toggleReached=toggleReached)
+              NeedsSection(needs=needs.slice(0, firstRows), n=needsN, wide=wide, beside=beside, openGoal=openGoal, more=open(path("needs")))
+              WorkSection(working=working.slice(0, firstRows), n=workingN, lines=2, wide=wide, reached=reached, open=showReached, now=now, offset=offset, beside=beside, openGoal=openGoal, more=openTasks("working"), toggleReached=toggleReached)
             if goals.watching.length > 0
               QuietHead(label="Watching", n=goals.watching.length, id="goals-head-watching")
               for w in (allWatches ? goals.watching : goals.watching.slice(0, 3)) key=w.id
@@ -93,8 +96,8 @@ component GoalsList
             if groups.length > 0
               QuietHead(label="Projects", n=groups.length, id="goals-head-projects")
               for p in (allGroups ? groups : groups.slice(0, 6)) key=p.name
-                ProjectRow(group=p, biggest=biggest, width=colW, open=open.includes(p.name), id=`goals-project-${p.name}`, toggle=toggle(p.name))
-                if open.includes(p.name)
+                ProjectRow(group=p, biggest=biggest, width=colW, open=openNames.includes(p.name), id=`goals-project-${p.name}`, toggle=toggle(p.name))
+                if openNames.includes(p.name)
                   column padding-left=24 testId=`goals-project-${p.name}-goals`
                     for x in goals.goals.filter(g => g.group == p.name and g.state != "dropped") key=x.id
                       GoalRow(goal=x, project="", lines=1, quiet=true, selected=(beside == `goal:${x.id}`), press=openGoal(x.id))
@@ -102,12 +105,8 @@ component GoalsList
                 ShowMore(n=groups.length - 6, shown=allGroups, pad="8px 10px 10px", id="goals-more-projects", press=toggleGroups)
           if wide
             column flex=1 min-width=0 margin-left=4 testId="goals-right"
-              NeedsSection(needs=(allNeeds ? needs : needs.slice(0, firstRows)), n=needs.length, all=allNeeds, wide=wide, beside=beside, openGoal=openGoal, more=toggleNeeds)
-              WorkSection(working=(allWork ? working : working.slice(0, firstRows)), n=working.length, all=allWork, lines=1, wide=wide, reached=reached, open=showReached, now=now, offset=offset, beside=beside, openGoal=openGoal, more=toggleWork, toggleReached=toggleReached)
-  action toggleNeeds
-    allNeeds = not allNeeds
-  action toggleWork
-    allWork = not allWork
+              NeedsSection(needs=needs.slice(0, firstRows), n=needsN, wide=wide, beside=beside, openGoal=openGoal, more=open(path("needs")))
+              WorkSection(working=working.slice(0, firstRows), n=workingN, lines=1, wide=wide, reached=reached, open=showReached, now=now, offset=offset, beside=beside, openGoal=openGoal, more=openTasks("working"), toggleReached=toggleReached)
   action toggleWatches
     allWatches = not allWatches
   action toggleGroups
@@ -181,19 +180,18 @@ component NeedsSection
   props
     needs: Goal[]
     n: number
-    all: bool
     wide: bool
     beside: string
     openGoal: action
     more: action
   view
-    if n > 0
+    if needs.length > 0
       column testId="goals-needs"
         StageHead(state="asks", label="Needs you", n=n, known=true, pad="9px 10px", id="goals-head-needs")
         for g in needs key=g.id
           GoalRow(goal=g, project=(wide ? "" : g.group), lines=1, quiet=false, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
-        if n > (wide ? 2 : 3)
-          ShowMore(n=(n - needs.length), shown=all, pad="8px 10px 10px", id="goals-more-needs", press=more)
+        if n > needs.length
+          ShowMore(n=(n - needs.length), shown=false, pad="8px 10px 10px", id="goals-more-needs", press=more)
         Rule(inset=true)
 
 component WorkSection
@@ -203,7 +201,6 @@ component WorkSection
   props
     working: Goal[]
     n: number
-    all: bool
     lines: number
     wide: bool
     reached: Goal[]
@@ -217,14 +214,14 @@ component WorkSection
   derive week = weekOf(reached.map(g => g.at), now, offset)
   derive most = max(1, match sortBy(week, x => x, "desc").at(0) { case some(x) => x, case none => 1 })
   view
-    if n > 0 or reached.length > 0
+    if working.length > 0 or reached.length > 0
       column testId="goals-working"
-        if n > 0
+        if working.length > 0
           StageHead(state="working", label="Working on", n=n, known=true, pad="9px 10px", id="goals-head-working")
           for g in working key=g.id
             GoalRow(goal=g, project=(wide ? "" : g.group), lines=lines, quiet=false, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
-          if n > (wide ? 2 : 3)
-            ShowMore(n=(n - working.length), shown=all, pad="8px 10px 10px", id="goals-more-working", press=more)
+          if n > working.length
+            ShowMore(n=(n - working.length), shown=false, pad="8px 10px 10px", id="goals-more-working", press=more)
         if reached.length > 0
           button press=toggleReached class=RowTap align-items="center" gap=10 aria-expanded=open aria-label=`Reached ${reached.length} this week` -exact-press-haptic=(haptics ? "selection" : "none") testId="goals-reached"
             Mark(state="done", size=22)
@@ -280,6 +277,8 @@ component WatchRow
     selected: bool
     press: action
   derive ran = weekOf(watch.runs.map(r => r.at), now, offset)
+  // An hourly watch runs many times a day: each bar is as tall as its day's runs against the busiest.
+  derive most = max(1, match sortBy(ran, x => x, "desc").at(0) { case some(x) => x, case none => 1 })
   view
     button press=press class=RowTap gap=10 align-items="center" border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`Watching ${watch.title}, ${watch.stopped ? "stopped" : watch.every}, ran ${ran.filter(x => x > 0).length} of the last 7 days` testId=`goals-watch-${watch.id}`
       box align-self="flex-start" padding-top=1 flex-shrink=0
@@ -287,9 +286,9 @@ component WatchRow
       column flex=1 min-width=0 gap=1
         text watch.title font="-exact-headline" color="-exact-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
         text (watch.stopped ? "Stopped" : capitalOf(watch.every)) font="-exact-subheadline" color="-exact-secondary-label" white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-      row gap=3 flex-shrink=0 aria-hidden=true
+      row gap=3 height=14 align-items="flex-end" flex-shrink=0 aria-hidden=true
         for x, i in ran key=i
-          box width=5 height=14 border-radius=2.5 background-color=(x > 0 ? "hex.accent" : "-exact-tertiary-fill")
+          box width=5 height=(x > 0 ? max(5, round(x / most * 14)) : 14) align-self="flex-end" border-radius=2.5 background-color=(x > 0 ? "hex.accent" : "-exact-tertiary-fill")
 
 // A project: a chevron that turns as it opens in place, its name, its goals as one bar as long as
 // the project is big against the biggest, split by where they stand, and how many.

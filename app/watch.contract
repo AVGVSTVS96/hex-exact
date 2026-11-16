@@ -1,6 +1,6 @@
 // Something hex keeps watch on for Bassim: what it checks and how often, when it runs next, its last
 // seven days at a glance (a mint check and the time on each day it ran), then what each run found on
-// a line that ties them together, what hex does, his own words, and "Stop watching" with Undo.
+// a line that ties them together, his own words, and "Stop watching" with Undo.
 // "Change this watch" floats in glass at the foot and goes to its topic. Wider than tall, what it
 // found stands to the right. A page over Home, or with two columns the page beside it.
 use Watch, Goals, WatchRun, Media from "./shapes.contract"
@@ -86,14 +86,14 @@ component WatchBody
     detach: action
     openTask: action
   state earlier = false
-  state allDoes = false
   derive w = watchOf(goals, id)
   derive found = foundOf(w)
   derive did = changeOf(changes, id)
   derive stopped = partOf(did, 1) == "stop" or w.stopped
   derive today = dayOf(now, offset)
   derive ranDays = range(7).filter(i => w.runs.filter(r => dayOf(r.at, offset) == today - 6 + i).length > 0).length
-  derive first = wide ? 3 : 2
+  // The newest finding; the rest wait behind "Show N earlier", so a run of "nothing new" reads once.
+  derive first = 1
   view
     column flex=1 min-height=0 position="relative" testId=`watch-${id}`
       scroll flex=1 min-height=0 padding=`0 16px ${w.run != "" ? foot + 80 : foot + 16}px` testId="watch-page"
@@ -117,13 +117,6 @@ component WatchBody
                   WatchDay(day=(today - 6 + i), today=today, runs=w.runs, next=(stopped ? 0 : w.next), offset=offset)
               if not wide
                 WatchFound(found=(earlier ? found : found.slice(0, first)), n=found.length, earlier=earlier, now=now, offset=offset, more=toggleEarlier)
-              if w.does != ""
-                column margin-top=14 testId="watch-does"
-                  text "What hex does" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label" padding-bottom=6
-                  text plainOf(w.does) font="-exact-subheadline" color="-exact-secondary-label" line-clamp=(allDoes ? 0 : 3) user-select="text"
-                  button press=toggleDoes class=Tap align-self="flex-start" display="flex" flex-direction="row" gap=6 align-items="center" min-height=36 aria-expanded=allDoes -exact-press-haptic=(haptics ? "selection" : "none") testId="watch-does-all"
-                    image "symbol:sf/chevron.down" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" rotate=(allDoes ? "180deg" : "0deg") transition=springOf(still, "rotate") aria-hidden=true
-                    text (allDoes ? "Less" : "Read all") font="-exact-subheadline" color="-exact-tertiary-label"
               if w.asked.length > 0 or w.run != ""
                 column margin-top=10 testId="watch-asked"
                   row gap=8 align-items="center"
@@ -146,10 +139,9 @@ component WatchBody
         TopicComposer(key=`thread:${w.run}`, run=w.run, hint="Change this watch", label=`Change ${w.title}`, draft=draftOf(drafts, `thread:${w.run}`), keep=keepDraft, message=message, attached=(attachedTo == `thread:${w.run}` ? attached : attached.slice(0, 0)), addError=(attachedTo == `thread:${w.run}` ? addError : ""), attach=attach, detach=detach, left=(wide ? "calc(50% + 12px)" : "12px"), right=footRight, foot=foot, id="watch")
   action toggleEarlier
     earlier = not earlier
-  action toggleDoes
-    allDoes = not allDoes
 
-// One day of the week: its letter, a mint check if it ran (the time under it), today's next run
+// One day of the week: its letter, a mint check if it ran (how many times, when more than once; its
+// last time under it), today's next run
 // in a blue ring, else an empty cell.
 component WatchDay
   props
@@ -158,14 +150,16 @@ component WatchDay
     runs: WatchRun[]
     next: number
     offset: number
-  derive run = runs.filter(r => dayOf(r.at, offset) == day).at(0)
-  derive ranAt = match run { case some(r) => r.at, case none => 0 }
+  derive ran = runs.filter(r => dayOf(r.at, offset) == day)
+  derive ranAt = match ran.at(0) { case some(r) => r.at, case none => 0 }
   derive upNext = ranAt == 0 and day == today and next > 0 and dayOf(next, offset) == today
   view
     column flex=1 align-items="center" gap=5 aria-hidden=true
       text letterOf(day) font-size=12 line-height="16px" font-weight=(day == today ? 600 : 400) color=(day == today ? "-exact-label" : "-exact-tertiary-label")
       box width=34 height=34 border-radius=11 box-sizing="border-box" display="flex" align-items="center" justify-content="center" background-color=(ranAt > 0 ? "hex.accent.wash" : upNext ? "transparent" : "-exact-quaternary-fill") border=(upNext ? "1.5px solid hex.progress" : "none")
-        if ranAt > 0
+        if ran.length > 1
+          text `${ran.length}` font="-exact-footnote" font-weight=600 font-variant-numeric="tabular-nums" color="hex.accent"
+        else if ranAt > 0
           image "symbol:checkmark" width=13 height=13 object-fit="contain" color="hex.accent"
         else if upNext
           image "symbol:sf/clock" width=14 height=14 object-fit="contain" color="hex.progress"
@@ -189,7 +183,7 @@ component WatchFound
         Note(kind="empty", text="Nothing found yet: it hasn't run since you asked.", pad="0", id="watch-not-yet")
       for r, i in found key=r.at
         FoundRun(run=r, last=(i == found.length - 1), now=now, offset=offset, id=`watch-run-${i}`)
-      if n > 2
+      if n > 1
         button press=more class=Tap display="flex" flex-direction="row" gap=10 align-items="center" min-height=40 aria-expanded=earlier -exact-press-haptic=(haptics ? "selection" : "none") testId="watch-earlier"
           column width=22 gap=3 align-items="center" flex-shrink=0 aria-hidden=true
             for k in [0, 1] key=k

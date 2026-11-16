@@ -281,17 +281,13 @@ component GoalWords
           for w, i in g.words key=i
             Bubble(text=w, id=`goal-said-${i}`)
 
-// One thing Bassim said, three lines until he taps it.
+// One thing Bassim said, in full.
 component Bubble
   props
     text: string
     id: string
-  state full = false
-  action flip
-    full = not full
   view
-    button press=flip class=Tap text-align="left" padding="8px 13px" border-radius=18 background-color="-exact-tertiary-fill" aria-expanded=full testId=id
-      text text font="-exact-callout" color="-exact-label" line-clamp=(full ? 0 : 3) user-select="text"
+    text text font="-exact-callout" color="-exact-label" padding="8px 13px" border-radius=18 background-color="-exact-tertiary-fill" user-select="text" testId=id
 
 // The answer row that ends a goal: Not needed, or Not what I asked once it's reached.
 component GoalEnd

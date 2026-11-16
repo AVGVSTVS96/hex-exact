@@ -27,4 +27,4 @@ hexexact://go/<path> opens a screen; hexexact://demo[/<path>] a demo call
 - `app/` is the Exact app. Exact's own delivery updates its screens (the Contract plan and assets) over the air; TypeScript data code and the shell need a new build.
 - `shell/` is the Swift app (`project.yml`, generated with xcodegen), which links ExactKit and the Exact embed build of `app/`.
 - `scripts/sim` builds for the simulator and screenshots each pose; `scripts/ship` builds both on the Mac, signs with the paid team and puts it on its install link.
-- `docs/build.md` is how it fits together; `docs/parity.md` is the stable app, screen by screen.
+- `docs/plan.md` is what finished means; `docs/build.md` is how it fits together; `docs/parity.md` is the stable app, screen by screen.

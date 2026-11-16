@@ -1,8 +1,8 @@
 # Building hex Exact
 
 hex Exact is the hex voice app rebuilt in Exact. Exact draws every screen; a small Swift shell
-holds what Exact leaves out today (the WebRTC call, Siri, the Live Activity). `docs/parity.md` is
-the stable app, screen by screen: it is what done means.
+holds what Exact leaves out today (the WebRTC call, Siri, the Live Activity). `docs/plan.md` is
+what done means and who builds which part; `docs/parity.md` is the stable app, screen by screen.
 
 ```
 ┌──────────── shell/ (Swift) ─────────────────────────────┐

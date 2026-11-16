@@ -1,0 +1,354 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hex Exact, finished: drawings</title>
+<style>
+:root{color-scheme:light dark;
+--bg:light-dark(#FFFFFF,#000000);--glass:light-dark(#FFFFFF,#1C1C1E);--glassEdge:light-dark(#0000001A,#FFFFFF1F);
+--fill:light-dark(#7878801F,#7878803D);--fill2:light-dark(#F2F2F7,#1C1C1E);--sep:light-dark(#3C3C4336,#54545899);
+--text:light-dark(#0A0A0A,#F5F5F5);--sec:light-dark(#6B6B70,#A1A1A8);--ter:light-dark(#A6A6AB,#636368);
+--accent:light-dark(#1F8A6D,#C4F3E5);--accentW:light-dark(#D7F2EA,#1B3534);
+--ask:light-dark(#A35F00,#F2C58A);--askW:light-dark(#F7E6CF,#3A2E1E);
+--prog:light-dark(#0A66D2,#8DB8FF);--progW:light-dark(#CFE0F7,#1F3354);
+--danger:light-dark(#D93A42,#F0A5A8);--end:#EB4B4B;
+--prom:light-dark(#0A0A0A,#F5F5F5);--onprom:light-dark(#FFFFFF,#0A0A0A);
+--shadow:light-dark(#0000001F,#00000000);--hinge:light-dark(#0000001A,#FFFFFF1C);--sel:light-dark(#F2F2F7,#1C1C1E);
+--tg:#2AABEE}
+*{box-sizing:border-box}
+body{margin:0;background:light-dark(#EDEDF0,#111113);color:var(--text);font-family:"SF Pro Text","SF Pro",-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+svg{display:block}
+/* the window */
+.dev{position:relative;background:var(--bg);color:var(--text);overflow:hidden;font-size:17px;line-height:22px}
+.abs{position:absolute}
+.pane{position:absolute;top:0;bottom:0;overflow:hidden}
+/* furniture: the system's, drawn as the shots show it */
+.cam{position:absolute;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:#000;box-shadow:0 0 0 1px light-dark(#00000000,#2A2A2C)}
+.clock{position:absolute;transform:translate(-50%,-50%);font-weight:600;font-size:16px;letter-spacing:-.1px;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.ring{position:absolute;width:46px;height:48px;margin:-23px 0 0 -23px;color:var(--text)}
+.hingeV{position:absolute;top:0;bottom:0;width:1px;background:var(--hinge)}
+.hingeH{position:absolute;left:0;right:0;height:1px;background:var(--hinge)}
+/* chrome: glass beside the status icons */
+.glass{background:var(--glass);border:.5px solid var(--glassEdge);box-shadow:0 1px 2px var(--shadow),0 6px 18px var(--shadow)}
+.cap{position:absolute;height:44px;border-radius:22px;display:flex;align-items:center;padding:0 4px}
+.cap .i,.circ{width:44px;height:44px;display:grid;place-items:center;position:relative;border-radius:22px;color:var(--text)}
+.circ{position:absolute}
+.cap .i.on{background:var(--fill)}
+.cap svg,.circ svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.cap .dot{position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--ask);box-shadow:0 0 0 2px var(--glass)}
+.upd{position:absolute;height:44px;border-radius:22px;display:flex;align-items:center;gap:8px;padding:0 4px 0 14px;font-size:15px;line-height:20px;white-space:nowrap}
+.upd b{font-weight:500}
+.upd .go{height:32px;border-radius:16px;padding:0 13px;display:grid;place-items:center;background:var(--prom);color:var(--onprom);font-weight:600;font-size:15px}
+.upd .x{width:30px;height:32px;display:grid;place-items:center;color:var(--sec)}.upd .x svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+/* hex */
+.orb{position:relative;overflow:hidden;border-radius:50%;flex:none}
+.orb::before{content:"";position:absolute;inset:-18%;background:conic-gradient(from 20deg,#ff6f61,#ffb25e,#f7f35c,#7fe08a,#3ccfd8,#5b8cff,#d77bff,#ff8ad0,#ff6f61);filter:blur(7px)}
+.orb::after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 50%,#ffffffcc 0,#fff0 34%),radial-gradient(circle at 30% 24%,#ffffffb0 0,#fff0 22%),radial-gradient(circle at 50% 50%,#0000 58%,light-dark(#6a6a7a40,#00000080) 100%)}
+.who{display:flex;flex-direction:column;align-items:center;text-align:center}
+.who .nm{font-size:17px;line-height:22px;font-weight:600;margin-top:8px}
+.live{color:var(--sec);font-size:15px;line-height:20px;margin-top:3px;text-wrap:balance}
+.live .dots{display:inline-flex;gap:3px;margin-right:7px;vertical-align:middle;position:relative;top:-1px}.dots i{width:4px;height:4px;border-radius:50%;background:var(--prog);display:block}.dots i:nth-child(1){opacity:.4}.dots i:nth-child(2){opacity:.7}
+/* lists */
+.head{display:flex;align-items:center;gap:12px;font-size:17px;line-height:22px;font-weight:600;padding:20px 10px 4px}
+.head .d{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none}.head .d i{width:8px;height:8px;border-radius:50%;display:block}
+.head.ask{color:var(--ask)}.head.ask .d{background:var(--askW)}.head.ask .d i{background:var(--ask)}
+.head.prog{color:var(--prog)}.head.prog .d{background:var(--progW)}.head.prog .d i{background:var(--prog)}
+.head.pick{color:var(--accent)}.head.pick .d{background:var(--accentW)}.head.pick .d i{background:var(--accent)}
+.head.plain{color:var(--text)}
+.head .n{margin-left:auto;color:var(--ter);font-weight:400;font-size:15px;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:12px;padding:9px 10px;align-items:flex-start;border-radius:12px}
+.row.sel{background:var(--sel)}
+.row .b{flex:1;min-width:0}.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{color:var(--sec);font-size:15px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .tm{color:var(--ter);font-size:12px;line-height:16px;padding-top:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.row .pill{align-self:center}
+.m{width:22px;height:22px;flex:none;border-radius:50%;display:grid;place-items:center;margin-top:0}
+.m svg{width:11px;height:11px}
+.m.q{background:var(--ask);color:var(--bg);font-size:14px;font-weight:700;line-height:22px}
+.m.dec{background:var(--accentW);color:var(--accent)}.m.dec svg{fill:currentColor}
+.m.w svg{width:20px;height:20px}
+.m.done{border-radius:6px;width:20px;height:20px;margin:1px;border:1.5px solid var(--ter);color:var(--sec)}.m.done svg{stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;width:10px;height:10px}
+.more{display:flex;gap:12px;align-items:center;color:var(--sec);font-size:15px;line-height:20px;padding:6px 10px}
+.more .g{width:22px;display:grid;place-items:center;flex:none}.more .g svg{width:14px;height:4px;fill:var(--ter)}
+.decided{display:flex;gap:12px;align-items:center;padding:12px 10px 6px;margin-top:14px;border-top:.5px solid var(--sep);font-weight:600}
+.decided .c{margin-left:auto;color:var(--ter)}.decided .c svg{width:8px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pill{font-size:13px;line-height:18px;font-weight:600;padding:5px 12px;border-radius:999px;background:var(--fill);color:var(--text);white-space:nowrap;flex:none}
+.fade{position:absolute;left:0;right:0;bottom:0;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--bg) 55%)}
+/* the call button */
+.call{position:absolute;width:64px;height:64px;border-radius:50%;background:var(--prom);color:var(--onprom);display:grid;place-items:center;box-shadow:0 6px 20px var(--shadow)}
+.call svg{width:26px;height:26px;stroke:currentColor;stroke-width:2;stroke-linecap:round;fill:none}
+/* pages */
+.title{font-size:28px;line-height:34px;font-weight:700;letter-spacing:.2px}
+.ptitle{font-size:22px;line-height:28px;font-weight:700;letter-spacing:.1px}
+.psub{color:var(--sec);font-size:15px;line-height:20px;margin-top:2px}
+.tabs{display:flex;gap:6px;font-size:15px;line-height:20px;white-space:nowrap}
+.tabs span{padding:7px 12px;border-radius:999px;background:var(--fill);color:var(--text);font-weight:500}
+.tabs .on{background:var(--prom);color:var(--onprom)}
+.tabs em{font-style:normal;margin-left:5px;color:var(--sec);font-variant-numeric:tabular-nums}.tabs .on em{color:light-dark(#F2C58A,#A35F00)}
+.meta{display:flex;align-items:center;gap:8px;color:var(--sec);font-size:13px;line-height:18px;font-variant-numeric:tabular-nums}
+.meta .ad{width:8px;height:8px;border-radius:50%;background:var(--ask);flex:none}
+.qt{font-size:20px;line-height:26px;font-weight:600;margin:10px 0 8px;letter-spacing:-.3px;text-wrap:pretty}
+.qb{font-size:17px;line-height:24px;color:var(--text);margin:0;text-wrap:pretty}
+.why{display:flex;gap:6px;align-items:center;font-size:15px;line-height:20px;color:var(--sec);margin:12px 0 0}
+.why b{color:var(--text);font-weight:600}.why svg{width:8px;height:12px;stroke:var(--ter);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-left:2px}
+.why.open svg{transform:rotate(90deg)}
+.quote{margin:8px 0 0;padding:2px 0 2px 12px;border-left:2px solid var(--sep);color:var(--sec);font-size:15px;line-height:21px}
+.quote .who2{display:flex;align-items:center;gap:6px;color:var(--text);font-weight:600;font-size:13px;line-height:18px;margin-bottom:2px}
+.tile{width:18px;height:18px;border-radius:5px;background:var(--tg);display:grid;place-items:center;flex:none}.tile svg{width:10px;height:10px;fill:#fff}
+.ans{border-top:.5px solid var(--sep);margin-top:16px}
+.a{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:.5px solid var(--sep)}
+.a .r{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ter);flex:none}
+.a.pick .r{border-color:var(--accent)}
+.a .l{flex:1;min-width:0}.a .l .s{color:var(--sec);font-size:15px;line-height:20px}
+.a .k{color:var(--accent);font-size:13px;font-weight:600;white-space:nowrap;align-self:center}
+.dock{position:absolute;height:48px;border-radius:24px;display:flex;align-items:center;padding:0 5px 0 18px;color:var(--ter);font-size:17px;background:var(--fill2);border:.5px solid var(--glassEdge)}
+.dock span{flex:1}.dock .mic{flex:none;width:38px;height:38px;border-radius:50%;background:var(--prom);color:var(--onprom);display:grid;place-items:center}
+.dock .mic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round}
+.sec{font-size:13px;line-height:18px;font-weight:600;color:var(--sec);margin:18px 0 6px;letter-spacing:.1px}
+.now{display:flex;gap:12px;align-items:flex-start}
+.now .tx{flex:1;font-size:17px;line-height:23px;text-wrap:pretty}
+.link{display:inline-flex;align-items:center;gap:5px;font-size:15px;line-height:20px;font-weight:600;color:var(--text);margin-top:8px}
+.link svg{width:8px;height:12px;stroke:var(--ter);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.place{display:inline-flex;align-items:center;gap:7px;font-size:15px;line-height:20px;color:var(--text);font-weight:500;padding:6px 12px 6px 7px;border-radius:999px;background:var(--fill)}
+.place .tile{width:22px;height:22px;border-radius:6px}.place .tile svg{width:12px;height:12px}
+.lane{position:relative;height:28px;border-radius:8px;background:var(--fill);overflow:hidden}
+.lane i{position:absolute;top:8px;bottom:8px;border-radius:4px;background:var(--prog)}
+.days{display:flex;justify-content:space-between;color:var(--ter);font-size:12px;line-height:16px;margin-top:6px;padding:0 4px}
+.drow{display:flex;gap:12px;align-items:flex-start;padding:7px 0}
+.drow .b{flex:1;min-width:0;font-size:17px;line-height:22px}.drow .tm{color:var(--ter);font-size:12px;padding-top:3px;white-space:nowrap}
+.drow .s{color:var(--sec);font-size:15px;line-height:20px}
+/* call */
+.words{display:flex;flex-direction:column;gap:14px}
+.hw{font-size:21px;line-height:28px;font-weight:500;letter-spacing:-.3px;color:var(--text);text-wrap:pretty}
+.hw.old{color:var(--sec)}
+.mine{align-self:flex-end;max-width:82%;background:var(--fill2);border-radius:20px;padding:9px 14px;font-size:17px;line-height:23px;color:var(--text)}
+.mine.old{color:var(--sec)}
+.agent{display:flex;gap:8px;align-items:center;justify-content:center;font-size:15px;line-height:20px;color:var(--prog);white-space:nowrap}
+.agent svg{width:16px;height:16px;flex:none}
+.ctl{position:absolute;display:flex;gap:28px;align-items:center}
+.ctl .c{width:58px;height:58px;margin:5px 0;border-radius:50%;display:grid;place-items:center;color:var(--text)}
+.ctl .c.end{margin:0}
+.ctl .c svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ctl .end{width:68px;height:68px;background:var(--end);color:#fff;border:0;box-shadow:0 6px 20px #eb4b4b40}
+.ctl .end svg{width:30px;height:30px;stroke-width:2.2}
+.ctl .lab{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:90px;gap:6px;font-size:12px;line-height:16px;color:var(--sec)}
+.timer{color:var(--sec);font-size:15px;line-height:20px;font-variant-numeric:tabular-nums;margin-top:2px}
+/* the index */
+main{max-width:1600px;margin:auto;padding:28px 20px 80px}
+main h1{font-size:26px;margin:0 0 6px;font-weight:700}main h2{font-size:19px;margin:44px 0 4px;font-weight:600}
+main .lede{color:var(--sec);margin:0 0 14px;max-width:780px;font-size:15px;line-height:21px}
+.grid{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+figure{margin:0}figcaption{font-size:13px;color:var(--sec);padding:7px 2px 0}figcaption b{color:var(--text);font-weight:600}
+.frame{overflow:hidden;border-radius:16px;border:.5px solid var(--glassEdge)}
+.frame>.dev{transform-origin:0 0}
+body.only{background:var(--bg)}
+</style></head><body><main id="m"></main>
+<script>
+// Every name, topic and number below is made up.
+const I={
+ calls:'<svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8M12 7.5V12l3 2"/></svg>',
+ tasks:'<svg viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r=".6"/><circle cx="4.5" cy="12" r=".6"/><circle cx="4.5" cy="17.5" r=".6"/></svg>',
+ settings:'<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+ back:'<svg viewBox="0 0 24 24"><path d="M14.5 5l-7 7 7 7" style="stroke-width:2.1"/></svg>',
+ wave:'<svg viewBox="0 0 24 24"><path d="M4 10v4M8 6.5v11M12 3.5v17M16 6.5v11M20 10v4"/></svg>',
+ search:'<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg>',
+ q:'<svg viewBox="0 0 12 12"><path d="M4.1 4.2a2 2 0 1 1 2.6 1.9c-.5.2-.7.6-.7 1.1v.3"/><circle cx="6" cy="10" r=".3"/></svg>',
+ spark:'<svg viewBox="0 0 12 12"><path d="M6 .5c.4 2.9 1.6 4.1 4.5 4.5v.1C7.6 5.5 6.4 6.7 6 9.6h-.1C5.5 6.7 4.3 5.5 1.4 5.1V5C4.3 4.6 5.5 3.4 5.9.5z" transform="translate(0 .9)"/></svg>',
+ check:'<svg viewBox="0 0 12 12"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg>',
+ chev:'<svg viewBox="0 0 8 13"><path d="M1.5 1.5l5 5-5 5"/></svg>',
+ dots:'<svg viewBox="0 0 14 4"><circle cx="2" cy="2" r="1.6"/><circle cx="7" cy="2" r="1.6"/><circle cx="12" cy="2" r="1.6"/></svg>',
+ mic:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>',
+ micOff:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>',
+ cam:'<svg viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="13" height="11" rx="3"/><path d="M15.5 10.5l5-3v9l-5-3"/></svg>',
+ end:'<svg viewBox="0 0 24 24"><path d="M3.2 13.6c-.6-.6-.6-1.6.1-2.2 4.8-4 12.6-4 17.4 0 .7.6.7 1.6.1 2.2l-1.3 1.3c-.5.5-1.3.6-1.9.2l-2-1.3c-.5-.3-.7-.8-.6-1.4l.2-1.2c-2-.7-4.4-.7-6.4 0l.2 1.2c.1.6-.1 1.1-.6 1.4l-2 1.3c-.6.4-1.4.3-1.9-.2z" style="fill:currentColor;stroke:none"/></svg>',
+ x:'<svg viewBox="0 0 13 13"><path d="M2 2l9 9M11 2l-9 9"/></svg>',
+ plane:'<svg viewBox="0 0 24 24"><path d="M2.5 11.2l18-7.4c.6-.2 1.1.3.9.9l-5.6 15.6c-.2.6-1 .7-1.4.2l-3.6-4.6-4.6 3 .9-5.3z"/></svg>',
+};
+const spin=(s=20)=>`<svg viewBox="0 0 20 20" width="${s}" height="${s}"><circle cx="10" cy="10" r="8" fill="none" stroke="var(--progW)" stroke-width="2.25"/><circle cx="10" cy="10" r="8" fill="none" stroke="var(--prog)" stroke-width="2.25" stroke-linecap="round" stroke-dasharray="14 40" transform="rotate(-30 10 10)"/></svg>`;
+const ringSvg=`<svg viewBox="0 0 46 48" width="46" height="48"><path d="M31 5.8A19 19 0 0 1 35.2 37.6M10.8 37.6A19 19 0 0 1 15 5.8" fill="none" stroke="#34C759" stroke-width="3.4" stroke-linecap="round"/><path d="M24.2 .8l-3.6 5.4h2.6l-1 4.2 3.7-5.5h-2.7z" fill="var(--ter)"/><path d="M14.6 21.4a12 12 0 0 1 16.8 0M18 24.8a7.2 7.2 0 0 1 10 0" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="23" cy="28.6" r="2" fill="currentColor"/><circle cx="15.5" cy="40.8" r="1.7" fill="currentColor"/><circle cx="20.5" cy="43.4" r="1.7" fill="currentColor"/><circle cx="25.5" cy="43.4" r="1.7" fill="currentColor"/><circle cx="30.5" cy="40.8" r="1.7" fill="currentColor"/></svg>`;
+
+// The four poses: the window, and where the system's furniture sits in it (from the simulator shots;
+// cover-side has no shot, so its camera follows the cover screen turned on its side and its status
+// icons sit as they do open on its side). `bar` is the toolbar row: its centre, and the x it ends at,
+// beside the status icons.
+const POSE={
+ 'cover-up':{w:466,h:678,cam:[418,47],clock:[418,93],ring:[418,128],bar:{y:47,end:384},clear:156},
+ 'cover-side':{w:678,h:466,cam:[47,48],clock:[578,44],ring:[631,44],bar:{y:44,end:542},clear:76},
+ 'open-up':{w:951,h:669,clock:[903,39],ring:[903,75],hinge:'v',bar:{y:39,end:866},clear:0},
+ 'open-side':{w:669,h:951,clock:[569,48],ring:[622,47],hinge:'h',bar:{y:48,end:533},clear:80},
+};
+const furniture=p=>{const P=POSE[p];return (P.hinge=='v'?`<div class="hingeV" style="left:${P.w/2-.5}px"></div>`:P.hinge=='h'?`<div class="hingeH" style="top:${P.h/2-.5}px"></div>`:'')
+ +(P.cam?`<div class="cam" style="left:${P.cam[0]}px;top:${P.cam[1]}px"></div>`:'')
+ +`<div class="clock" style="left:${P.clock[0]}px;top:${P.clock[1]}px">9:41</div><div class="ring" style="left:${P.ring[0]}px;top:${P.ring[1]}px">${ringSvg}</div>`};
+
+// The toolbar: Calls, Tasks and Settings in one capsule, Back beside the status icons on inner pages,
+// the update notice in the row's free space.
+const toolbar=(p,{back=false,on='',update=false}={})=>{const P=POSE[p],top=P.bar.y-22;let end=P.bar.end,h='';
+ if(back){h+=`<div class="circ glass" style="left:${end-44}px;top:${top}px" aria-label="Back">${I.back}</div>`;end-=54}
+ const capL=end-140;
+ h+=`<div class="cap glass" style="left:${capL}px;top:${top}px"><div class="i${on=='calls'?' on':''}">${I.calls}</div><div class="i${on=='tasks'?' on':''}">${I.tasks}${on=='tasks'?'':'<span class="dot"></span>'}</div><div class="i${on=='settings'?' on':''}">${I.settings}</div></div>`;
+ if(update)h+=`<div class="upd glass" style="left:16px;top:${top}px"><b>Update ready</b><span class="go">Install</span><span class="x">${I.x}</span></div>`;
+ return h};
+
+// hex: face, name, one live line (two lines allowed).
+const hexHead=(size=60,max=300)=>`<div class="who"><div class="orb" style="width:${size}px;height:${size}px"></div><div class="nm">hex</div>
+ <div class="live" style="max-width:${max}px">${LIVE}</div></div>`;
+const LIVE=`<span class="dots"><i></i><i></i><i></i></span><span style="white-space:nowrap">Pricing countertops;</span> <span style="white-space:nowrap">the stone sample comes Friday</span>`;
+const R=(mark,t,s,tm,sel)=>`<div class="row${sel?' sel':''}">${mark}<div class="b"><div class="t">${t}</div><div class="s">${s}</div></div><span class="tm">${tm}</span></div>`;
+const MQ=`<span class="m q">?</span>`,MW=`<span class="m w">${spin()}</span>`,MD=`<span class="m dec">${I.spark}</span>`,MDone=`<span class="m done">${I.check}</span>`;
+const more=n=>`<div class="more"><span class="g">${I.dots}</span>Show ${n} more</div>`;
+// Home never scrolls: it shows as many of what needs you as fit, the rest behind Show N more.
+const NEEDS=[['kitchen','Kitchen remodel','Quartz or wood for the island?','3:40 PM'],['lisbon-q','Lisbon trip','9:15 or 11:40 train to Sintra?','1:12 PM'],
+ ['news','Newsletter','Send issue 14 Thursday, or wait?','Nov 14'],['bike','Bike repair','New chain, or the cassette too?','Nov 13'],['books','Book club','Which of three novels for March?','Nov 12']];
+const needsRows=(sel,n=3)=>NEEDS.slice(0,n).map(([k,t,s,tm])=>R(MQ,t,s,tm,sel==k)).join('');
+const workRows=sel=>R(MW,'Lisbon trip','Checking hotels near Alfama','3:28 PM',sel=='lisbon');
+const homeList=(sel,n=3)=>`<div class="head ask"><span class="d"><i></i></span>Needs you</div>${needsRows(sel,n)}${n<NEEDS.length?more(NEEDS.length-n):''}
+ <div class="head prog"><span class="d"><i></i></span>Working on</div>${workRows(sel)}
+ <div class="decided">${MD}<span>hex decided 12 this week</span><span class="c">${I.chev}</span></div>`;
+// In a column beside a page, hex's head is a row: face, then name and live line.
+const hexRow=(call=false)=>`<div style="display:flex;gap:14px;align-items:center"><div class="orb" style="width:52px;height:52px"></div><div style="flex:1;min-width:0"><div style="font-weight:600">hex</div><div class="live" style="margin-top:1px;text-align:left">${LIVE}</div></div>${call?`<div class="call" style="position:relative;width:52px;height:52px;flex:none">${I.wave}</div>`:''}</div>`;
+
+// A task's page.
+const taskPage=t=>{const T={
+ lisbon:{title:'Lisbon trip',sub:'Working · started 2 h ago',now:'Checking hotels near Alfama under €180 a night, with a lift and a quiet street',
+  need:['9:15 or 11:40 train to Sintra?','1:12 PM'],
+  done:[['Booked both flights, aisle seats','11:02 AM'],['Found a 3‑day transit pass for €22','Nov 13']],
+  dec:['Earlier flight home, no layover'],spans:[[.05,.12],[.34,.4],[.62,.7],[.86,1]]},
+ kitchen:{title:'Kitchen remodel',sub:'Working · started 40 min ago',now:'Pricing countertops; the stone sample comes Friday',
+  need:['Quartz or wood for the island?','3:40 PM'],
+  done:[['Booked the installer for the 22nd','Nov 14'],['Ordered cabinet handles in brass','Nov 11']],
+  dec:['Asked for the sink cutout in every quote'],spans:[[.1,.16],[.48,.58],[.9,1]]}}[t];
+ return `<div class="ptitle">${T.title}</div><div class="psub">${T.sub}</div>
+ <div style="margin-top:12px"><span class="place"><span class="tile">${I.plane}</span>Telegram</span></div>
+ <div class="sec" style="color:var(--prog)">Now</div>
+ <div class="now">${MW}<div><div class="tx">${T.now}</div><span class="link">Steps${I.chev}</span></div></div>
+ <div class="sec" style="color:var(--ask)">Needs you</div>
+ <div class="drow">${MQ}<div class="b">${T.need[0]}</div><span class="tm">${T.need[1]}</span></div>
+ <div class="sec">This week</div>
+ <div class="lane">${T.spans.map(([a,b])=>`<i style="left:${a*100}%;width:${(b-a)*100}%"></i>`).join('')}</div>
+ <div class="days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Today</span></div>
+ <div class="sec">Done</div>
+ ${T.done.map(([a,b])=>`<div class="drow">${MDone}<div class="b">${a}</div><span class="tm">${b}</span></div>`).join('')}
+ <div class="sec" style="color:var(--accent)">hex decided</div>
+ <div class="drow" style="align-items:center">${MD}<div class="b">${T.dec[0]}</div><span class="pill">Undo</span></div>`};
+
+// A question, flat.
+const question=({why=false}={})=>`<div class="ptitle">Kitchen remodel</div>
+ <div class="meta" style="margin-top:6px"><span class="ad"></span>Question 1 of 2 · 3:40 PM</div>
+ <p class="qt">Quartz or wood for the island?</p>
+ <p class="qb">The installer can cut either on the 22nd. Quartz needs no upkeep; butcher block is warmer but needs oiling every few months.</p>
+ <div class="why${why?' open':''}"><b>Why</b>· from Telegram, 3:40 PM${I.chev}</div>
+ ${why?`<div class="quote"><div class="who2"><span class="tile">${I.plane}</span>Installer</div>We can cut either slab on the 22nd. Quartz needs a template visit first, so tell us by Tuesday.</div>`:''}
+ <div class="ans">
+  <div class="a pick"><span class="r"></span><div class="l">Quartz<div class="s">€2,140 · no upkeep</div></div><span class="k">✦ hex’s pick</span></div>
+  <div class="a"><span class="r"></span><div class="l">Butcher block<div class="s">€980 · oil it every few months</div></div></div>
+  <div class="a"><span class="r"></span><div class="l">Quartz counters, wood island<div class="s">€1,560</div></div></div>
+  <div class="a"><span class="r" style="border-style:dashed"></span><div class="l" style="color:var(--sec)">Not needed<div class="s">Take it off your list</div></div></div>
+ </div>`;
+const dock=(l,r,b=16)=>`<div class="dock" style="left:${l}px;right:${r}px;bottom:${b}px"><span>Reply in your own words</span><span class="mic">${I.mic}</span></div>`;
+
+// Tasks.
+const tasksList=({tab='all',sel='',dec=2,n=3,tail=true}={})=>`<div class="tabs"><span${tab=='all'?' class="on"':''}>All</span><span${tab=='needs'?' class="on"':''}>Needs you<em>5</em></span><span${tab=='working'?' class="on"':''}>Working<em>2</em></span><span>Done<em>12</em></span><span>Quiet<em>4</em></span></div>
+ <div style="margin:0 -10px">
+ <div class="head ask"><span class="d"><i></i></span>Needs you<span class="n">5</span></div>${needsRows(sel,tab=='needs'?5:n)}${tab=='needs'?'':more(5-n)}
+ ${tab=='needs'?'':`<div class="head prog"><span class="d"><i></i></span>Working on<span class="n">2</span></div>${R(MW,'Kitchen remodel','Pricing countertops','3:41 PM',sel=='kitchen-w')}${workRows(sel)}`}
+ <div class="head pick"><span class="d"><i></i></span>hex decided<span class="n">12</span></div>
+ <div class="row">${MD}<div class="b"><div class="t">Lisbon trip</div><div class="s">Earlier flight home, no layover</div></div><span class="pill">Undo</span></div>
+ ${dec>1?`<div class="row">${MD}<div class="b"><div class="t">Newsletter</div><div class="s">Kept plain text for issue 14</div></div><span class="pill">Undo</span></div>`:''}
+ ${tail?more(12-dec):''}</div>`;
+const tasksHead=search=>`<div style="display:flex;align-items:center;justify-content:space-between"><div class="title">Tasks</div>${search?`<div class="circ glass" style="position:relative">${I.search}</div>`:''}</div>`;
+
+// The call.
+const callWords=({short=false}={})=>`<div class="words">
+ ${short?'':`<div class="hw old">I’ve booked the template visit for Tuesday morning.</div><div class="mine old">Great, thanks.</div><div class="hw old">Also, the countertop quotes are all in, and one of them is a lot cheaper than I expected.</div><div class="mine old">Which one?</div>`}
+ <div class="hw${short?' old':''}">The quartz quote came in at €2,140, with the template visit included. Want me to hold the 22nd for the install?</div>
+ <div class="mine">Yes, hold the 22nd, and ask if they can do the sink cutout too.</div>
+ <div class="hw">Done. I’ve asked them about the cutout, and I’ll tell you as soon as they answer.</div></div>`;
+const agentLine=`<div class="agent">${spin(16)}<span>Asking the installer about the sink cutout</span></div>`;
+const controls=(cx,bottom)=>`<div class="ctl" style="left:${cx}px;bottom:${bottom}px;transform:translateX(-50%)">
+ <div class="lab"><div class="c glass">${I.mic}</div>Mute</div><div class="lab"><div class="c end">${I.end}</div>End</div><div class="lab"><div class="c glass">${I.cam}</div>Camera</div></div>`;
+
+const dev=(p,inner)=>{const P=POSE[p];return `<div class="dev" style="width:${P.w}px;height:${P.h}px">${inner}${furniture(p)}</div>`};
+const callBtn=(cx,bottom)=>`<div class="call" style="left:${cx-32}px;bottom:${bottom}px" aria-label="Call hex">${I.wave}</div>`;
+
+const D={
+ // 1. Home
+ 'home-cover-up':(update=false)=>dev('cover-up',`
+  <div class="abs" style="left:0;right:0;top:80px">${hexHead(56,300)}</div>
+  <div class="abs" style="left:6px;right:6px;top:196px">${homeList('',2)}</div>
+  ${callBtn(233,22)}${toolbar('cover-up',{update})}`),
+ 'home-cover-side':()=>dev('cover-side',`
+  <div class="pane" style="left:0;width:360px">
+   <div class="abs" style="left:80px;right:16px;top:18px">${hexRow()}</div>
+   <div class="abs" style="left:6px;right:6px;top:80px">${homeList('lisbon',2)}</div></div>
+  <div class="pane" style="left:360px;right:0;border-left:.5px solid var(--sep)"><div class="abs" style="left:20px;right:20px;top:80px;bottom:96px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 80%,transparent)">${taskPage('lisbon')}</div>${callBtn(318-16-32,18)}</div>
+  ${toolbar('cover-side')}`),
+ 'home-open-up':()=>dev('open-up',`
+  <div class="pane" style="left:0;width:475px">
+   <div class="abs" style="left:22px;right:22px;top:20px">${hexRow()}</div>
+   <div class="abs" style="left:6px;right:6px;top:92px">${homeList('lisbon')}</div>
+   ${callBtn(237.5,18)}</div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${taskPage('lisbon')}</div><div class="fade" style="height:70px"></div></div>
+  ${toolbar('open-up')}`),
+ 'home-open-side':()=>dev('open-side',`
+  <div class="pane" style="left:0;width:320px;border-right:.5px solid var(--sep)">
+   <div class="abs" style="left:0;right:0;top:36px">${hexHead(60,272)}</div>
+   <div class="abs" style="left:6px;right:6px;top:192px">${homeList('lisbon',5)}</div>
+   ${callBtn(160,24)}</div>
+  <div class="pane" style="left:320px;right:0"><div class="abs" style="left:22px;right:22px;top:80px">${taskPage('lisbon')}</div></div>
+  ${toolbar('open-side')}`),
+ // 2. Home with an update waiting
+ 'update-cover-up':()=>D['home-cover-up'](true),
+ // 3. A question
+ 'question-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:16px;right:16px;top:84px">${question()}</div>
+  <div class="fade" style="height:110px"></div>${dock(16,16,18)}${toolbar('cover-up',{back:true})}`),
+ 'question-open-up':()=>dev('open-up',`
+  <div class="pane" style="left:0;width:475px;padding:22px 16px 0"><div style="padding:0 6px">${tasksHead(true)}</div><div style="padding:12px 6px 0">${tasksList({tab:'needs',sel:'kitchen',dec:1})}</div></div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${question({why:true})}</div><div class="fade" style="height:100px"></div>${dock(24,24,18)}</div>
+  ${toolbar('open-up',{on:'tasks'})}`),
+ // 4. A live call
+ 'call-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:0;right:0;top:80px;display:flex;flex-direction:column;align-items:center"><div class="orb" style="width:96px;height:96px"></div><div class="nm" style="font-weight:600;margin-top:10px">hex</div><div class="timer">4:12</div><div style="margin-top:10px">${agentLine}</div></div>
+  <div class="abs" style="left:20px;right:20px;bottom:150px;max-height:330px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end">${callWords({short:true})}</div>
+  <div class="abs" style="left:0;right:0;top:262px;height:60px;background:linear-gradient(var(--bg),transparent)"></div>
+  ${controls(233,28)}${toolbar('cover-up')}`),
+ 'call-open-up':()=>dev('open-up',`
+  <div class="pane" style="left:0;width:475px">
+   <div class="abs" style="left:0;right:0;top:108px;display:flex;flex-direction:column;align-items:center"><div class="orb" style="width:168px;height:168px"></div><div class="nm" style="font-weight:600;margin-top:16px;font-size:20px">hex</div><div class="timer">4:12</div><div style="margin-top:14px">${agentLine}</div></div>
+   ${controls(237.5,30)}</div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:28px;right:28px;bottom:30px">${callWords()}</div><div class="abs" style="left:0;right:0;top:0;height:120px;background:linear-gradient(var(--bg) 55%,transparent)"></div></div>
+  ${toolbar('open-up')}`),
+ // 5. Tasks
+ 'tasks-cover-up':()=>dev('cover-up',`
+  <div class="abs" style="left:22px;right:82px;top:84px">${tasksHead(true)}</div>
+  <div class="abs" style="left:16px;right:16px;top:162px"><div style="padding:0 6px">${tasksList({n:2,dec:1,tail:false})}</div></div>
+  ${toolbar('cover-up',{back:true,on:'tasks'})}`),
+ 'tasks-open-up':()=>dev('open-up',`
+  <div class="pane" style="left:0;width:475px;padding:22px 16px 0"><div style="padding:0 6px">${tasksHead(true)}</div><div style="padding:12px 6px 0">${tasksList({sel:'kitchen-w',n:2,dec:1})}</div></div>
+  <div class="pane" style="left:476px;right:0"><div class="abs" style="left:24px;right:24px;top:22px">${taskPage('kitchen')}</div><div class="fade" style="height:60px"></div></div>
+  ${toolbar('open-up',{on:'tasks'})}`),
+};
+// The frames to draw: [screen, pose, themes, what it shows].
+const F=[
+ ['home','cover-up',['dark','light'],'Folded upright. hex, its live line in two lines, the few things that need you, what it’s working on, what it decided. Chrome beside the status icons, nothing under them.'],
+ ['home','cover-side',['dark'],'Folded on its side. 678 wide is two columns: Home on the left, the row you picked beside it.'],
+ ['home','open-up',['dark','light'],'Open like a book. Home on the left page, the task a row opens on the right; the hinge is the seam.'],
+ ['home','open-side',['dark'],'Open on its side. Two columns again, so no row stretches 669 wide.'],
+ ['update','cover-up',['dark'],'An update waiting: it sits in the toolbar row’s free space, clear of hex.'],
+ ['question','cover-up',['dark','light'],'A question, flat. Back beside the status icons; Not needed is one more row like the answers; your own words docked at the foot.'],
+ ['question','open-up',['dark','light'],'Book: Needs you on the left, the question beside it, Why opened in one tap.'],
+ ['call','cover-up',['dark'],'A live call: hex’s face stays, the words bright, mute, end and camera in thumb reach.'],
+ ['call','open-up',['dark'],'Book: hex and the controls on the left, the words on the right.'],
+ ['tasks','cover-up',['dark'],'Tasks: tabs with counts, each state in its own colour, Undo on what hex decided.'],
+ ['tasks','open-up',['dark'],'Book: Tasks beside the task you picked.'],
+];
+const q=new URLSearchParams(location.search);
+const theme=q.get('theme');if(theme)document.documentElement.style.colorScheme=theme;
+if(q.get('only')){document.body.classList.add('only');m.outerHTML=D[q.get('only')]();}
+else{
+ const fig=(s,p,t,cap)=>{const P=POSE[p],k=`${s}-${p}`,sc=Math.min(1,(P.w>P.h?520:300)/P.w);
+  return `<figure><div class="frame" style="width:${P.w*sc}px;height:${P.h*sc}px;color-scheme:${t}"><div style="transform:scale(${sc});transform-origin:0 0">${D[k]()}</div></div><figcaption><b>${k}-${t}</b></figcaption></figure>`};
+ let h=`<h1>hex Exact, finished</h1><p class="lede">Drawn from the app’s own colours and type at the Duo’s real sizes. Every name and number is made up. Open one frame alone with <code>?only=home-cover-up&amp;theme=dark</code>.</p>`;
+ let last='';for(const [s,p,ts,cap] of F){if(s!=last){h+=`<h2>${{home:'Home',update:'Home with an update',question:'A question',call:'A live call',tasks:'Tasks'}[s]}</h2>`;last=s}
+  h+=`<p class="lede">${cap}</p><div class="grid">${ts.map(t=>fig(s,p,t,cap)).join('')}</div>`}
+ m.innerHTML=h;
+}
+</script></body></html>

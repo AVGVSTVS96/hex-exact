@@ -8,7 +8,7 @@ use Tasks, Asks, Counts, TaskRow from "./shapes.contract"
 use Mark, Note, Tap, RowTap, PillTap, PillFace, ShowMore, whenOf, dayOf, washOf, tintOf from "./parts.contract"
 use Room, Chrome, homeRoomOf, stacked from "./room.contract"
 use Said from "./said.contract"
-use Item, Topic, problemOf, unique, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
+use Item, Topic, problemOf, unique, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
 use ProjectRow, TopicHead, EntryRow, topicMark, newestOf from "./rows.contract"
 use CallButton from "./call.contract"
 
@@ -48,6 +48,9 @@ component TasksList
     tasks: Tasks
     asks: Asks
     entries: Item[]
+    // What isn't put away here, and its topics on this tab, worked out once in App.
+    waiting: Item[]
+    shown: Topic[]
     counts: Counts
     said: Said[]
     loading: bool
@@ -81,13 +84,10 @@ component TasksList
   derive col = rm.first
   // An ask put away here leaves the list and its counts at once.
   derive away = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
-  derive waiting = entries.filter(e => not away.includes(e.id))
   derive words = wordsOf(query)
   derive searching = words.length > 0
   derive found = entries.filter(e => matches(e, words))
   derive foundTopics = topicsOf(found)
-  derive overview = stageTopics(waiting, "all")
-  derive shown = tab == "all" ? overview : stageTopics(waiting, tab)
   derive needs = shown.filter(t => stageOf(t) == "needs")
   derive working = shown.filter(t => stageOf(t) == "working")
   derive history = sortBy(shown.filter(t => stageOf(t) == "done" or stageOf(t) == "quiet"), t => newestOf(t).at, "desc")

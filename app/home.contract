@@ -123,7 +123,7 @@ component HexHome
   derive listH = max(height - listTop, 0)
   derive edges = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - 16, 8)}px, transparent ${listH}px)`
   // The pages that scroll under Call fade out under it, as iOS fades content under a floating control.
-  derive underCall = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - foot - float - 8, 8)}px, transparent ${max(listH - foot, 8)}px)`
+  derive underCall = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - foot - float - 38, 8)}px, transparent ${max(listH - foot - 40, 8)}px)`
   // The pill is centred on hex and never wider than the room either side of it allows.
   derive half = max(min(x, width - x), 0)
   view

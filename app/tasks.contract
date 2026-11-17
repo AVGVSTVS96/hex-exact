@@ -159,7 +159,7 @@ component TasksList
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="tasks-list" position="absolute" inset=0 background-color="-exact-background" testId="tasks"
       Chrome(room=room, on="tasks", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
-      scroll id="tasks-list" position="absolute" top=headTop bottom=listBottom left=col.x width=col.width overflow-y="auto" mask-image=(across ? "none" : callOn ? "linear-gradient(to top, transparent 0, #000 26px)" : `linear-gradient(to top, transparent 0, transparent ${room.foot}px, #000 ${room.foot + 66}px)`) testId="tasks-rows"
+      scroll id="tasks-list" position="absolute" top=headTop bottom=listBottom left=col.x width=col.width overflow-y="auto" mask-image=(across ? "none" : callOn ? "linear-gradient(to top, transparent 0, #000 26px)" : `linear-gradient(to top, transparent 0, transparent ${room.foot + 40}px, #000 ${room.foot + 96}px)`) testId="tasks-rows"
         column padding="0 6px" padding-bottom=footRoom
           if searchOpen
             row height=44 margin="4px 6px 6px" padding="0 4px 0 14px" gap=9 border-radius=22 background-color="-exact-tertiary-fill" align-items="center" testId="tasks-search-field"

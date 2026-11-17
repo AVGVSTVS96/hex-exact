@@ -305,26 +305,23 @@ final class OrbView: UIView {
     #endif
   }
 
-  /// How awake it is: resting small and dim, half woken while connecting, full size when live.
+  /// How awake it is: resting small, half woken while connecting, full size when live. It is never
+  /// dimmed: at rest it is hex's face on Home, drawn over the pill under it.
   private func move() {
     let awake: CGFloat = status == "live" ? 1 : status == "idle" ? 0 : 0.5
     let scale = 0.86 + 0.14 * awake
-    let alpha = min(1, 0.5 + 0.5 * awake)
     breath.layer.removeAnimation(forKey: "breath")
     if still {
       wake.transform = CGAffineTransform(scaleX: scale, y: scale)
-      wake.alpha = alpha
       return
     }
     if awake == 1 {
       UIView.animate(withDuration: 0.64, delay: 0, usingSpringWithDamping: 0.45, initialSpringVelocity: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
         self.wake.transform = CGAffineTransform(scaleX: scale, y: scale)
-        self.wake.alpha = alpha
       }
     } else {
       UIView.animate(withDuration: awake == 0 ? 0.82 : 0.41, delay: 0, options: [.beginFromCurrentState, .curveEaseInOut]) {
         self.wake.transform = CGAffineTransform(scaleX: scale, y: scale)
-        self.wake.alpha = alpha
       }
     }
     if awake == 0 {

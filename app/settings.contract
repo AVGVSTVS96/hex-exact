@@ -9,7 +9,7 @@ use Room, Chrome, stacked, homeRoomOf, callSize from "./room.contract"
 use VoiceBody, Seg, voiceName from "./voice.contract"
 use WordsBody from "./words.contract"
 use liveOf from "./home.contract"
-use entriesOf from "./inbox.contract"
+use Item from "./inbox.contract"
 
 shape Swatch
   id: string
@@ -43,6 +43,7 @@ component SettingsPages
     counts: Counts
     tasks: Tasks
     asks: Asks
+    entries: Item[]
     now: number
     voice: string
     persona: string
@@ -79,7 +80,7 @@ component SettingsPages
   derive tint = personaColor == "" ? "#FFFFFF" : personaColor
   derive palette = opalPalette == "original" ? "" : opalPalette
   // What hex is doing right now, as Home's pill says it.
-  derive working = entriesOf(tasks, asks, now).filter(e => e.stage == "working").length
+  derive working = entries.filter(e => e.stage == "working").length
   derive live = match liveOf(tasks) { case some(t) => working > 1 ? `Working on ${t.name} +${working - 1}` : `Working on ${t.name}`, case none => "" }
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId=at

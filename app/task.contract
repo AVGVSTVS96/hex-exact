@@ -9,7 +9,7 @@ use Viewport, Counts, TaskPage, Chat, Asks, Tasks, TaskRow, Ask, Place, Words, T
 use Mark, PlaceTile, Row, Head, Note, ShowMore, RowTap, PillTap, PillFace, whenOf, dayOf, weekdayOf, appName, appSymbol, lengthOf, Tap, inlineOf, plainOf, tintOf, washOf from "./parts.contract"
 use Room, Chrome from "./room.contract"
 use Said, failedWords from "./said.contract"
-use Item, Topic, entriesOf, isPart, asksOf, stateWord from "./inbox.contract"
+use Item, Topic, isPart, asksOf, stateWord from "./inbox.contract"
 use EntryRow from "./rows.contract"
 use AskCard, StuckCard, DecidedCard, ReplyComposer from "./ask.contract"
 
@@ -54,6 +54,7 @@ component TaskScreen
     task: TaskPage
     chat: Chat
     asks: Asks
+    entries: Item[]
     tasks: Tasks
     said: Said[]
     drafts: string[]
@@ -92,7 +93,7 @@ component TaskScreen
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="task-page" interactive-widget="resizes-content" position="absolute" inset=0 background-color="-exact-background" testId="task"
       Chrome(room=room, on="task", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, end=0, head=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, answerAll=answerAll, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
+        TaskBody(id=entry.params.id, pane=false, room=room, clearTop=clearTop, end=0, head=0, foot=(callOn ? room.foot + 64 + 12 : room.foot), entry=entry, viewport=viewport, now=now, offset=offset, task=task, chat=chat, asks=asks, entries=entries, tasks=tasks, said=said, drafts=drafts, words=words, wordsAsk=wordsAsk, loading=loading, failed=failed, inCall=inCall, open=open, openTask=openTask, answer=answer, answerMany=answerMany, answerAll=answerAll, note=note, dismiss=dismiss, undo=undo, again=again, act=act, markRead=markRead, showWords=showWords, keepDraft=keepDraft, talk=talk, message=message, answering=answering, attached=attached, attachedTo=attachedTo, addError=addError, missing=missing, openOut=openOut, attach=attach, detach=detach, back=back)
 
 // A page's head: its title (two lines at most) and where it stands, clear of the status icons beside
 // it, then what it offers (its children: a way out to where it lives, a call about it). Whatever
@@ -381,6 +382,7 @@ component TaskBody
     task: TaskPage
     chat: Chat
     asks: Asks
+    entries: Item[]
     tasks: Tasks
     said: Said[]
     drafts: string[]
@@ -437,7 +439,7 @@ component TaskBody
   derive working = siblings.filter(t => t.state == "working")
   derive busyAgents = task.agents.filter(a => a.state == "working")
   derive finished = match tasks.finished.filter(f => f.id == doneId).at(0) { case some(f) => f, case none => Finished(id="", title="", topic="", app="", proof="", at=0, run="", link="", said="", links=[]) }
-  derive topicEntries = entriesOf(tasks, asks, now).filter(e => e.topic == topicName and e.kind != "ask")
+  derive topicEntries = entries.filter(e => e.topic == topicName and e.kind != "ask")
   derive stuckHere = topicEntries.filter(e => e.kind == "stuck")
   // A question opens on its own page: one opened on it, a topic of only questions, and the page beside
   // Home (it opens on what needs Bassim first). Its mark and topic head it.

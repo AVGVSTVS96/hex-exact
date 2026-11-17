@@ -32,7 +32,8 @@ component GoalPage
     // none over the keyboard.
     foot: number
     id: string
-    goals: Goals
+    goal: Goal
+    project: Goal[]
     asks: Asks
     said: Said[]
     now: number
@@ -62,7 +63,7 @@ component GoalPage
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="goal"
       Chrome(room=room, on="goal", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       column position="absolute" top=room.below bottom=0 left=room.clear.x width=room.clear.width
-        GoalBody(foot=foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), head=0, footRight=max(12, room.clear.x + room.clear.width - room.footEnd), wide=(room.clear.width > room.clear.height), id=id, goals=goals, asks=asks, said=said, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, answer=answer, unanswer=unanswer, again=again, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
+        GoalBody(foot=foot, end=max(room.clear.x + room.clear.width - 16 - room.bar.end, 0), head=0, footRight=max(12, room.clear.x + room.clear.width - room.footEnd), wide=(room.clear.width > room.clear.height), id=id, goal=goal, project=project, asks=asks, said=said, now=now, offset=offset, loading=loading, changes=changes, drafts=drafts, attached=attached, attachedTo=attachedTo, addError=addError, change=change, undo=undo, answer=answer, unanswer=unanswer, again=again, message=message, keepDraft=keepDraft, attach=attach, detach=detach, openTask=openTask, open=open)
 
 component GoalBody
   props
@@ -78,7 +79,9 @@ component GoalBody
     // Wider than tall: what it waits on stands to the right.
     wide: bool
     id: string
-    goals: Goals
+    // The goal and its project's goals, found once in App.
+    goal: Goal
+    project: Goal[]
     asks: Asks
     said: Said[]
     now: number
@@ -100,11 +103,10 @@ component GoalBody
     detach: action
     openTask: action
     open: action
-  derive g = goalOf(goals, id)
+  derive g = goal
   derive done = g.state == "done"
   derive did = changeOf(changes, id)
   derive verb = partOf(did, 1)
-  derive mine = goals.goals.filter(x => x.group == g.group and x.state != "dropped")
   view
     column flex=1 min-height=0 position="relative" testId=`goal-${id}`
       scroll flex=1 min-height=0 padding=`0 16px ${g.run != "" ? foot + 80 : foot + 16}px` testId="goal-page"
@@ -117,7 +119,7 @@ component GoalBody
                 row gap=8 align-items="center" min-height=24
                   Mark(state=markOfGoal(g.state), size=22)
                   text g.group font="-exact-subheadline" font-weight=600 color=stateInk(g.state) flex=1 min-width=0 white-space="nowrap" overflow="hidden" text-overflow="ellipsis"
-                  ProjectSegments(goals=mine, id=g.id)
+                  ProjectSegments(goals=project, id=g.id)
                 text g.title font=(head > 0 ? "-exact-title3" : "-exact-title2") font-weight=600 color="-exact-label" line-clamp=3 margin-top=6 role="heading" aria-level=1 user-select="text"
                 text `${g.asked > 0 ? `Asked ${whenOf(g.asked, now, offset)}` : "Goal"}${g.at > 0 ? ` · last word ${whenOf(g.at, now, offset)}` : ""}` font="-exact-footnote" color="-exact-tertiary-label" margin-top=4
               if g.doneWhen != ""

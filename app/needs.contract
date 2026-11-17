@@ -37,6 +37,7 @@ component NeedsPage
     offset: number
     tasks: Tasks
     asks: Asks
+    entries: Item[]
     said: Said[]
     picked: string[]
     counts: number
@@ -59,7 +60,7 @@ component NeedsPage
   derive two = room.columns == 2
   derive across = stacked(room)
   derive known = tasks.version > 0 and asks.version > 0
-  derive needs = needsOf(tasks, asks, said, now).filter(e => known)
+  derive needs = needsOf(entries, said).filter(e => known)
   derive kinds = needKinds().filter(k => needs.filter(e => kindOf(e, asks.asks) == k).length > 0)
   derive picks = picksOf(asks.asks, said)
   derive taking = picks.filter(a => choiceOf(picked, a) != "")

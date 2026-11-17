@@ -39,6 +39,8 @@ component GoalsList
     wide: bool
     // hex's queue of questions, so what needs him runs in the order Now has it.
     queue: string[]
+    // How many goals are in each of goalStates(), counted once in App.
+    counts: number[]
     // The app's own counts of what needs him and what hex is working on, as Now shows them.
     needsN: number
     workingN: number
@@ -57,8 +59,6 @@ component GoalsList
   state allGroups = false
   state showReached = false
   derive known = goals.version > 0
-  derive states = goals.goals.map(g => g.state)
-  derive counts = goalStates().map(s => countIn(states, s))
   derive needs = sortBy(sortBy(goals.goals.filter(g => g.state == "needs"), g => g.asked, "desc"), g => (queue.includes(g.ask) ? queue.indexOf(g.ask) : 100000))
   derive working = sortBy(goals.goals.filter(g => g.state == "working"), g => g.at, "desc")
   derive reached = sortBy(goals.goals.filter(g => g.state == "done" and dayOf(g.at, offset) > dayOf(now, offset) - 7), g => g.at, "desc")

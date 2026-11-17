@@ -8,7 +8,7 @@ use Tasks, Asks, Counts, TaskRow from "./shapes.contract"
 use Mark, Note, Tap, RowTap, PillTap, PillFace, ShowMore, whenOf, dayOf, washOf, tintOf from "./parts.contract"
 use Room, Chrome, homeRoomOf, stacked from "./room.contract"
 use Said from "./said.contract"
-use Item, Topic, problemOf, unique, entriesOf, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
+use Item, Topic, problemOf, unique, stageTopics, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
 use ProjectRow, TopicHead, EntryRow, topicMark, newestOf from "./rows.contract"
 use CallButton from "./call.contract"
 
@@ -47,6 +47,7 @@ component TasksList
     pickTab: action
     tasks: Tasks
     asks: Asks
+    entries: Item[]
     counts: Counts
     said: Said[]
     loading: bool
@@ -78,7 +79,6 @@ component TasksList
   derive across = stacked(room)
   derive two = room.columns == 2
   derive col = rm.first
-  derive entries = entriesOf(tasks, asks, now)
   // An ask put away here leaves the list and its counts at once.
   derive away = said.filter(s => s.verb != "note" and s.status != "failed").map(s => s.id)
   derive waiting = entries.filter(e => not away.includes(e.id))

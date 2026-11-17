@@ -9,7 +9,7 @@ use Folded from "./rows.contract"
 use FeedList, FeedView from "./feed.contract"
 use IdeasList, Ideas, Idea from "./ideas.contract"
 use GoalsList from "./goals.contract"
-use Item, entriesOf, homeOf, problemOf, picksOf from "./inbox.contract"
+use Item, homeOf, problemOf, picksOf from "./inbox.contract"
 use pickOf from "./rows.contract"
 
 // hex floats at the top of its room: the orb (Home draws it, so a call grows it from there) over a
@@ -29,11 +29,11 @@ fn foldedOf(e: Item, said: Said[]): bool = e.kind == "ask" and wordOf(said, e.id
 // What waits for Bassim's answer, as Tasks lists it: questions (a pick of hex's still waits on
 // him), threads that wait on him and stuck runs. A result he hasn't seen is new in Feed, not here;
 // what hex decided itself has left already (asks.decided).
-fn needsOf(tasks: Tasks, asks: Asks, said: Said[], now: number): Item[] = entriesOf(tasks, asks, now).filter(e => e.stage == "needs" and e.kind != "fresh" and not awayOf(said).includes(e.id))
+fn needsOf(entries: Item[], said: Said[]): Item[] = entries.filter(e => e.stage == "needs" and e.kind != "fresh" and not awayOf(said).includes(e.id))
 // The page a row opens: its thread's main page, "" for what has none (a stuck run).
 fn pageFor(e: Item, tasks: Tasks): string = e.page == "" ? "" : homeOf(e.page, tasks.tasks)
 // The page beside Home with two columns until Bassim picks one: the first thing that needs him.
-fn firstNeed(tasks: Tasks, asks: Asks, said: Said[], now: number): string = match needsOf(tasks, asks, said, now).filter(e => e.page != "").at(0) { case some(e) => homeOf(e.page, tasks.tasks), case none => "" }
+fn firstNeed(entries: Item[], tasks: Tasks, said: Said[]): string = match needsOf(entries, said).filter(e => e.page != "").at(0) { case some(e) => homeOf(e.page, tasks.tasks), case none => "" }
 // What hex is doing right now: the thread that moved last of those running.
 fn liveOf(tasks: Tasks): option<TaskRow> = sortBy(tasks.tasks.filter(t => t.state == "working" and t.running), t => t.at, "desc").at(0)
 // A row's mark, as Tasks draws its topic's.
@@ -64,6 +64,7 @@ component HexHome
     offset: number
     tasks: Tasks
     asks: Asks
+    entries: Item[]
     said: Said[]
     // hex's counts of what needs Bassim and what's working.
     needing: number
@@ -92,6 +93,7 @@ component HexHome
     openIdea: action
     retryIdeas: action
     goals: Goals
+    goalCounts: number[]
     goalsOpened: string[]
     goalsChosen: bool
     goalsFailed: bool
@@ -106,10 +108,10 @@ component HexHome
   derive live = liveOf(tasks)
   derive liveId = match live { case some(t) => t.id, case none => "" }
   derive liveTopic = match live { case some(t) => t.name, case none => "" }
-  derive needs = needsOf(tasks, asks, said, now)
+  derive needs = needsOf(entries, said)
   // Those rows with what he put away here still among them, folded in place, so no row moves.
-  derive shelf = entriesOf(tasks, asks, now).filter(e => e.stage == "needs" and e.kind != "fresh")
-  derive working = sortBy(entriesOf(tasks, asks, now).filter(e => e.stage == "working"), e => e.at, "desc")
+  derive shelf = entries.filter(e => e.stage == "needs" and e.kind != "fresh")
+  derive working = sortBy(entries.filter(e => e.stage == "working"), e => e.at, "desc")
   derive liveText = working.length > 1 ? `Working on ${liveTopic} +${working.length - 1}` : `Working on ${liveTopic}`
   derive under = top + hexHeight()
   // Each page's scroll: from just under the pill to above the foot's float, fading at both ends.
@@ -138,7 +140,7 @@ component HexHome
           else if p == "ideas"
             IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, wide=(width > height), selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
           else if p == "goals"
-            GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), needsN=needs.length, workingN=working.length, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals, open=open, openTasks=openTasks)
+            GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), counts=goalCounts, needsN=needs.length, workingN=working.length, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals, open=open, openTasks=openTasks)
       row position="absolute" top=(top + hexOrb() - 9) left=(x - half) width=(2 * half) justify-content="center" testId="hex"
         button press=goLive disabled=(liveId == "") class=Tap display="flex" flex-direction="row" align-items="center" gap=7 max-width=min(330, 2 * half - 24) min-width=0 padding="13px 14px 6px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(liveId == "" ? "hex" : `hex is working on ${liveTopic}`) testId="live-line"
           text "hex" font="-exact-footnote" font-weight=600 color="-exact-label" flex-shrink=0
@@ -166,8 +168,10 @@ fn needH(e: Item, width: number): number = 40 + 18 * linesOf(lineFor(e), width, 
 fn shelfH(e: Item, said: Said[], width: number): number = foldedOf(e, said) ? 40 + 22 * linesOf(`${wordOf(said, e.id).label} → ${wordOf(said, e.id).detail != "" ? wordOf(said, e.id).detail : e.topic}`, width - 70, 2) + (wordOf(said, e.id).missed > 0 ? 40 : 0) : needH(e, width) + (wordOf(said, e.id).status == "failed" ? 20 : 0)
 // A working row: its title, one line, and the ribbon under it.
 fn workH(): number = 72
-// How many of rows `heights` fit in `room`, at least `least` (when there are that many).
-fn fitting(heights: number[], room: number, least: number): number = max(min(least, heights.length), range(heights.length).filter(i => sum(heights.slice(0, i + 1)) <= room).length)
+// How many of rows `heights` fit in `room`, at least `least` (when there are that many). No row is
+// shorter than a head, so only the first room / headH() can fit: summing past them would grow with
+// the square of the list, against Exact's 65,536 steps.
+fn fitting(heights: number[], room: number, least: number): number = max(min(least, heights.length), range(min(heights.length, floor(max(room, 0) / headH()))).filter(i => sum(heights.slice(0, i + 1)) <= room).length)
 // How many rows a list shows in `room`: all when they fit, else as many as fit above its "Show N more".
 fn shownIn(heights: number[], room: number, least: number): number = sum(heights) <= room ? heights.length : fitting(heights, room - moreH(), least)
 fn usedBy(heights: number[], shown: number): number = sum(heights.slice(0, shown)) + (shown < heights.length ? moreH() : 0)

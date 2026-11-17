@@ -3,7 +3,7 @@
 // on and what it decided for him; Feed, Ideas and Goals join it as tabs at the foot of hex's column.
 // Home shows it whenever no call is on; Tasks has the rest.
 use Tasks, Ask, Asks, TaskRow, Track, Goals from "./shapes.contract"
-use Mark, StageHead, ShowMore, Row, Ribbon, Note, RowTap, PillTap, PillFace, whenOf, dayOf, Tap, springOf from "./parts.contract"
+use Mark, Row, Ribbon, Note, RowTap, PillTap, PillFace, OpenHead, whenOf, dayOf, Tap, springOf from "./parts.contract"
 use Said, failedWords from "./said.contract"
 use Folded from "./rows.contract"
 use FeedList, FeedView from "./feed.contract"
@@ -157,9 +157,10 @@ component HexHome
 
 // Now: as many of what needs Bassim as fit in about 60% of the room, then hex's picks to take at
 // once; as many of what hex is working on as fit in the rest (at least one), each with its agents
-// and its last day; then what hex decided this week, a bar a day. "Show N more" opens each whole
-// list. A room wider than tall holds them in two columns, Working on on the right. Rows are counted
-// to the room so none sits half under Call or the window's edge.
+// and its last day; then what hex decided this week, a bar a day. Each head counts its list and
+// opens all of it. A room wider than tall holds them in two columns, Working on on the right. Rows
+// are counted to the room so none sits half under Call or the window's edge, and what's left
+// over is shared out between them.
 fn agentsIn(e: Item, tasks: TaskRow[]): number = match tasks.filter(t => t.id == e.id).at(0) { case some(t) => t.agents.filter(a => a.state == "working").length, case none => 0 }
 fn trackOf(e: Item, tasks: TaskRow[]): Track[] = match tasks.filter(t => t.id == e.id).at(0) { case some(t) => t.track, case none => [] }
 // The last seven days, oldest first: how many hex decided on each.
@@ -167,7 +168,7 @@ fn decidedWeek(decided: Ask[], now: number, offset: number): number[] = range(7)
 // A row's height, as measured: its padding and title (40), then 18 a line of its 15pt text, which
 // runs about 7.2pt a character in a column `width` wide less the row's insets and mark (52).
 fn linesOf(text: string, width: number, most: number): number = max(1, min(most, ceil(text.length * 7.2 / max(width - 52, 60))))
-fn needH(e: Item, width: number): number = 40 + 18 * linesOf(lineFor(e), width, 2)
+fn needH(e: Item, width: number): number = 40 + 18 * linesOf(lineFor(e), width, 1)
 // A row on Needs you with what this phone said on it: folded beside Undo, or a failed line under it.
 fn shelfH(e: Item, said: Said[], width: number): number = foldedOf(e, said) ? 40 + 22 * linesOf(`${wordOf(said, e.id).label} → ${wordOf(said, e.id).detail != "" ? wordOf(said, e.id).detail : e.topic}`, width - 70, 2) + (wordOf(said, e.id).missed > 0 ? 40 : 0) : needH(e, width) + (wordOf(said, e.id).status == "failed" ? 20 : 0)
 // A working row: its title, one line, and the ribbon under it.
@@ -175,16 +176,13 @@ fn workH(): number = 72
 // How many of rows `heights` fit in `room`, at least `least` (when there are that many). No row is
 // shorter than a head, so only the first room / headH() can fit: summing past them would grow with
 // the square of the list, against Exact's 65,536 steps.
-fn fitting(heights: number[], room: number, least: number): number = max(min(least, heights.length), range(min(heights.length, floor(max(room, 0) / headH()))).filter(i => sum(heights.slice(0, i + 1)) <= room).length)
-// How many rows a list shows in `room`: all when they fit, else as many as fit above its "Show N more".
-fn shownIn(heights: number[], room: number, least: number): number = sum(heights) <= room ? heights.length : fitting(heights, room - moreH(), least)
-fn usedBy(heights: number[], shown: number): number = sum(heights.slice(0, shown)) + (shown < heights.length ? moreH() : 0)
-// What the room's parts take, as measured: a head (40), "Show N more" (36), the picks row (46), a
-// rule (11) and hex decided (58).
-fn headH(): number = 40
-fn moreH(): number = 36
+fn shownIn(heights: number[], room: number, least: number): number = max(min(least, heights.length), range(min(heights.length, floor(max(room, 0) / headH()))).filter(i => sum(heights.slice(0, i + 1)) <= room).length)
+fn usedBy(heights: number[], shown: number): number = sum(heights.slice(0, shown))
+// What the room's parts take, as measured: a head (34), the picks row (46), a rule (9) and hex
+// decided (58).
+fn headH(): number = 34
 fn picksH(): number = 46
-fn ruleH(): number = 11
+fn ruleH(): number = 9
 fn decidedH(): number = 58
 
 component NowList
@@ -225,9 +223,10 @@ component NowList
   derive needHs = shelf.map(e => shelfH(e, said, colW))
   derive workHs = working.map(e => workH())
   derive base = height - 2 * headH() - 2 * ruleH() - decidedH() - (picks.length > 0 ? picksH() : 0)
-  derive needsRoom = wide ? height - headH() - decidedH() - (picks.length > 0 ? picksH() : 0) : sum(needHs) + sum(workHs) <= base ? base : max(round(base * 0.6), base - sum(workHs) - moreH())
+  derive needsRoom = wide ? height - headH() - decidedH() - (picks.length > 0 ? picksH() : 0) : sum(needHs) + sum(workHs) <= base ? base : max(round(base * 0.6), base - sum(workHs))
   derive shownNeeds = shelf.slice(0, shownIn(needHs, needsRoom, 2))
-  derive workRoom = wide ? height - headH() : base - usedBy(needHs, shownNeeds.length)
+  // Wide, Working on has the trailing column to itself, down to Call in its corner.
+  derive workRoom = wide ? height - headH() - clear : base - usedBy(needHs, shownNeeds.length)
   derive shownWork = working.slice(0, shownIn(workHs, workRoom, 1))
   derive week = decidedWeek(decided, now, offset)
   derive most = match sortBy(week, n => n, "desc").at(0) { case some(n) => max(1, n), case none => 1 }
@@ -248,25 +247,24 @@ component NowList
     else
       openTask(pageFor(e, tasks))
   view
-    // Rows come whole, so up to a row's height is left over: it goes to the gaps between the
-    // sections, and hex decided sits on Call's line.
+    // Rows come whole, so a list with more than fit has up to a row's height left over: it shares
+    // it out between its rows. hex decided sits on Call's line.
     column min-height=height testId="home-now"
       if failed and not known
         Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
       row flex=1 flex-direction=(wide ? "row" : "column") align-items="stretch" gap=(wide ? 4 : 0)
-        column flex=(wide ? 1 : 0) min-width=0 testId="home-needs"
-          StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="9px 10px", id="home-head-asks")
+        column flex-grow=1 flex-basis=(wide ? 0 : "auto") justify-content=(shelf.length > shownNeeds.length ? "space-between" : "flex-start") min-width=0 testId="home-needs"
+          OpenHead(state="asks", label="Needs you", n=needs.length, known=known, id="home-head-asks", press=open(path("needs")))
           for e in shownNeeds key=e.id
             if foldedOf(e, said)
               Folded(said=wordOf(said, e.id), question=e.title, topic=e.topic, pad="9px 10px", undo=undo, again=again)
             else
-              Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=2, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
-              if wordOf(said, e.id).status == "failed"
-                text failedWords(wordOf(said, e.id)) font="-exact-footnote" color="hex.danger" padding="0 10px 8px 42px" margin-top=-6 testId=`home-failed-${e.id}`
+              column
+                Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+                if wordOf(said, e.id).status == "failed"
+                  text failedWords(wordOf(said, e.id)) font="-exact-footnote" color="hex.danger" padding="0 10px 8px 42px" margin-top=-6 testId=`home-failed-${e.id}`
           if known and shelf.length == 0
             Note(kind="empty", text="Nothing waits on you", pad="6px 10px 6px 42px", id="home-empty-needs")
-          if shelf.length > shownNeeds.length
-            ShowMore(n=shelf.length - shownNeeds.length, shown=false, pad="8px 10px 10px", id="home-more-needs", press=open(path("needs")))
           if picks.length > 0
             row gap=10 align-items="center" padding="1px 10px" testId="home-picks"
               Mark(state="decided", size=22)
@@ -275,23 +273,18 @@ component NowList
                 box class=PillFace height=32 box-sizing="border-box" padding="0 12px" background-color="hex.accent.wash"
                   text "Take all" font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap"
           if wide
-            box flex=1
             Decided(n=sum(week), week=week, most=most, clear=0, open=open(path("decided")))
         if not wide
-          box flex=1
-          box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
-        column flex=(wide ? 1 : 0) min-width=0 testId="home-working"
-          StageHead(state="working", label="Working on", n=working.length, known=known, pad="9px 10px", id="home-head-working")
+          box height=0 margin="4px -6px 4px 42px" border-top="0.5px solid -exact-separator"
+        column flex-grow=1 flex-basis=(wide ? 0 : "auto") justify-content=(working.length > shownWork.length ? "space-between" : "flex-start") min-width=0 padding-bottom=(wide ? clear : 0) testId="home-working"
+          OpenHead(state="working", label="Working on", n=working.length, known=known, id="home-head-working", press=openTasks("working"))
           for e in shownWork key=e.id
             Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=agentsIn(e, tasks.tasks), selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
               Ribbon(track=trackOf(e, tasks.tasks), now=now)
           if known and working.length == 0
             Note(kind="empty", text="Nothing is working", pad="6px 10px 6px 42px", id="home-empty-working")
-          if working.length > shownWork.length
-            ShowMore(n=working.length - shownWork.length, shown=false, pad="8px 10px 10px", id="home-more-working", press=openTasks("working"))
         if not wide
-          box flex=1
-          box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
+          box height=0 margin="4px -6px 4px 42px" border-top="0.5px solid -exact-separator"
           Decided(n=sum(week), week=week, most=most, clear=clear, open=open(path("decided")))
 
 // What hex decided itself this week, as a row: its count under it, a bar a day trailing (a day with

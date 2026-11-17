@@ -188,6 +188,25 @@ component StageHead
       text (known ? `${n}` : "–") font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
 
 // "Show N more" under the first few of a list: the rows' mark column holds a grid of six dots.
+// A list's head that opens all of it: its dot, its name, how many and a chevron (Now, Goals).
+component OpenHead
+  inject
+    haptics: bool
+  props
+    state: string
+    label: string
+    n: number
+    known: bool
+    id: string
+    press: action
+  view
+    button press=press class=RowTap gap=10 align-items="center" padding="6px 10px" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${label}, ${n}, see all` testId=id
+      box width=22 height=22 border-radius=11 background-color=washOf(state) display="flex" align-items="center" justify-content="center" flex-shrink=0
+        box width=8 height=8 border-radius=4 background-color=tintOf(state)
+      text label font="-exact-headline" color=tintOf(state) flex=1
+      text (known ? `${n}` : "–") font="-exact-subheadline" font-variant-numeric="tabular-nums" color="-exact-tertiary-label"
+      image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
+
 component ShowMore
   inject
     haptics: bool

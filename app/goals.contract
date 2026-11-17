@@ -4,7 +4,7 @@
 // hex's face over them, scrolls them and stops them above the tabs. A room wider than tall holds
 // them in two columns, what needs him and what hex is on to the right.
 use Goal, Goals, GoalGroup, Watch from "./shapes.contract"
-use StageHead, ShowMore, Note, Mark, RowTap, Tap, dayOf, springOf from "./parts.contract"
+use OpenHead, ShowMore, Note, Mark, RowTap, Tap, dayOf, springOf from "./parts.contract"
 
 // Where a goal can stand, in the order the grid, the legend and a project's bar take them.
 fn goalStates(): string[] = ["needs", "working", "done", "idle", "unstarted", "dropped"]
@@ -187,11 +187,9 @@ component NeedsSection
   view
     if needs.length > 0
       column testId="goals-needs"
-        StageHead(state="asks", label="Needs you", n=n, known=true, pad="9px 10px", id="goals-head-needs")
+        OpenHead(state="asks", label="Needs you", n=n, known=true, id="goals-head-needs", press=more)
         for g in needs key=g.id
           GoalRow(goal=g, project=(wide ? "" : g.group), lines=1, quiet=false, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
-        if n > needs.length
-          ShowMore(n=(n - needs.length), shown=false, pad="8px 10px 10px", id="goals-more-needs", press=more)
         Rule(inset=true)
 
 component WorkSection
@@ -217,11 +215,9 @@ component WorkSection
     if working.length > 0 or reached.length > 0
       column testId="goals-working"
         if working.length > 0
-          StageHead(state="working", label="Working on", n=n, known=true, pad="9px 10px", id="goals-head-working")
+          OpenHead(state="working", label="Working on", n=n, known=true, id="goals-head-working", press=more)
           for g in working key=g.id
             GoalRow(goal=g, project=(wide ? "" : g.group), lines=lines, quiet=false, selected=(beside == `goal:${g.id}`), press=openGoal(g.id))
-          if n > working.length
-            ShowMore(n=(n - working.length), shown=false, pad="8px 10px 10px", id="goals-more-working", press=more)
         if reached.length > 0
           button press=toggleReached class=RowTap align-items="center" gap=10 aria-expanded=open aria-label=`Reached ${reached.length} this week` -exact-press-haptic=(haptics ? "selection" : "none") testId="goals-reached"
             Mark(state="done", size=22)

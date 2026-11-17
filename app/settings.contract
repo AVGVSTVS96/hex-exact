@@ -266,8 +266,7 @@ component SettingRows
         Line(symbol="symbol:microphone", title="Reacts to you", line="How much hex’s face moves when you talk", id="setting-reaction")
           box width=204 flex-shrink=0
             Seg(options=reactions(), value=reaction, pick=pickReaction, label="How much the orb reacts to your voice", testKey="reaction")
-      box height=10
-      row height=32 align-items="flex-end" padding="0 16px 6px"
+      row height=28 align-items="flex-end" padding="0 16px 6px"
         text "Calls" font="-exact-footnote" font-weight=600 color="-exact-tertiary-label"
       Line(symbol="symbol:speaker", title="Call sounds", line="A tone when a call starts and ends", id="setting-sounds")
         input type="checkbox" role="switch" accent-color="ink.switch" checked=sounds change=setSounds aria-label="Call sounds" testId="sounds"

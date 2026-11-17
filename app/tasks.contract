@@ -159,7 +159,7 @@ component TasksList
   view
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" navigationScroll="tasks-list" position="absolute" inset=0 background-color="-exact-background" testId="tasks"
       Chrome(room=room, on="tasks", needsYou=counts.yours, working=counts.working, open=open, openTasks=openTasks, back=back)
-      scroll id="tasks-list" position="absolute" top=headTop bottom=listBottom left=col.x width=col.width overflow-y="auto" mask-image=(callOn and not across ? "linear-gradient(to top, transparent 0, #000 26px)" : "none") testId="tasks-rows"
+      scroll id="tasks-list" position="absolute" top=headTop bottom=listBottom left=col.x width=col.width overflow-y="auto" mask-image=(across ? "none" : callOn ? "linear-gradient(to top, transparent 0, #000 26px)" : `linear-gradient(to top, transparent 0, transparent ${room.foot}px, #000 ${room.foot + 66}px)`) testId="tasks-rows"
         column padding="0 6px" padding-bottom=footRoom
           if searchOpen
             row height=44 margin="4px 6px 6px" padding="0 4px 0 14px" gap=9 border-radius=22 background-color="-exact-tertiary-fill" align-items="center" testId="tasks-search-field"
@@ -249,7 +249,8 @@ component TasksList
             Note(kind="failed", text="Can't reach hex. Trying again…", pad="48px 10px", id="tasks-offline")
           if loading and not known and not failed
             Note(kind="loading", text="Loading tasks", pad="48px 10px", id="tasks-loading")
-      // Call floats at the list's trailing foot; open like a laptop at the window's, beside the system's tabs.
+      // Call floats at the list's trailing foot, the rows fading out under it; open like a laptop at the
+      // window's, beside the system's tabs.
       if not callOn
         box position="absolute" right=(across ? 14 : room.width - col.x - col.width + 12) bottom=room.foot z-index=4 testId="tasks-call"
           CallButton(size=58, status="idle", busy=false, retry=false, primary=call)

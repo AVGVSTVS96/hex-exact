@@ -5,7 +5,7 @@
 // the list in the first and the open row's page in the second (open like a laptop, the list above
 // the hinge and the page below).
 use Tasks, Asks, Counts, TaskRow from "./shapes.contract"
-use Mark, Note, Tap, RowTap, PillTap, PillFace, ShowMore, whenOf, dayOf, washOf, tintOf from "./parts.contract"
+use Mark, Note, Tap, RowTap, PillTap, PillFace, whenOf, dayOf, washOf, tintOf from "./parts.contract"
 use Room, Chrome, homeRoomOf, stacked from "./room.contract"
 use Said from "./said.contract"
 use Item, Topic, problemOf, unique, topicsOf, wordsOf, matches, whyOf, pageOf, homeOf, picksOf, stageWord from "./inbox.contract"
@@ -120,10 +120,10 @@ component TasksList
   derive glance = known ? floor((dots.length + perRow - 1) / perRow) * (cell + 3) - 3 + 34 : 0
   // As many rows as the room holds before the floating Call, three at most per state in one column.
   derive roomLeft = tall - (wide ? titleHeight() + 8 : titleHeight() + glance + 18) - footRoom
-  derive needsRows = tab != "all" ? needs.length : wide ? max(1, floor((roomLeft - 40 - 2 * 38) / rowHeight())) : min(3, max(1, floor((roomLeft - 2 * 40 - 3 * 38) / rowHeight())))
-  derive workRows = tab != "all" ? working.length : wide ? max(1, floor((roomLeft - 40 - 38) / workHeight())) : min(3, max(1, floor((roomLeft - 2 * 40 - 3 * 38 - min(needs.length, needsRows) * rowHeight()) / workHeight())))
+  derive needsRows = tab != "all" ? needs.length : wide ? max(1, floor((roomLeft - 40 - 38) / rowHeight())) : min(3, max(1, floor((roomLeft - 2 * 40 - 38) / rowHeight())))
+  derive workRows = tab != "all" ? working.length : wide ? max(1, floor((roomLeft - 40) / workHeight())) : min(3, max(1, floor((roomLeft - 2 * 40 - 38 - min(needs.length, needsRows) * rowHeight()) / workHeight())))
   // What got done fills the rest of the room under them, three rows at least, then "Show N earlier".
-  derive aboveHistory = wide ? 40 + min(needs.length, needsRows) * rowHeight() + (needs.length > needsRows ? 38 : 0) : 2 * 40 + min(needs.length, needsRows) * rowHeight() + min(working.length, workRows) * workHeight() + 76
+  derive aboveHistory = wide ? 40 + min(needs.length, needsRows) * rowHeight() : 2 * 40 + min(needs.length, needsRows) * rowHeight() + min(working.length, workRows) * workHeight()
   derive historyFit = max(3, floor((roomLeft - aboveHistory - 38) / (rowHeight() + 8)))
   derive historyRows = tab == "done" or tab == "quiet" or earlier ? history.length : historyFit
   // The two columns of search, topics in order down the first, then the second.
@@ -185,7 +185,7 @@ component TasksList
           if failed and known
             text "Last from hex · waiting for an update" font="-exact-caption1" color="-exact-tertiary-label" padding="4px 10px" testId="tasks-behind"
           if searching
-            row align-items="flex-start" gap=(wide ? 12 : 0) flex-direction=(wide ? "row" : "column")
+            row align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 12 : 0) flex-direction=(wide ? "row" : "column")
               column flex=(wide ? 1 : 0) min-width=0
                 for t in foundTopics.slice(0, wide ? foundLeft : foundTopics.length) key=t.name
                   TopicHead(topic=t, select=openPage(pageOf(t)))
@@ -200,7 +200,7 @@ component TasksList
             if known and found.length == 0
               Note(kind="empty", text="Nothing matches", pad="48px 10px", id="tasks-empty")
           else if not searchOpen
-            row align-items="flex-start" gap=(wide ? 12 : 0) flex-direction=(wide ? "row" : "column")
+            row align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 12 : 0) flex-direction=(wide ? "row" : "column")
               column flex=(wide ? 1 : 0) width=(wide ? half : "auto") min-width=0
                 if needs.length > 0
                   Section(stage="needs", label="Needs you", topics=needs, rows=needsRows, all=(tab == "all"), threads=tasks.tasks, now=now, offset=offset, two=two, beside=beside, tasks=tasks, narrow=narrow, openPage=openPage)
@@ -283,8 +283,8 @@ component Glance
               text `${match counts.at(i) { case some(n) => n, case none => 0 }}` font-weight=600 font-variant-numeric="tabular-nums" color=(k.id == "quiet" ? "-exact-secondary-label" : inkOf(k.id))
               text ` ${k.word}` color="-exact-tertiary-label"
 
-// A state's section: its coloured dot head (a tap narrows the list to it, or back), the rows that fit,
-// and "Show N more", which narrows to it.
+// A state's section: its coloured dot head (a tap narrows the list to it, or back; a chevron while
+// there's more of it to see) and the rows that fit.
 component Section
   inject
     haptics: bool
@@ -308,7 +308,7 @@ component Section
       box width=22 height=22 border-radius=11 background-color=washOf(state) display="flex" align-items="center" justify-content="center" flex-shrink=0
         box width=8 height=8 border-radius=4 background-color=tintOf(state)
       text label font="-exact-headline" color=tintOf(state) flex=1
+      if all and topics.length > rows
+        image "symbol:sf/chevron.right" width=11 height=11 object-fit="contain" color="-exact-tertiary-label" aria-hidden=true
     for t in topics.slice(0, rows) key=t.name
       ProjectRow(topic=t, threads=threads, now=now, offset=offset, selected=(two and beside == homeOf(pageOf(t), tasks.tasks)), select=openPage(pageOf(t)))
-    if topics.length > rows
-      ShowMore(n=sum(topics.slice(rows).map(t => t.entries.length)), shown=false, pad="8px 10px 10px", id=`more-${stage}`, press=narrow(stage))

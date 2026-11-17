@@ -122,6 +122,8 @@ component HexHome
   derive listTop = under - 4
   derive listH = max(height - listTop, 0)
   derive edges = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - 16, 8)}px, transparent ${listH}px)`
+  // The pages that scroll under Call fade out under it, as iOS fades content under a floating control.
+  derive underCall = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - foot - float - 8, 8)}px, transparent ${max(listH - foot, 8)}px)`
   // The pill is centred on hex and never wider than the room either side of it allows.
   derive half = max(min(x, width - x), 0)
   view
@@ -132,7 +134,7 @@ component HexHome
       // point past its room: Exact's bake takes a scroll exactly as tall as its rows for one that
       // grows unbounded (bake-scroll-unbounded).
       for p in pages key=p
-        scroll position="absolute" top=listTop bottom=0 left=0 right=0 padding=`4px 6px ${p == "now" ? foot + 1 : foot + float + 12}px` box-sizing="border-box" mask-image=edges opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
+        scroll position="absolute" top=listTop bottom=0 left=0 right=0 padding=`4px 6px ${p == "now" ? foot + 1 : foot + float + 12}px` box-sizing="border-box" mask-image=(p == "now" or float == 0 ? edges : underCall) opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
           if p == "now"
             children
             NowList(wide=(width > height), width=(width - 12), height=max(listH - 4 - foot, 0), clear=clear, now=now, offset=offset, tasks=tasks, needs=needs, shelf=shelf, said=said, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, undo=undo, again=again)
@@ -168,7 +170,8 @@ fn decidedWeek(decided: Ask[], now: number, offset: number): number[] = range(7)
 // A row's height, as measured: its padding and title (40), then 18 a line of its 15pt text, which
 // runs about 7.2pt a character in a column `width` wide less the row's insets and mark (52).
 fn linesOf(text: string, width: number, most: number): number = max(1, min(most, ceil(text.length * 7.2 / max(width - 52, 60))))
-fn needH(e: Item, width: number): number = 40 + 18 * linesOf(lineFor(e), width, 1)
+// A question: its topic leads its words, two lines at most, the time beside the first (70).
+fn needH(e: Item, width: number): number = 22 + 20 * linesOf(`${e.topic} ${lineFor(e)}`, width - 70, 2)
 // A row on Needs you with what this phone said on it: folded beside Undo, or a failed line under it.
 fn shelfH(e: Item, said: Said[], width: number): number = foldedOf(e, said) ? 40 + 22 * linesOf(`${wordOf(said, e.id).label} → ${wordOf(said, e.id).detail != "" ? wordOf(said, e.id).detail : e.topic}`, width - 70, 2) + (wordOf(said, e.id).missed > 0 ? 40 : 0) : needH(e, width) + (wordOf(said, e.id).status == "failed" ? 20 : 0)
 // A working row: its title, one line, and the ribbon under it.
@@ -260,7 +263,7 @@ component NowList
               Folded(said=wordOf(said, e.id), question=e.title, topic=e.topic, pad="9px 10px", undo=undo, again=again)
             else
               column
-                Row(mark=markOf(e), title=e.topic, line=lineFor(e), lines=1, failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), n=0, agents=0, selected=(e.id == lit), href="", label=`${e.topic}: ${lineFor(e)}`, id=`home-row-${e.id}`, press=go(e))
+                AskRow(mark=markOf(e), topic=e.topic, words=lineFor(e), failed=(problemOf(e.title) != ""), stamp=whenOf(e.at, now, offset), selected=(e.id == lit), id=`home-row-${e.id}`, press=go(e))
                 if wordOf(said, e.id).status == "failed"
                   text failedWords(wordOf(said, e.id)) font="-exact-footnote" color="hex.danger" padding="0 10px 8px 42px" margin-top=-6 testId=`home-failed-${e.id}`
           if known and shelf.length == 0
@@ -286,6 +289,28 @@ component NowList
         if not wide
           box height=0 margin="4px -6px 4px 42px" border-top="0.5px solid -exact-separator"
           Decided(n=sum(week), week=week, most=most, clear=clear, open=open(path("decided")))
+
+// What needs Bassim on Now: its topic leading its words in one run, so what's asked gets the
+// room, two lines at most, and when, beside the first.
+component AskRow
+  inject
+    haptics: bool
+  props
+    mark: string
+    topic: string
+    words: string
+    failed: bool
+    stamp: string
+    selected: bool
+    id: string
+    press: action
+  view
+    button press=press class=RowTap gap=10 border-radius=14 background-color=(selected ? "-exact-tertiary-fill" : "transparent") aria-current=selected -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`${topic}: ${words}` testId=id
+      Mark(state=mark, size=22)
+      text font="-exact-subheadline" color=(failed ? "hex.danger" : "-exact-label") line-clamp=2 flex=1 min-width=0 margin-top=1
+        text topic font-weight=600 color="-exact-label"
+        text ` ${words}`
+      text stamp font="-exact-footnote" font-variant-numeric="tabular-nums" color="-exact-tertiary-label" white-space="nowrap" margin-top=2
 
 // What hex decided itself this week, as a row: its count under it, a bar a day trailing (a day with
 // none a faint dot), and a chevron to the list.

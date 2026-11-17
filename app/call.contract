@@ -203,10 +203,12 @@ component Home
   // keeps its whole room.
   derive callRight = across ? 14 : hexRight + 12
   derive callBottom = across ? 52 - fabSize / 2 : bottom
-  // The page ends above what floats at the foot of hex's room (Call, the update toast beside it, 8
-  // clear), so no row sits under them at rest.
+  // Where hex's pages end at rest: Now's last line on Call's line, clear of it; above the update
+  // toast when it's beside Call, or the app's own tabs.
   derive toastRoom = notice ? 52 : 0
-  derive listFoot = across ? toastRoom + 12 : tabbed ? toastRoom + 8 : callBottom + fabSize + 8
+  derive listFoot = across ? toastRoom + 12 : tabbed ? toastRoom + 8 : notice ? callBottom + fabSize + 8 : callBottom
+  derive callFloat = across or tabbed or notice ? 0 : fabSize + 8
+  derive callClear = across or tabbed or notice ? 0 : callRight - hexRight + fabSize + 8
   derive callSize = 64
   derive fabSize = 58
   derive footTop = tabbed ? H - room.tabs.top : homeMode ? roomBottom : 0
@@ -270,7 +272,7 @@ component Home
       // hex as the home: hex's room, its page scrolling under hex to the top edge and under Call to the
       // foot; with two columns the page a row opens beside it (below it open like a laptop).
       column position="absolute" top=0 bottom=footTop left=left right=hexRight opacity=(homeMode ? 1 : 0) pointer-events=(homeMode ? "auto" : "none") transition=springOf(still, "opacity") z-index=1 testId="hex-home"
-        HexHome(width=hexW, height=(H - footTop), top=hexTop, x=hexX, dark=(viewport.prefersColorScheme == "dark"), foot=listFoot, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, entries=entries, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, again=again, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalCounts=goalCounts, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
+        HexHome(width=hexW, height=(H - footTop), top=hexTop, x=hexX, dark=(viewport.prefersColorScheme == "dark"), foot=listFoot, float=callFloat, clear=callClear, still=still, pages=pages, page=page, now=now, offset=offset, tasks=tasks, asks=asks, entries=entries, said=said, needing=counts.yours, workingOn=counts.working, loading=listsLoading, failed=listsFailed, split=two, beside=(wordsShown ? "" : beside), select=choose, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, feed=feed, openFeed=openFeed, discuss=discuss, undo=undo, again=again, moreFeed=moreFeed, retryFeed=retryFeed, ideas=ideas, heldIdea=heldIdea, ideasFailed=ideasFailed, openIdea=openIdea, retryIdeas=retryIdeas, goals=goals, goalCounts=goalCounts, goalsOpened=goalsOpened, goalsChosen=goalsChosen, goalsFailed=goalsFailed, goalsWhy=goalsWhy, toggleProject=toggleProject, openGoal=openGoal, openWatch=openWatch, retryGoals=retryGoals)
           // What the call just left: how it ended until hex has written its wrap-up, then the wrap-up
           // (beside Now with two columns).
           if wrapped and single
@@ -285,7 +287,7 @@ component Home
 
       // The call's panel: the orb's colour behind it, a hint rather than a wash.
       box position="absolute" left=0 top=0 width=panelW height=panelH overflow="hidden" border-top-right-radius=(aside ? 34 : 0) border-bottom-right-radius=34 border-bottom-left-radius=(aside ? 0 : 34) background-color="-exact-background" border-right=(aside ? "0.5px solid -exact-separator" : "none") border-bottom=(aside ? "none" : "0.5px solid -exact-separator") box-sizing="border-box" opacity=(callShown ? 1 : 0) transition=fade z-index=2 pointer-events="none" aria-hidden=true testId="call-panel"
-        image (viewport.prefersColorScheme == "dark" ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(orbX - seen * 1.6) top=(callOrbY - seen * 1.2) width=(seen * 3.2) height=(seen * 2.4) opacity=0.75 testId="call-glow"
+        image (viewport.prefersColorScheme == "dark" ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(orbX - seen * 1.6) top=(callOrbY - seen * 1.2) width=(seen * 3.2) height=(seen * 2.4) opacity=0.4 testId="call-glow"
 
       // The orb: hex floating over its room at rest, grown into the call.
       box position="absolute" left=(orbX - bigOrb / 2) top=(callOrbY - bigOrb / 2) width=bigOrb height=bigOrb translate=(homeMode ? restShift : "0px 0px") scale=(homeMode ? hexOrbFrame() / bigOrb : 1) transition=glide z-index=3 pointer-events="none" testId="orb-spot"

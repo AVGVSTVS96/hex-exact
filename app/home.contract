@@ -47,13 +47,17 @@ keyframes liveDot
 
 component HexHome
   props
-    // hex's room, from the window's top: hex floats `top` down at `x`, and each page scrolls between
-    // its pill and what floats at the room's foot, `foot` high, so nothing sits under either at rest.
+    // hex's room, from the window's top: hex floats `top` down at `x`, and each page scrolls from
+    // under its pill to the room's foot. What floats there (Call) ends `foot` up from it, `float`
+    // tall and `clear` wide at the trailing corner: Now's last line shares its line, and the other
+    // pages' last row scrolls clear of it.
     width: number
     height: number
     top: number
     x: number
     foot: number
+    float: number
+    clear: number
     // The glow is drawn from the orb as each appearance shows it.
     dark: bool
     still: bool
@@ -114,10 +118,10 @@ component HexHome
   derive working = sortBy(entries.filter(e => e.stage == "working"), e => e.at, "desc")
   derive liveText = working.length > 1 ? `Working on ${liveTopic} +${working.length - 1}` : `Working on ${liveTopic}`
   derive under = top + hexHeight()
-  // Each page's scroll: from just under the pill to above the foot's float, fading at both ends.
+  // Each page's scroll: from just under the pill to the room's foot, fading at both ends.
   derive listTop = under - 4
-  derive listH = max(height - listTop - foot, 0)
-  derive edges = `linear-gradient(to bottom, transparent 0, #000 12px, #000 ${max(listH - 20, 12)}px, transparent ${listH}px)`
+  derive listH = max(height - listTop, 0)
+  derive edges = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - 16, 8)}px, transparent ${listH}px)`
   // The pill is centred on hex and never wider than the room either side of it allows.
   derive half = max(min(x, width - x), 0)
   action goLive
@@ -127,14 +131,16 @@ component HexHome
       openTask(homeOf(liveId, tasks.tasks))
   view
     column flex=1 min-height=0 position="relative" overflow="hidden" testId="home-all"
-      // A hint of the orb's colour behind hex, centred on the orb.
-      image (dark ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(x - 260) top=(top - 173) width=520 height=390 pointer-events="none" aria-hidden=true testId="hex-glow"
-      // Each tab keeps its own scroll, mounted while another shows, so it keeps its place.
+      // A hint of the orb's colour behind hex, centred on the orb, gone before the first row.
+      image (dark ? "assets/glow.png" : "assets/glow-light.png") position="absolute" left=(x - 200) top=(top + 22 - 130) width=400 height=260 opacity=0.45 pointer-events="none" aria-hidden=true testId="hex-glow"
+      // Each tab keeps its own scroll, mounted while another shows, so it keeps its place. Now ends a
+      // point past its room: Exact's bake takes a scroll exactly as tall as its rows for one that
+      // grows unbounded (bake-scroll-unbounded).
       for p in pages key=p
-        scroll position="absolute" top=listTop bottom=foot left=0 right=0 padding="10px 6px 24px" box-sizing="border-box" mask-image=edges opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
+        scroll position="absolute" top=listTop bottom=0 left=0 right=0 padding=`4px 6px ${p == "now" ? foot + 1 : foot + float + 12}px` box-sizing="border-box" mask-image=edges opacity=(p == page ? 1 : 0) pointer-events=(p == page ? "auto" : "none") aria-hidden=(p != page) testId=`home-list-${p}`
           if p == "now"
             children
-            NowList(wide=(width > height), width=(width - 12), height=(listH - 34), now=now, offset=offset, tasks=tasks, needs=needs, shelf=shelf, said=said, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, undo=undo, again=again)
+            NowList(wide=(width > height), width=(width - 12), height=max(listH - 4 - foot, 0), clear=clear, now=now, offset=offset, tasks=tasks, needs=needs, shelf=shelf, said=said, working=working, picks=picksOf(asks.asks, said), decided=asks.decided, known=known, failed=failed, split=split, beside=beside, select=select, openTask=openTask, openTasks=openTasks, open=open, answerAll=answerAll, undo=undo, again=again)
           else if p == "feed"
             FeedList(feed=feed, now=now, offset=offset, width=(width - 12), wide=(width > height), beside=beside, open=openFeed, discuss=discuss, undo=undo, older=moreFeed, retry=retryFeed)
           else if p == "ideas"
@@ -188,9 +194,11 @@ component NowList
     haptics: bool
   props
     wide: bool
-    // The list's own width and the height it shows without scrolling.
+    // The list's own width and the height it shows without scrolling; its last line leaves
+    // `clear` at its trailing end for Call.
     width: number
     height: number
+    clear: number
     now: number
     offset: number
     tasks: Tasks
@@ -242,10 +250,12 @@ component NowList
     else
       openTask(pageFor(e, tasks))
   view
-    column testId="home-now"
+    // Rows come whole, so up to a row's height is left over: it goes to the gaps between the
+    // sections, and hex decided sits on Call's line.
+    column min-height=height testId="home-now"
       if failed and not known
         Note(kind="failed", text="Can't reach hex. Trying again…", pad="24px 10px", id="home-offline")
-      row flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch") gap=(wide ? 4 : 0)
+      row flex=1 flex-direction=(wide ? "row" : "column") align-items="stretch" gap=(wide ? 4 : 0)
         column flex=(wide ? 1 : 0) min-width=0 testId="home-needs"
           StageHead(state="asks", label="Needs you", n=needs.length, known=known, pad="9px 10px", id="home-head-asks")
           for e in shownNeeds key=e.id
@@ -267,8 +277,10 @@ component NowList
                 box class=PillFace height=32 box-sizing="border-box" padding="0 12px" background-color="hex.accent.wash"
                   text "Take all" font="-exact-subheadline" font-weight=600 color="hex.accent" white-space="nowrap"
           if wide
-            Decided(n=sum(week), week=week, most=most, open=open(path("decided")))
+            box flex=1
+            Decided(n=sum(week), week=week, most=most, clear=0, open=open(path("decided")))
         if not wide
+          box flex=1
           box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
         column flex=(wide ? 1 : 0) min-width=0 testId="home-working"
           StageHead(state="working", label="Working on", n=working.length, known=known, pad="9px 10px", id="home-head-working")
@@ -280,8 +292,9 @@ component NowList
           if working.length > shownWork.length
             ShowMore(n=working.length - shownWork.length, shown=false, pad="8px 10px 10px", id="home-more-working", press=openTasks("working"))
         if not wide
+          box flex=1
           box height=0 margin="5px -6px 5px 42px" border-top="0.5px solid -exact-separator"
-          Decided(n=sum(week), week=week, most=most, open=open(path("decided")))
+          Decided(n=sum(week), week=week, most=most, clear=clear, open=open(path("decided")))
 
 // What hex decided itself this week, as a row: its count under it, a bar a day trailing (a day with
 // none a faint dot), and a chevron to the list.
@@ -292,9 +305,10 @@ component Decided
     n: number
     week: number[]
     most: number
+    clear: number
     open: action
   view
-    button press=open class=RowTap gap=10 align-items="center" width="auto" -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${n} this week` testId="home-decided"
+    button press=open class=RowTap gap=10 align-items="center" width="auto" margin-right=clear -exact-press-haptic=(haptics ? "selection" : "none") aria-label=`hex decided ${n} this week` testId="home-decided"
       Mark(state="decided", size=22)
       column flex=1 min-width=0 gap=2
         text "hex decided" font="-exact-headline" color="-exact-label" white-space="nowrap"

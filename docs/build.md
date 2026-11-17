@@ -114,6 +114,7 @@ scripts/sim / /tasks /settings                 # simulator build on the Mac, sho
 BUILT=1 POSES=open-up APPEARANCES="dark light" scripts/sim /calls   # reuse the last build
 scripts/sim scripts/flows/answer.flow          # a flow: taps, types, swipes, folds, a shot per step
 scripts/phone                                  # a picture of the real Duo's screen
+scripts/responds                               # does it answer taps? scripts/ship and publish ask first
 scripts/ship                                   # new install link on the Duo
 scripts/publish                                # screens only, over the air
 cd app && bun exact.mjs test web               # app.test.contract, about 3 minutes

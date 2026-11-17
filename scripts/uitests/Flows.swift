@@ -21,6 +21,8 @@ import XCTest
 //   pose <pose>            has scripts/sim fold or turn the Duo there, the app still running
 //   wait <seconds>
 //   exists <query>, absent <query>
+//   shows <testId>         the element with that testId comes on screen within 10 s (a|b: either)
+//   gone <testId>          it leaves the screen within 20 s (a Loading note, say)
 //   mark <query>, then still <query>: it hasn't moved or resized
 //   apart <query> <query>  the two don't overlap
 //   above-keyboard <query> the keyboard is up and the element shows whole above it
@@ -101,6 +103,8 @@ final class Flows: XCTestCase {
             case "wait": usleep(UInt32((Double(argument) ?? 1) * 1_000_000))
             case "exists": _ = element(argument)
             case "absent": XCTAssertFalse(app.descendants(matching: .any)[argument].exists, "\(argument) is there")
+            case "shows": XCTAssertTrue(onScreen(argument, within: 10), "\(argument) didn't come on screen in 10 s")
+            case "gone": XCTAssertTrue(onScreen(argument, within: 20, gone: true), "\(argument) was still on screen after 20 s")
             case "mark": marked[argument] = element(argument)?.frame
             case "still":
                 guard let was = marked[argument] else { XCTFail("\(argument) wasn't marked"); break }
@@ -128,6 +132,21 @@ final class Flows: XCTestCase {
             default: XCTFail("unknown flow command: \(line)")
             }
         }
+    }
+
+    /// Whether an element with exactly this testId is on screen (or, `gone`, isn't), asked until `within` seconds pass.
+    private func onScreen(_ id: String, within seconds: Double, gone: Bool = false) -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        repeat {
+            let screen = app.windows.firstMatch.frame
+            let shown = id.split(separator: "|").contains { one in
+                app.descendants(matching: .any).matching(identifier: String(one)).allElementsBoundByIndex
+                    .contains { $0.exists && screen.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }
+            }
+            if shown != gone { return true }
+            usleep(250_000)
+        } while Date() < deadline
+        return false
     }
 
     /// `/tasks` opens Tasks; `call:/tasks` starts the demo call, then opens Tasks over it.

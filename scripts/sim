@@ -196,7 +196,10 @@ play() {
   local name=$1 script=$2 pose=$3 appearance=$4 dir=$out/$1 step=0 answered=0 line shot at=$3 where
   mkdir -p "$dir"
   rm -rf "$tests/sync" "$tests/result.xcresult" "$tests/attachments" && mkdir -p "$tests/sync"
-  local from=$(($( { wc -c <"$writes"; } 2>/dev/null || echo 0) + 1))
+  local from=$(($( { wc -c <"$writes"; } 2>/dev/null || echo 0) + 1)) journal=$dir/exact-$pose-$appearance.log
+  # What Exact says as the flow plays (streamed: the simulator keeps few of its info lines).
+  xcrun simctl spawn "$id" log stream --level info --style compact --predicate 'subsystem == "com.exact.app"' >"$journal" 2>/dev/null &
+  local streaming=$!
   # The loop reads from a process substitution, not a pipe, so the poses it moves to stay known here.
   while IFS= read -r line; do
     case $line in
@@ -220,6 +223,11 @@ play() {
     -derivedDataPath "$tests" -resultBundlePath "$tests/result.xcresult" -collect-test-diagnostics never 2>&1 |
     tee "$tests-$name-$pose-$appearance.log")
   tail -c +"$from" "$writes" >"$dir/writes-$pose-$appearance.txt" 2>/dev/null || true
+  kill "$streaming" 2>/dev/null || true
+  # Exact's own word when it stopped the screen (no tap or load goes through after), refused an
+  # action (a tap that did nothing) or left a value unset, which the taps alone may not show.
+  grep -E 'poisoned the runner|trapped Trap\(|\) refused: Instance' "$journal" |
+    sed -n "s/.*\] screen: /$pose $appearance: exact: /p" | sort -u >>"$dir/notes.txt" || true
   [ -d "$tests/result.xcresult" ] || return 0
   xcrun xcresulttool export attachments --path "$tests/result.xcresult" --output-path "$tests/attachments" >/dev/null 2>&1 || return 0
   jq -r '.[].attachments[] | select(.suggestedHumanReadableName | startswith("tree")) |

@@ -8,8 +8,6 @@
 # revoke that certificate to make its own.
 #   scripts/ship
 set -euo pipefail
-hold=$HOME/.local/share/hex-exact/hold
-[ ! -e "$hold" ] || { echo "installs are on hold: $(cat "$hold")" >&2; exit 1; }
 # Ships and publishes take turns in a Mac folder of their own (scripts/sim has another), so what's
 # on main never waits behind pictures.
 mkdir -p ~/.local/share/hex-exact && exec 9>~/.local/share/hex-exact/ship.lock && flock 9
@@ -22,13 +20,16 @@ bundle=com.shahidy.hexexact
 work=$HOME/.local/share/hex-exact/work
 mkdir -p "$link" "$work"
 
-eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 number=$(git -C "$here" rev-list --count HEAD)
 title=$(git -C "$here" log --oneline -1 | cut -c1-80)
 # Builders ship main as they land on it, so a ship that waited its turn behind one of the same or
 # a newer main has nothing to do.
 on_link=$(jq -r .number "$link/latest.json" 2>/dev/null || echo 0)
 [ "$number" -gt "$on_link" ] || { echo "build $on_link is on the install link already, as new as this one"; exit 0; }
+# Nothing reaches the Duo that doesn't answer taps on the simulator. Before hex-env, which writes
+# back the hex.ts the simulator's build pointed at its stand-in.
+"$here/scripts/responds" || { echo "build $number isn't shipped" >&2; exit 1; }
+eval "$("$here/scripts/hex-env" | sed 's/^/export /')"
 
 ssh -o ConnectTimeout=15 -o BatchMode=yes "$mac" true </dev/null || { echo "the Mac didn't answer, so it's asleep" >&2; exit 1; }
 "$here/scripts/mac-room"

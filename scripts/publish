@@ -12,6 +12,9 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 mac=${HEX_EXACT_MAC:-mac}
 link=${HEX_EXACT_LINK:-$HOME/.local/share/hex-exact/link}
 url=${HEX_EXACT_URL:-https://updates.$(tailscale status --json | jq -r .MagicDNSSuffix)/hex-exact}
+# A screen that doesn't answer taps on the simulator never reaches the Duo (scripts/responds),
+# checked before hex-env writes back the hex.ts the simulator's build pointed at its stand-in.
+"$here/scripts/responds" || { echo "main's screen isn't published" >&2; exit 1; }
 "$here/scripts/hex-env" >/dev/null
 "$here/scripts/mac-room"
 # The folder starts as a clone of the first one (Rust's target, which names its own path, left out).

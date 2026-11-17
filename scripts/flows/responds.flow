@@ -1,0 +1,32 @@
+# Whether the app answers taps, as scripts/responds asks before every install: each tab takes its
+# page, a row opens its page (beside Now, or over it folded) and it loads, and Calls, Tasks and
+# Settings open from the bars and go Back.
+launch /
+shows home-list-now
+tap tab-goals
+shows home-list-goals
+tap tab-feed
+shows home-list-feed
+tap tab-ideas
+shows home-list-ideas
+tap tab-now
+shows home-list-now
+tap home-row-*
+shows task-pane|task-page
+gone task-loading
+shoot row
+launch /
+tap bar-calls
+shows calls
+tap bar-back
+shows home-list-now
+tap bar-tasks
+shows tasks
+gone tasks-loading
+tap bar-back
+shows home-list-now
+tap bar-settings
+shows settings-body
+tap bar-back
+shows home-list-now
+shoot end

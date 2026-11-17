@@ -32,7 +32,7 @@ component LastCheck
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="last-check"
       Chrome(room=room, on="check", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       // With two columns, what it read and what came of it in the first, its notes in the second.
-      column position="absolute" top=room.below bottom=(across ? room.height - room.across : 0) left=(two ? room.first.x : room.clear.x) width=(two ? room.first.width : room.clear.width) padding-right=(two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)) box-sizing="border-box"
+      column position="absolute" top=room.below bottom=(across ? room.height - room.across : 0) left=(two ? room.first.x : room.clear.x) width=(two ? room.first.width : room.clear.width) box-sizing="border-box"
         CheckBody(check=check, loading=loading, failed=failed, now=now, offset=offset, width=(two ? room.first.width : room.clear.width), height=(across ? room.across : room.height), foot=(across ? 0 : room.foot), part=(two ? "head" : "all"), top=(two ? 0 : max(0, room.headBottom - room.below)), id="check-page")
       if two
         column position="absolute" top=room.secondBelow bottom=0 left=room.second.x width=room.second.width

@@ -70,7 +70,6 @@ component NeedsPage
   derive colW = two ? room.first.width : room.clear.width
   derive colH = across ? room.across : room.height
   derive wide = colW >= 520 and colW > colH
-  derive right = two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)
   // Go through them floats at the list's foot, which ends above it so no row sits under it at rest, except where the room is short (wide), or a call is
   // docked there.
   derive floating = not wide and not callOn and needs.length > 1
@@ -99,7 +98,7 @@ component NeedsPage
     column navigationKey=`${entry.id}` navigationBar="none" -exact-safe-area="none" position="absolute" inset=0 background-color="-exact-background" testId="needs"
       Chrome(room=room, on="needs", needsYou=counts, working=working, open=open, openTasks=openTasks, back=back)
       scroll id="needs-list" position="absolute" top=room.below bottom=(across ? room.height - room.across : callOn ? room.foot + 64 + 6 : floating ? room.foot + 8 + 50 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(callOn or floating ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)") testId="needs-list"
-        column padding=`0 ${right + 6}px ${floating or callOn ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
+        column padding=`0 6px ${floating or callOn ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
           row gap=(wide ? 4 : 0) flex-direction=(wide ? "row" : "column") align-items=(wide ? "flex-start" : "stretch")
             column flex=(wide ? 1 : 0) min-width=0
               // The title and its line stand beside the status icons; the rows start under their cover.

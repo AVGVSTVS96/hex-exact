@@ -49,7 +49,6 @@ component Picks
   derive colX = two ? room.first.x : room.clear.x
   derive colW = two ? room.first.width : room.clear.width
   derive colH = across ? room.across : room.height
-  derive right = two ? 0 : max(room.width - room.clear.x - room.clear.width, 0)
   // Wider than tall the room is short: Take all sits by the counts instead of over the rows.
   derive wide = colW >= 520 and colW > colH
   derive floating = picks.length > 0 and not wide
@@ -69,7 +68,7 @@ component Picks
       Chrome(room=room, on="picks", needsYou=needsYou, working=working, open=open, openTasks=openTasks, back=back)
       // Take all floats at the list's foot, which ends above it so no row sits under it at rest.
       scroll id="picks" position="absolute" top=room.below bottom=(across ? room.height - room.across : floating ? room.foot + 8 + 50 + 6 : 0) left=colX width=colW box-sizing="border-box" mask-image=(floating ? "linear-gradient(to top, transparent 0, #000 24px)" : "linear-gradient(to bottom, transparent 0, #000 12px, #000 100%)")
-        column padding=`0 ${right + 6}px ${floating ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
+        column padding=`0 6px ${floating ? 24 : room.foot + 24}px 6px` box-sizing="border-box"
           column min-height=(two ? 0 : max(0, room.headBottom - room.below))
             row gap=10 align-items="baseline" padding="0 10px 4px" testId="picks-title"
               text "hex’s picks" font="-exact-title1" font-weight=600 color="-exact-label" role="heading" aria-level=1 white-space="nowrap"

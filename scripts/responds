@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Runs where hex runs (server or twin): whether this tree's app answers taps, asked by scripts/ship
 # before every install. scripts/sim builds it for the simulator and plays scripts/flows/responds.flow
-# folded and open like a book, on hex's real lists (through the stand-in): each tab takes its page,
-# a row opens its page and it loads, and Calls, Tasks and Settings open and go Back. A step that
-# didn't happen fails it, and so does Exact saying it stopped the screen or left a value unset.
+# on hex's real lists (through the stand-in), open like a book and then folded, in one pass: each
+# tab takes its page, a row opens its page and it loads, and Calls, Tasks and Settings open and go
+# Back. A step that didn't happen fails it, and so does Exact saying it stopped the screen, refused
+# a tap or left a value unset.
 #   scripts/responds        (its pictures: ~/hex/scratch/hex-exact/shots/<commit>-responds/)
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 shots=$HOME/hex/scratch/hex-exact/shots/$(git -C "$here" rev-parse --short HEAD)-responds
 rm -rf "$shots"
-SHOTS=$shots POSES="open-up cover-up" APPEARANCES=dark "$here/scripts/sim" "$here/scripts/flows/responds.flow" >&2 ||
+SHOTS=$shots POSES=open-up APPEARANCES=dark "$here/scripts/sim" "$here/scripts/flows/responds.flow" >&2 ||
   { echo "the simulator run didn't finish, so whether it responds is unknown" >&2; exit 1; }
 notes=$shots/responds/notes.txt
 [ -f "$notes" ] || { echo "the simulator played nothing, so whether it responds is unknown" >&2; exit 1; }

@@ -7,6 +7,9 @@ import XCTest
 //                          call first; waits until it has drawn
 //   open <path>            the same link into the running app
 //   tap <query>            taps it; with the keyboard up, the middle of what shows of it above it
+//   press <testId>         taps the one element with that testId (`*` at the end: the first whose
+//                          testId starts so), found by one query: quicker than tap, which reads the
+//                          whole tree to choose among elements that share a name
 //   hold <query>           presses it for a second, as for a context menu
 //   tap-at <x> <y>         taps that point of the window
 //   type <query> <text>    taps the field and types on the software keyboard, after what it holds
@@ -62,6 +65,9 @@ final class Flows: XCTestCase {
                 sleep(3)
             case "open": app.open(try XCTUnwrap(URL(string: link(argument))))
             case "tap": element(argument).map { tap($0, argument) }
+            case "press":
+                guard seen(argument, within: 10) else { XCTFail("nothing has the testId \(argument), so its line was skipped"); break }
+                app.descendants(matching: .any).matching(ids(argument)).firstMatch.tap()
             case "hold": element(argument)?.press(forDuration: 1)
             case "tap-at":
                 let point = argument.split(separator: " ").compactMap { Double($0) }
@@ -99,6 +105,8 @@ final class Flows: XCTestCase {
                 sleep(1)
                 print("flow-\(command) \(argument)")
                 waitForSim()
+                // A fold or turn moves the window.
+                if command == "pose" { screen = nil }
             case "snap": print("flow-snap \(argument)")
             case "wait": usleep(UInt32((Double(argument) ?? 1) * 1_000_000))
             case "exists": _ = element(argument)
@@ -138,15 +146,32 @@ final class Flows: XCTestCase {
     private func onScreen(_ id: String, within seconds: Double, gone: Bool = false) -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         repeat {
-            let screen = app.windows.firstMatch.frame
-            let shown = id.split(separator: "|").contains { one in
-                app.descendants(matching: .any).matching(identifier: String(one)).allElementsBoundByIndex
-                    .contains { $0.exists && screen.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }
-            }
-            if shown != gone { return true }
-            usleep(250_000)
+            if seen(id, within: 0) != gone { return true }
+            usleep(200_000)
         } while Date() < deadline
         return false
+    }
+
+    /// Whether an element with these testIds has its middle on screen, read in one snapshot (each
+    /// read of a big tree takes a moment), asked until `within` seconds pass.
+    private var screen: CGRect?
+    private func seen(_ id: String, within seconds: Double) -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        let window = screen ?? app.windows.firstMatch.frame
+        screen = window
+        let found = app.descendants(matching: .any).matching(ids(id)).firstMatch
+        repeat {
+            if let frame = try? found.snapshot().frame, window.contains(CGPoint(x: frame.midX, y: frame.midY)) { return true }
+            if seconds > 0 { usleep(200_000) }
+        } while Date() < deadline
+        return false
+    }
+
+    /// Exactly these testIds (`a|b`), or those starting so (`row-*`).
+    private func ids(_ query: String) -> NSPredicate {
+        query.hasSuffix("*")
+            ? NSPredicate(format: "identifier BEGINSWITH %@", String(query.dropLast()))
+            : NSPredicate(format: "identifier IN %@", query.split(separator: "|").map(String.init))
     }
 
     /// `/tasks` opens Tasks; `call:/tasks` starts the demo call, then opens Tasks over it.

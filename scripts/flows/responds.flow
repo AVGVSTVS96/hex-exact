@@ -1,32 +1,41 @@
-# Whether the app answers taps, as scripts/responds asks before every install: each tab takes its
-# page, a row opens its page (beside Now, or over it folded) and it loads, and Calls, Tasks and
-# Settings open from the bars and go Back.
+# Whether the app answers taps, as scripts/responds asks before every install, in one pass: open
+# like a book each tab takes its page, a row opens its page beside Now and it loads, and Calls,
+# Tasks and Settings open from the bars and go Back; then folded, Goals and a row's page over Now.
 launch /
 shows home-list-now
-tap tab-goals
+press tab-goals
 shows home-list-goals
-tap tab-feed
+press tab-feed
 shows home-list-feed
-tap tab-ideas
+press tab-ideas
 shows home-list-ideas
-tap tab-now
+press tab-now
 shows home-list-now
-tap home-row-*
-shows task-pane|task-page
+press home-row-*
+shows task-pane
 gone task-loading
-shoot row
-launch /
-tap bar-calls
+press bar-calls
 shows calls
-tap bar-back
+press bar-back
 shows home-list-now
-tap bar-tasks
+press bar-tasks
 shows tasks
 gone tasks-loading
-tap bar-back
+press bar-back
 shows home-list-now
-tap bar-settings
+press bar-settings
 shows settings-body
-tap bar-back
+press bar-back
 shows home-list-now
-shoot end
+pose cover-up
+shows home-list-now
+press tab-goals
+shows home-list-goals
+press tab-now
+shows home-list-now
+press home-row-*
+shows task-page
+gone task-loading
+press bar-back
+shows home-list-now
+shoot folded

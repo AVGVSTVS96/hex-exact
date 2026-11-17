@@ -158,14 +158,17 @@ fresh() {
   xcrun simctl uninstall "$id" com.shahidy.hexexact 2>/dev/null || true
   xcrun simctl install "$id" "$app"
 }
-if [ ${#flows[@]} -gt 0 ]; then
-  (cd $run/scripts/uitests && xcodegen generate -q)
+# The flows' UI tests, built again only when they change.
+uitests=$(cat $run/scripts/uitests/Flows.swift $run/scripts/uitests/project.yml | shasum | cut -c1-40)
+[ ${#flows[@]} = 0 ] || (cd $run/scripts/uitests && xcodegen generate -q)
+if [ ${#flows[@]} -gt 0 ] && [ "$uitests" != "$(cat "$tests.built" 2>/dev/null)" ]; then
   xcodebuild build-for-testing -project $run/scripts/uitests/Flows.xcodeproj -scheme Flows \
     -destination "id=$id" -derivedDataPath "$tests" -quiet >"$tests.log" 2>&1 || {
     grep -E 'error:' "$tests.log" | sort -u >&2
     echo "the flows' UI tests didn't build" >&2
     exit 1
   }
+  echo "$uitests" >"$tests.built"
 fi
 
 # A pose is <fold>-<up|side>: the hinge moves only when the fold changes, and a turn is sent twice,
@@ -260,8 +263,8 @@ for pose in $poses; do
     for ((i = 0; i < ${#flows[@]}; i += 2)); do
       fresh
       play "${flows[i]}" "${flows[i + 1]}" "$pose" "$appearance"
-      # A flow that folded the Duo leaves it where the next one expects it.
-      place "$pose"
+      # A flow that folded the Duo leaves it where the next one expects it (each pose starts placed).
+      [ $((i + 2)) -ge ${#flows[@]} ] || place "$pose"
     done
   done
 done

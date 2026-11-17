@@ -1,0 +1,12 @@
+# hex at the top opens hex's page: its pill, and its orb (tapped where it sits folded upright,
+# so play this one folded: POSES=cover-up).
+launch /
+shows home-list-now
+shoot home
+tap live-line
+shows settings-body
+shoot page
+tap bar-back
+shows home-list-now
+tap-at 188 47
+shows settings-body

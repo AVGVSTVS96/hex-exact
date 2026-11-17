@@ -13,7 +13,7 @@ use Item, homeOf, problemOf, picksOf from "./inbox.contract"
 use pickOf from "./rows.contract"
 
 // hex floats at the top of its room: the orb (Home draws it, so a call grows it from there) over a
-// glass pill with its name and one short live line.
+// glass pill with its name and one short live line. A tap on either opens hex's page.
 fn hexOrb(): number = 44
 // The persona fills two thirds of its frame (measured on the simulator), so its frame is larger.
 fn hexOrbFrame(): number = 66
@@ -124,11 +124,6 @@ component HexHome
   derive edges = `linear-gradient(to bottom, transparent 0, #000 8px, #000 ${max(listH - 16, 8)}px, transparent ${listH}px)`
   // The pill is centred on hex and never wider than the room either side of it allows.
   derive half = max(min(x, width - x), 0)
-  action goLive
-    if split
-      select(homeOf(liveId, tasks.tasks))
-    else
-      openTask(homeOf(liveId, tasks.tasks))
   view
     column flex=1 min-height=0 position="relative" overflow="hidden" testId="home-all"
       // A hint of the orb's colour behind hex, centred on the orb, gone before the first row.
@@ -147,8 +142,11 @@ component HexHome
             IdeasList(ideas=ideas, held=heldIdea, failed=ideasFailed, now=now, offset=offset, wide=(width > height), selected=(beside.startsWith("idea:") ? beside.slice(5) : ""), open=openIdea, retry=retryIdeas)
           else if p == "goals"
             GoalsList(goals=goals, now=now, offset=offset, failed=goalsFailed, why=goalsWhy, width=(width - 12), wide=(width > height), queue=asks.asks.map(a => a.id), counts=goalCounts, needsN=needs.length, workingN=working.length, opened=goalsOpened, chosen=goalsChosen, beside=(split ? beside : ""), toggle=toggleProject, openGoal=openGoal, openWatch=openWatch, retry=retryGoals, open=open, openTasks=openTasks)
+      // hex, its orb or its pill, opens hex's page (Settings: its face, look and voice). The orb is
+      // drawn by Home over this, letting taps through.
+      button press=open(path("settings")) class=Tap position="absolute" top=top left=(x - hexOrb() / 2) width=hexOrb() height=hexOrb() border-radius=(hexOrb() / 2) aria-hidden=true testId="hex-orb-tap"
       row position="absolute" top=(top + hexOrb() - 9) left=(x - half) width=(2 * half) justify-content="center" testId="hex"
-        button press=goLive disabled=(liveId == "") class=Tap display="flex" flex-direction="row" align-items="center" gap=7 max-width=min(330, 2 * half - 24) min-width=0 padding="13px 14px 6px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(liveId == "" ? "hex" : `hex is working on ${liveTopic}`) testId="live-line"
+        button press=open(path("settings")) class=Tap display="flex" flex-direction="row" align-items="center" gap=7 max-width=min(330, 2 * half - 24) min-width=0 padding="13px 14px 6px" box-sizing="border-box" border-radius=18 backgroundMaterial="glass" box-shadow="0 8px 28px light-dark(rgba(20,20,40,0.12), rgba(0,0,0,0.5))" aria-live="polite" aria-label=(liveId == "" ? "hex's page" : `hex's page; hex is working on ${liveTopic}`) testId="live-line"
           text "hex" font="-exact-footnote" font-weight=600 color="-exact-label" flex-shrink=0
           if known and liveId != ""
             row gap=6 align-items="center" min-width=0 flex-shrink=1
